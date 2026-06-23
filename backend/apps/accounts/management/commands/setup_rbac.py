@@ -7,6 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 ROLES = {
     'super_administrateur':   'Super Administrateur',
     'administrateur':         'Administrateur',
+    'recuperateur':           'Récupérateur',
     'responsable_collecte':   'Responsable Collecte',
     'agent_collecte':         'Agent de Collecte',
     'responsable_decharge':   'Responsable Décharge',
@@ -47,6 +48,22 @@ PERM_MATRIX = {
         'ai_assistant.aiconversation':      ['v', 'a', 'c'],
         'ai_assistant.knowledgebase':       ['v', 'c'],
         'ai_assistant.airecommendation':    ['v', 'c'],
+    },
+    'recuperateur': {
+        'accounts.user':                    [],
+        'recuperateurs.recuperateur':       ['v', 'c'],
+        'recuperateurs.agrementrecuperateur': ['v'],
+        'operations.operationrecuperation': ['v', 'a', 'c'],
+        'bsd.bordereausuividechet':         ['v', 'a', 'c'],
+        'declarations.declaration':         ['v', 'a', 'c'],
+        'inspections.inspection':           ['v'],
+        'operateurs.operateur':             ['v'],
+        'administration.administrationenvironnement': ['v'],
+        'nomenclature.nomenclature':        ['v'],
+        'archive.document':                 ['v', 'a'],
+        'ai_assistant.aiconversation':      ['v', 'a', 'c'],
+        'ai_assistant.knowledgebase':       ['v'],
+        'ai_assistant.airecommendation':    ['v'],
     },
     'responsable_collecte': {
         'accounts.user':                    [],
@@ -176,7 +193,7 @@ class Command(BaseCommand):
             'SUPERADMIN':   'super_administrateur',
             'ADMIN':        'administrateur',
             'INSPECTEUR':   'responsable_collecte',
-            'RECUPERATEUR': 'agent_collecte',
+            'RECUPERATEUR': 'recuperateur',
             'READONLY':     'observateur',
         }
         for user in existing_users:

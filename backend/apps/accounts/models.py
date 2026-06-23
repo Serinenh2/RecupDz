@@ -6,6 +6,7 @@ class User(AbstractUser):
     ROLE_CHOICES = [
         ('SUPERADMIN',            'Super Administrateur'),
         ('ADMIN',                 'Administrateur'),
+        ('RECUPERATEUR',          'Récupérateur'),
         ('RESPONSABLE_COLLECTE',  'Responsable Collecte'),
         ('AGENT_COLLECTE',        'Agent de Collecte'),
         ('RESPONSABLE_DECHARGE',  'Responsable Décharge'),
@@ -15,6 +16,7 @@ class User(AbstractUser):
     ROLE_HIERARCHY = {
         'SUPERADMIN':            100,
         'ADMIN':                 80,
+        'RECUPERATEUR':          60,
         'RESPONSABLE_COLLECTE':  60,
         'AGENT_COLLECTE':        40,
         'RESPONSABLE_DECHARGE':  40,
