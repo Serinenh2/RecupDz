@@ -29,6 +29,11 @@ class AgrementAdmin(admin.ModelAdmin):
 
 # ════════════════════════════════════════════════════════════════════════════
 # Hiérarchie de spécialisation — gestion complète par le Super Admin
+#
+# Chaque DetailSpecialisation a un champ "classe_nomenclature" (MA/I/S/SD).
+# Quand un détail est coché pour un récupérateur (sur sa fiche, plus haut),
+# TOUS les codes de nomenclature de cette classe s'affichent dans sa page
+# Nomenclature côté frontend (filtre ?mes_specialisations=1).
 # ════════════════════════════════════════════════════════════════════════════
 
 class SousCategorieInline(admin.TabularInline):
@@ -46,6 +51,7 @@ class CategorieSpecialisationAdmin(admin.ModelAdmin):
 class DetailInline(admin.TabularInline):
     model = DetailSpecialisation
     extra = 1
+    fields = ['nom', 'classe_nomenclature', 'ordre']
 
 @admin.register(SousCategorieSpecialisation)
 class SousCategorieSpecialisationAdmin(admin.ModelAdmin):
@@ -58,7 +64,7 @@ class SousCategorieSpecialisationAdmin(admin.ModelAdmin):
 
 @admin.register(DetailSpecialisation)
 class DetailSpecialisationAdmin(admin.ModelAdmin):
-    list_display  = ['nom', 'sous_categorie', 'ordre']
-    list_filter   = ['sous_categorie__categorie', 'sous_categorie']
-    list_editable = ['ordre']
+    list_display  = ['nom', 'sous_categorie', 'classe_nomenclature', 'ordre']
+    list_filter   = ['sous_categorie__categorie', 'sous_categorie', 'classe_nomenclature']
+    list_editable = ['ordre', 'classe_nomenclature']
     search_fields = ['nom']

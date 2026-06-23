@@ -44,11 +44,31 @@ class SousCategorieSpecialisation(models.Model):
 
 class DetailSpecialisation(models.Model):
     """Niveau 3 — ex: PET, PEHD, Huiles usagées... — c'est ce qui est cochable par récupérateur"""
+    CLASSE_CHOICES = [
+        ('MA', 'Ménagers et Assimilés'),
+        ('I',  'Inertes'),
+        ('S',  'Spéciaux'),
+        ('SD', 'Spéciaux Dangereux'),
+    ]
     sous_categorie = models.ForeignKey(SousCategorieSpecialisation, on_delete=models.CASCADE,
                       related_name='details')
     nom            = models.CharField(max_length=200,
                       help_text="ex: Plastique — PET (bouteilles, bocaux)")
+    classe_nomenclature = models.CharField(
+        max_length=5, choices=CLASSE_CHOICES, blank=True,
+        help_text="Classe de nomenclature liée à ce détail. Quand ce détail est coché pour "
+                   "un récupérateur, tous les codes de cette classe s'affichent dans sa page "
+                   "Nomenclature. Laissez vide si ce détail ne doit filtrer aucun code."
+    )
     ordre          = models.PositiveSmallIntegerField(default=0)
+
+    # Codes de nomenclature correspondant à ce détail — cochés par le Super Admin.
+    # C'est ce lien qui permet de filtrer la page Nomenclature côté récupérateur.
+    codes_nomenclature = models.ManyToManyField(
+        'nomenclature.Nomenclature', blank=True, related_name='details_specialisation',
+        verbose_name="Codes de nomenclature liés",
+        help_text="Cochez les codes déchets (nomenclature) correspondant à ce type."
+    )
 
     class Meta:
         verbose_name = "Détail de spécialisation"
