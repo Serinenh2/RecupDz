@@ -11,7 +11,7 @@ import { WILAYAS, getCommunesByWilaya } from '../../utils/algeria_geo'
 import { NOMENCLATURE } from '../nomenclature/nomenclatureData'
 import { NOMENCLATURE_GOLD } from '../nomenclature/nomenclatureGold'
 import DateInput from '../../components/common/DateInput'
-import SpecialisationPicker from './SpecialisationPicker'
+import SpecialisationReadOnly from './SpecialisationReadOnly'
 
 // Merged lookup — NOMENCLATURE_GOLD has real designations + dangerosite + annexe
 const NOM_MAP = (() => {
@@ -460,7 +460,6 @@ export default function ProfilPage() {
   const [hasAgrement, setHasAgrement] = useState(null)
   const [showAgrForm, setShowAgrForm] = useState(false)
   const [loadingAgr,  setLoadingAgr]  = useState(false)
-  const [specialisation, setSpecialisation] = useState([])
 
   const isRecuperateur = !!(user?.role === 'RECUPERATEUR' || user?.recuperateur_id)
 
@@ -475,9 +474,6 @@ export default function ProfilPage() {
           setRecup(r.data)
           recForm.reset(r.data)
           if (r.data.wilaya) setCommunes(getCommunesByWilaya(r.data.wilaya))
-          if (r.data.specialisation) {
-            setSpecialisation(r.data.specialisation.split(',').map(s => s.trim()).filter(Boolean))
-          }
         }).catch(() => {})
     }
   }, [isRecuperateur])
@@ -714,7 +710,7 @@ export default function ProfilPage() {
         </div>
       )}
 
-      {/* ── Spécialisation du récupérateur ── */}
+      {/* ── Spécialisation du récupérateur (LECTURE SEULE — assignée par l'administrateur) ── */}
       {isRecuperateur && recup && (
         <div className="card p-5">
           <div className="flex items-center justify-between mb-4">
@@ -724,20 +720,12 @@ export default function ProfilPage() {
           </div>
           <div className="card p-3 bg-blue-50/50 border-blue-200 mb-4">
             <p className="text-xs text-blue-700">
-              <strong>ℹ️</strong> Sélectionnez les types de déchets que vous récupérez. Seuls les codes
-              de la nomenclature correspondant à votre sélection seront affichés dans la page Nomenclature.
+              <strong>ℹ️</strong> Cette spécialisation est attribuée par l'administrateur de la plateforme.
+              Seuls les codes de la nomenclature correspondant à votre sélection sont affichés dans la page Nomenclature.
+              Pour toute modification, contactez l'administrateur.
             </p>
           </div>
-          <SpecialisationPicker
-            value={specialisation}
-            onChange={async (next) => {
-              setSpecialisation(next)
-              try {
-                await api.patch('/accounts/mon-recuperateur/', { specialisation: next.join(',') })
-                toast.success('Spécialisation mise à jour')
-              } catch { toast.error('Erreur sauvegarde spécialisation') }
-            }}
-          />
+          <SpecialisationReadOnly assignedIds={recup.specialisation_details?.map(d => d.id) || []}/>
         </div>
       )}
 

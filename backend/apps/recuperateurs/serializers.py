@@ -1,5 +1,8 @@
 from rest_framework import serializers
 from .models import Recuperateur, AgrementRecuperateur, DocumentRecuperateur
+from .models_specialisation import (
+    CategorieSpecialisation, SousCategorieSpecialisation, DetailSpecialisation,
+)
 
 class AgrementSerializer(serializers.ModelSerializer):
     type_display    = serializers.CharField(source='get_type_agrement_display', read_only=True)
@@ -33,11 +36,36 @@ class RecuperateurListSerializer(serializers.ModelSerializer):
         if agr: return AgrementSerializer(agr).data
         return None
 
+
+# ── Spécialisation — lecture seule pour le récupérateur ────────────────────────
+
+class DetailSpecialisationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = DetailSpecialisation
+        fields = ['id', 'nom', 'ordre']
+
+class SousCategorieSpecialisationSerializer(serializers.ModelSerializer):
+    details = DetailSpecialisationSerializer(many=True, read_only=True)
+    class Meta:
+        model  = SousCategorieSpecialisation
+        fields = ['id', 'nom', 'ordre', 'details']
+
+class CategorieSpecialisationSerializer(serializers.ModelSerializer):
+    sous_categories = SousCategorieSpecialisationSerializer(many=True, read_only=True)
+    class Meta:
+        model  = CategorieSpecialisation
+        fields = ['id', 'nom', 'icone', 'ordre', 'sous_categories']
+
+
 class RecuperateurSerializer(serializers.ModelSerializer):
-    statut_display = serializers.CharField(source='get_statut_display', read_only=True)
-    type_display   = serializers.CharField(source='get_type_recuperateur_display', read_only=True)
-    agrements      = AgrementSerializer(many=True, read_only=True)
-    documents      = DocumentSerializer(many=True, read_only=True)
+    statut_display          = serializers.CharField(source='get_statut_display', read_only=True)
+    type_display            = serializers.CharField(source='get_type_recuperateur_display', read_only=True)
+    agrements                = AgrementSerializer(many=True, read_only=True)
+    documents                = DocumentSerializer(many=True, read_only=True)
+    # Lecture seule — assignée uniquement par le Super Admin via Django Admin
+    specialisation_details   = DetailSpecialisationSerializer(many=True, read_only=True)
+
     class Meta:
         model  = Recuperateur
         fields = '__all__'
+        read_only_fields = ['specialisation_details']

@@ -1,5 +1,8 @@
 from django.contrib import admin
 from .models import Recuperateur, AgrementRecuperateur, DocumentRecuperateur
+from .models_specialisation import (
+    CategorieSpecialisation, SousCategorieSpecialisation, DetailSpecialisation,
+)
 
 class AgrementInline(admin.TabularInline):
     model = AgrementRecuperateur
@@ -15,9 +18,47 @@ class RecuperateurAdmin(admin.ModelAdmin):
     list_filter   = ['type_recuperateur','statut','wilaya']
     search_fields = ['nom_raison_sociale','numero_id']
     inlines       = [AgrementInline, DocInline]
+    filter_horizontal = ['specialisation_details']  # widget double-liste avec cases à cocher
 
 @admin.register(AgrementRecuperateur)
 class AgrementAdmin(admin.ModelAdmin):
     list_display  = ['numero_agrement','recuperateur','type_agrement','etendue_geo','statut','date_fin']
     list_filter   = ['type_agrement','statut','etendue_geo']
     search_fields = ['numero_agrement','codes_dechets']
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Hiérarchie de spécialisation — gestion complète par le Super Admin
+# ════════════════════════════════════════════════════════════════════════════
+
+class SousCategorieInline(admin.TabularInline):
+    model = SousCategorieSpecialisation
+    extra = 1
+
+@admin.register(CategorieSpecialisation)
+class CategorieSpecialisationAdmin(admin.ModelAdmin):
+    list_display  = ['icone', 'nom', 'ordre']
+    list_editable = ['ordre']
+    inlines       = [SousCategorieInline]
+    search_fields = ['nom']
+
+
+class DetailInline(admin.TabularInline):
+    model = DetailSpecialisation
+    extra = 1
+
+@admin.register(SousCategorieSpecialisation)
+class SousCategorieSpecialisationAdmin(admin.ModelAdmin):
+    list_display  = ['nom', 'categorie', 'ordre']
+    list_filter   = ['categorie']
+    list_editable = ['ordre']
+    inlines       = [DetailInline]
+    search_fields = ['nom']
+
+
+@admin.register(DetailSpecialisation)
+class DetailSpecialisationAdmin(admin.ModelAdmin):
+    list_display  = ['nom', 'sous_categorie', 'ordre']
+    list_filter   = ['sous_categorie__categorie', 'sous_categorie']
+    list_editable = ['ordre']
+    search_fields = ['nom']

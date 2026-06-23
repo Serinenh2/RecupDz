@@ -1,5 +1,8 @@
 from django.db import models
 from django.conf import settings
+from .models_specialisation import (
+    CategorieSpecialisation, SousCategorieSpecialisation, DetailSpecialisation,
+)
 
 class Recuperateur(models.Model):
     TYPE_CHOICES = [
@@ -18,10 +21,13 @@ class Recuperateur(models.Model):
         ('EURL','EURL'),('SARL','SARL'),('SPA','SPA'),
         ('SNC','SNC'),('PHYSIQUE','Personne physique'),('AUTRE','Autre'),
     ]
-    specialisation = models.TextField(
-        blank=True,
-        default='',
-        help_text="Liste des sous-types de déchets sélectionnés, séparés par des virgules (ex: emb_plastique_pet,sp_huiles)"
+
+    # ── Spécialisation — assignée UNIQUEMENT par le Super Admin via Django Admin ──
+    # Le récupérateur la consulte en lecture seule sur son profil (API read-only).
+    specialisation_details = models.ManyToManyField(
+        DetailSpecialisation, blank=True, related_name='recuperateurs',
+        verbose_name="Spécialisation (cochée par l'administrateur)",
+        help_text="Cochez les types de déchets que ce récupérateur est autorisé à traiter."
     )
 
     numero_id          = models.CharField(max_length=30, unique=True, blank=True)

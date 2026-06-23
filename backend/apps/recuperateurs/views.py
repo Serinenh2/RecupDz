@@ -7,8 +7,26 @@ from django.db.models import Count
 from datetime import date, timedelta
 from apps.accounts.permissions import ModulePermission
 from .models import Recuperateur, AgrementRecuperateur
-from .serializers import RecuperateurSerializer, RecuperateurListSerializer, AgrementSerializer
+from .models_specialisation import CategorieSpecialisation
+from .serializers import (
+    RecuperateurSerializer, RecuperateurListSerializer, AgrementSerializer,
+    CategorieSpecialisationSerializer,
+)
 from .alerts import get_all_alerts, check_droit_recuperation
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def specialisation_hierarchie(request):
+    """
+    Retourne la hiérarchie complète (Catégorie > SousCatégorie > Détail).
+    Utile pour afficher toute la structure, en surlignant ce qui est
+    coché pour le récupérateur connecté (voir mon-recuperateur pour ses IDs cochés).
+    """
+    categories = CategorieSpecialisation.objects.prefetch_related(
+        'sous_categories__details'
+    ).all()
+    return Response(CategorieSpecialisationSerializer(categories, many=True).data)
 
 
 @api_view(['POST'])
