@@ -83,8 +83,23 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
   const [sousCategorie, setSousCategorie] = useState('')
   const [sousCategories,setSousCategories]= useState([])
   const [loadingCascade,setLoadingCascade]= useState(false)
+  const [designations,     setDesignations]     = useState([])
+  const [designationChoisie, setDesignationChoisie] = useState('')
+  const [loadingDesignations, setLoadingDesignations] = useState(false)
   const [alertes,       setAlertes]       = useState([])
   const [etape,         setEtape]         = useState(1)
+
+  // 4eme niveau de la cascade : une fois un code reglementaire choisi, charge
+  // les designations precises disponibles pour ce code (ex: code 15.01.02
+  // "Emballages plastiques" -> "Bouteille d'eau PET", "Flacon PEHD"...).
+  useEffect(() => {
+    if (!codeDechet) { setDesignations([]); setDesignationChoisie(''); return }
+    setLoadingDesignations(true)
+    api.get('/nomenclature/designations/', { params: { code: codeDechet } })
+      .then(r => setDesignations(r.data || []))
+      .catch(() => setDesignations([]))
+      .finally(() => setLoadingDesignations(false))
+  }, [codeDechet])
 
   // Charge, pour le récupérateur connecté, la liste des sous-catégories +
   // détails + codes nomenclature qui lui ont été assignés (Django Admin)
@@ -219,6 +234,7 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
                   setSousCategorie('')
                   setCodeDechet('')
                   setClasse('')
+                  setDesignationChoisie('')
                   setValue('designation_dechet', '')
                   setValue('classe_dechet', '')
                 }}>
@@ -242,6 +258,7 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
                       setSousCategorie(e.target.value)
                       setCodeDechet('')
                       setClasse('')
+                      setDesignationChoisie('')
                       setValue('designation_dechet', '')
                       setValue('classe_dechet', '')
                     }}>
@@ -262,6 +279,7 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
                   onChange={e => {
                     const code = e.target.value
                     const c = codesDisponibles.find(x => x.code === code)
+                    setDesignationChoisie('')
                     if (c) {
                       setCodeDechet(c.code)
                       setClasse(c.classe)
@@ -283,6 +301,42 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
                 </select>
                 <input type="hidden" {...register('designation_dechet')}/>
                 <input type="hidden" {...register('classe_dechet')}/>
+              </F>
+            )}
+
+            {codeDechet && (
+              <F label="Designation precise">
+                {loadingDesignations ? (
+                  <p className="text-xs text-slate-400 py-2">Chargement...</p>
+                ) : designations.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-2">
+                    Aucune designation precise disponible pour ce code.
+                  </p>
+                ) : (
+                  <select value={designationChoisie} className="input"
+                    onChange={e => {
+                      const id = e.target.value
+                      setDesignationChoisie(id)
+                      const d = designations.find(x => String(x.id) === id)
+                      if (d) {
+                        setValue('designation_dechet', d.designation)
+                        setValue('id_recup_dz', d.id_recup_dz)
+                        setValue('matiere_dechet', d.matiere)
+                      } else {
+                        setValue('id_recup_dz', '')
+                        setValue('matiere_dechet', '')
+                      }
+                    }}>
+                    <option value="">-- Selectionner une designation --</option>
+                    {designations.map(d => (
+                      <option key={d.id} value={d.id}>
+                        {d.designation} {d.matiere ? `(${d.matiere})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <input type="hidden" {...register('id_recup_dz')}/>
+                <input type="hidden" {...register('matiere_dechet')}/>
               </F>
             )}
             {classe&&(

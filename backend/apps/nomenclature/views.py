@@ -1,8 +1,10 @@
 from rest_framework import viewsets, filters
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Nomenclature
-from .serializers import NomenclatureSerializer
+from .models import Nomenclature, DesignationDechet
+from .serializers import NomenclatureSerializer, DesignationDechetSerializer
 
 class NomenclatureViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -36,3 +38,19 @@ class NomenclatureViewSet(viewsets.ReadOnlyModelViewSet):
                     # Spécialisation pas encore assignée → aucun code (évite de tout montrer par erreur)
                     qs = qs.none()
         return qs
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def designations_par_code(request):
+    """
+    4ème niveau de la cascade Traçabilité : pour un Code nomenclature donné
+    (ex: 15.01.02), retourne la liste des désignations précises disponibles
+    (ex: Bouteille d'eau PET, Flacon PEHD, Big Bag PP...).
+    GET /api/nomenclature/designations/?code=15.01.02
+    """
+    code = request.query_params.get('code', '').strip()
+    if not code:
+        return Response({'error': 'Paramètre "code" requis.'}, status=400)
+    designations = DesignationDechet.objects.filter(nomenclature__code=code)
+    return Response(DesignationDechetSerializer(designations, many=True).data)
