@@ -20,7 +20,6 @@ import ProfilPage       from './pages/profil/ProfilPage'
 import DocumentsPage from './pages/documents/index'
 import TracabilitePage from './pages/tracabilite/index'
 import AIAssistantPage from './pages/ai/index'
-import OperationsPage from './pages/operations/index'
 import BSDPage from './pages/bsd/index'
 import DeclarationsPage from './pages/declarations/index'
 
@@ -41,6 +40,15 @@ function PrivateRoute({ children }) {
 function AdminRoute({ children }) {
   const user = useAuthStore(s => s.user)
   if (user && !user.is_superuser && user.role !== 'SUPERADMIN' && user.role !== 'ADMIN') {
+    return <Navigate to="/dashboard" replace />
+  }
+  return children
+}
+
+function RequirePermission({ permission, children }) {
+  const user          = useAuthStore(s => s.user)
+  const hasPermission = useAuthStore(s => s.hasPermission)
+  if (user && !user.is_superuser && !hasPermission(permission)) {
     return <Navigate to="/dashboard" replace />
   }
   return children
@@ -71,8 +79,7 @@ export default function App() {
         <Route path="documents"           element={<DocumentsPage />} />
         <Route path="admin/roles"         element={<AdminRoute><AdminRolesPage /></AdminRoute>} />
         <Route path="profil"              element={<ProfilPage />} />
-        <Route path="tracabilite"         element={<TracabilitePage />} />
-        <Route path="operations"          element={<OperationsPage />} />
+        <Route path="tracabilite"         element={<RequirePermission permission="traceability.view_traceability"><TracabilitePage /></RequirePermission>} />
         <Route path="bsd"                 element={<BSDPage />} />
         <Route path="declarations"        element={<DeclarationsPage />} />
         <Route path="assistant-ia"       element={<AIAssistantPage />} />

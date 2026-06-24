@@ -1,8 +1,8 @@
 from django.contrib import admin
-from .models import OperationRecuperation
+from .models import Traceability
 
-@admin.register(OperationRecuperation)
-class OperationAdmin(admin.ModelAdmin):
+@admin.register(Traceability)
+class TraceabilityAdmin(admin.ModelAdmin):
     list_display  = ['numero','recuperateur','generateur','code_dechet',
                      'quantite','unite','date_recuperation','statut']
     list_filter   = ['statut','classe_dechet','destination_type']

@@ -119,7 +119,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { to: '/recuperateurs/new', label: 'Nouveau récupérateur', icon: Users, color: 'border-primary-200 hover:border-primary-400 hover:bg-primary-50' },
-          { to: '/operations/new',    label: 'Nouvelle opération',   icon: Package, color: 'border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50' },
+          { to: '/tracabilite',       label: 'Nouveau dossier',      icon: Package, color: 'border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50' },
           { to: '/bsd/new',           label: 'Créer un BSD',         icon: FileText, color: 'border-amber-200 hover:border-amber-400 hover:bg-amber-50' },
           { to: '/declarations/new',  label: 'Nouvelle déclaration', icon: FileText, color: 'border-violet-200 hover:border-violet-400 hover:bg-violet-50' },
         ].map(item => (

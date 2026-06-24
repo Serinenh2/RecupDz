@@ -1,7 +1,7 @@
 from rest_framework import serializers
-from .models import OperationRecuperation
+from .models import Traceability
 
-class OperationSerializer(serializers.ModelSerializer):
+class TraceabilitySerializer(serializers.ModelSerializer):
     statut_display      = serializers.CharField(source='get_statut_display', read_only=True)
     unite_display       = serializers.CharField(source='get_unite_display', read_only=True)
     destination_display = serializers.CharField(source='get_destination_type_display', read_only=True)
@@ -14,7 +14,7 @@ class OperationSerializer(serializers.ModelSerializer):
     recuperateur_nom    = serializers.SerializerMethodField()
 
     class Meta:
-        model  = OperationRecuperation
+        model  = Traceability
         fields = '__all__'
 
     def get_generateur_nom(self, obj):

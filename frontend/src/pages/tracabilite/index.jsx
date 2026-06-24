@@ -13,10 +13,10 @@ import DateInput from '../../components/common/DateInput'
 import toast from 'react-hot-toast'
 
 const opAPI = {
-  getAll:  (p)    => api.get('/operations/', { params: p }),
-  create:  (d)    => api.post('/operations/', d),
-  update:  (id,d) => api.patch(`/operations/${id}/`, d),
-  delete:  (id)   => api.delete(`/operations/${id}/`),
+  getAll:  (p)    => api.get('/traceability/', { params: p }),
+  create:  (d)    => api.post('/traceability/', d),
+  update:  (id,d) => api.patch(`/traceability/${id}/`, d),
+  delete:  (id)   => api.delete(`/traceability/${id}/`),
 }
 const recupAPI  = { getAll: () => api.get('/recuperateurs/?page_size=200&statut=ACTIF') }
 const opListAPI = {

@@ -11,7 +11,7 @@ urlpatterns = [
     path('api/accounts/', include('apps.accounts.urls')),
     path('api/recuperateurs/', include('apps.recuperateurs.urls')),
     path('api/nomenclature/', include('apps.nomenclature.urls')),
-    path('api/operations/', include('apps.operations.urls')),
+    path('api/traceability/', include('apps.traceability.urls')),
     path('api/bsd/', include('apps.bsd.urls')),
     path('api/declarations/', include('apps.declarations.urls')),
     path('api/inspections/', include('apps.inspections.urls')),

@@ -1,7 +1,7 @@
 from django.db import models
 from django.conf import settings
 
-class OperationRecuperation(models.Model):
+class Traceability(models.Model):
     STATUT_CHOICES = [
         ('EN_COURS',  'En cours'),
         ('TERMINEE',  'Terminée'),
@@ -21,19 +21,19 @@ class OperationRecuperation(models.Model):
         ('RECYCLAGE',    'Recyclage'),
     ]
 
-    # ── Numéro d'opération ────────────────────────────────────────
+    # ── Numéro de dossier ─────────────────────────────────────────
     numero           = models.CharField(max_length=30, unique=True, blank=True)
 
     # ── Récupérateur ──────────────────────────────────────────────
     recuperateur     = models.ForeignKey(
         'recuperateurs.Recuperateur', on_delete=models.PROTECT,
-        related_name='operations'
+        related_name='traceability_records'
     )
 
     # ── Générateur (lié aux opérateurs enregistrés) ───────────────
     generateur       = models.ForeignKey(
         'operateurs.Operateur', on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='operations_generateur',
+        null=True, blank=True, related_name='traceability_generateur',
         limit_choices_to={'type_operateur': 'GENERATEUR'}
     )
     # Bon de livraison / commande
@@ -53,7 +53,7 @@ class OperationRecuperation(models.Model):
     # ── Transporteur ──────────────────────────────────────────────
     transporteur      = models.ForeignKey(
         'operateurs.Operateur', on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='operations_transport',
+        null=True, blank=True, related_name='traceability_transport',
         limit_choices_to={'type_operateur': 'TRANSPORTEUR'}
     )
     chauffeur         = models.CharField(max_length=200, blank=True)
@@ -68,14 +68,14 @@ class OperationRecuperation(models.Model):
     # Valorisateur
     valorisateur      = models.ForeignKey(
         'operateurs.Operateur', on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='operations_valorisation',
+        null=True, blank=True, related_name='traceability_valorisation',
         limit_choices_to={'type_operateur': 'VALORISATEUR'}
     )
 
     # Éliminateur (DSD uniquement)
     eliminateur       = models.ForeignKey(
         'operateurs.Operateur', on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='operations_elimination',
+        null=True, blank=True, related_name='traceability_elimination',
         limit_choices_to={'type_operateur': 'ELIMINATEUR'}
     )
     # BSD requis si DSD
@@ -93,7 +93,8 @@ class OperationRecuperation(models.Model):
 
     class Meta:
         ordering     = ['-date_recuperation', '-created_at']
-        verbose_name = 'Opération de récupération'
+        verbose_name = 'Traçabilité'
+        verbose_name_plural = 'Traçabilités'
 
     def __str__(self):
         return f"{self.numero} — {self.recuperateur}"
@@ -102,7 +103,7 @@ class OperationRecuperation(models.Model):
         if not self.numero:
             import uuid
             from datetime import date
-            self.numero = f"OP-{date.today().strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}"
+            self.numero = f"TR-{date.today().strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}"
         super().save(*args, **kwargs)
 
     @property

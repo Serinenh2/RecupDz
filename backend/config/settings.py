@@ -21,7 +21,7 @@ INSTALLED_APPS = [
     'apps.accounts',
     'apps.recuperateurs',
     'apps.nomenclature',
-    'apps.operations',
+    'apps.traceability',
     'apps.bsd',
     'apps.declarations',
     'apps.inspections',

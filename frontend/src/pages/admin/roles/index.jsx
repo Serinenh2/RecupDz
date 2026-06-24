@@ -6,7 +6,7 @@ import clsx from 'clsx'
 const MODULE_LABELS = {
   accounts: 'Utilisateurs',
   recuperateurs: 'Récupérateurs',
-  operations: 'Opérations',
+  traceability: 'Traçabilité',
   bsd: 'BSD',
   declarations: 'Déclarations',
   inspections: 'Inspections',

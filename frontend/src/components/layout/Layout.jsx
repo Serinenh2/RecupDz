@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard, Users, Package, FileText, ClipboardList,
+  LayoutDashboard, Users, Package, FileText,
   BarChart3, LogOut, ChevronLeft, ChevronRight,
   Menu, Moon, Sun, Recycle, Shield, BookOpen, X, User,
   Award, Bell, GraduationCap, Building2, Landmark, FolderOpen, Bot
@@ -15,8 +15,7 @@ const NAV_BASE = [
   { to: '/recuperateurs',  icon: Users,            label: 'Récupérateurs',       permission: 'recuperateurs.view_recuperateur' },
   { to: '/operateurs',     icon: Building2,        label: 'Opérateurs',          permission: 'operateurs.view_operateur' },
   { to: '/administration', icon: Landmark,         label: 'Administration Env.', permission: 'administration.view_administrationenvironnement' },
-  { to: '/tracabilite',    icon: Package,          label: 'Tracabilite',         permission: 'operations.view_operationrecuperation' },
-  { to: '/operations',     icon: ClipboardList,    label: 'Opérations',          permission: 'operations.view_operationrecuperation' },
+  { to: '/tracabilite',    icon: Package,          label: 'Tracabilite',         permission: 'traceability.view_traceability' },
   { to: '/nomenclature',   icon: BookOpen,         label: 'Nomenclature',        permission: null },
   { to: '/glossaire',      icon: GraduationCap,    label: 'Glossaire',           permission: null },
   { to: '/documents',      icon: FileText,         label: 'Documents',           permission: 'archive.view_document' },

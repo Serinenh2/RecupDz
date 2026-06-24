@@ -15,7 +15,7 @@ from .serializers import (
 from apps.accounts.models import User
 from apps.recuperateurs.models import Recuperateur, AgrementRecuperateur
 from apps.bsd.models import BordereauSuiviDechet
-from apps.operations.models import OperationRecuperation
+from apps.traceability.models import Traceability
 
 
 from .glossaire_data import rechercher_glossaire, formater_glossaire, detecter_langue
@@ -149,7 +149,7 @@ class AIConversationViewSet(viewsets.ModelViewSet):
                     entite = AgrementRecuperateur.objects.get(id=conversation.entite_id)
                     return self._analyser_agrement_contextuel(entite, message, langue)
                 elif contexte_type == 'operation':
-                    entite = OperationRecuperation.objects.get(id=conversation.entite_id)
+                    entite = Traceability.objects.get(id=conversation.entite_id)
                     return self._analyser_operation_contextelle(entite, message, langue)
             except Exception:
                 pass
@@ -362,7 +362,7 @@ Comment puis-je vous aider aujourd'hui ?"""
         if langue == 'ar':
             reponse = "## تحليل المخزون\n\n"
             try:
-                operations = OperationRecuperation.objects.filter(statut='EN_COURS')
+                operations = Traceability.objects.filter(statut='EN_COURS')
                 reponse += f"📊 العمليات الجارية : {operations.count()}\n\n"
                 if operations:
                     total = sum(float(op.quantite or 0) for op in operations)
@@ -372,7 +372,7 @@ Comment puis-je vous aider aujourd'hui ?"""
         else:
             reponse = "## Analyse des stocks\n\n"
             try:
-                operations = OperationRecuperation.objects.filter(statut='EN_COURS')
+                operations = Traceability.objects.filter(statut='EN_COURS')
                 reponse += f"📊 Opérations en cours : {operations.count()}\n\n"
                 if operations:
                     total = sum(float(op.quantite or 0) for op in operations)

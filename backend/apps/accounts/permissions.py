@@ -74,7 +74,7 @@ class ModulePermission(BasePermission):
             return True
 
         model = getattr(view, 'queryset', None)
-        model_name = model.model.__name__.lower() if model else None
+        model_name = model.model.__name__.lower() if model is not None else None
         if not model_name:
             return True
 

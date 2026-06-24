@@ -40,10 +40,13 @@ export const recuperateursAPI = {
 export const nomenclatureAPI = {
   getAll:  (p) => api.get('/nomenclature/', { params: p }),
 }
-export const operationsAPI = {
-  getAll:  (p) => api.get('/operations/', { params: p }),
-  create:  (d) => api.post('/operations/', d),
-  update:  (id,d)=> api.patch(`/operations/${id}/`, d),
+export const traceabilityAPI = {
+  getAll:  (p) => api.get('/traceability/', { params: p }),
+  get:     (id)=> api.get(`/traceability/${id}/`),
+  create:  (d) => api.post('/traceability/', d),
+  update:  (id,d)=> api.patch(`/traceability/${id}/`, d),
+  delete:  (id)=> api.delete(`/traceability/${id}/`),
+  stats:   ()  => api.get('/traceability/stats/'),
 }
 export const bsdAPI = {
   getAll:  (p) => api.get('/bsd/', { params: p }),
