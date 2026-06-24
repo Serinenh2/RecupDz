@@ -36,7 +36,6 @@ export default function DashboardPage() {
             <p className="font-semibold text-red-800 text-sm">{alerts.length} alerte(s) active(s)</p>
             <p className="text-xs text-red-600 mt-0.5">{alerts[0]?.message}</p>
           </div>
-          <Link to="/recuperateurs" className="ml-auto text-xs text-red-700 font-semibold hover:underline flex-shrink-0">Voir →</Link>
         </div>
       )}
 
@@ -118,12 +117,10 @@ export default function DashboardPage() {
       {/* Quick links */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { to: '/recuperateurs/new', label: 'Nouveau récupérateur', icon: Users, color: 'border-primary-200 hover:border-primary-400 hover:bg-primary-50' },
           { to: '/tracabilite',       label: 'Nouveau dossier',      icon: Package, color: 'border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50' },
-          { to: '/bsd/new',           label: 'Créer un BSD',         icon: FileText, color: 'border-amber-200 hover:border-amber-400 hover:bg-amber-50' },
-          { to: '/declarations/new',  label: 'Nouvelle déclaration', icon: FileText, color: 'border-violet-200 hover:border-violet-400 hover:bg-violet-50' },
+          { to: '/documents',         label: 'BSD / Déclarations',   icon: FileText, color: 'border-amber-200 hover:border-amber-400 hover:bg-amber-50' },
         ].map(item => (
-          <Link key={item.to} to={item.to}
+          <Link key={item.label} to={item.to}
             className={`card p-4 flex items-center gap-3 border-2 transition-all ${item.color}`}>
             <item.icon size={18} className="text-slate-600 flex-shrink-0" />
             <span className="text-sm font-semibold text-slate-700 leading-tight">{item.label}</span>

@@ -5,10 +5,7 @@ import { useAuthStore } from './store'
 import Layout   from './components/layout/Layout'
 import LoginPage from './pages/auth/LoginPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
-import RecuperateursPage from './pages/recuperateurs/RecuperateursPage'
-import RecuperateurFormPage from './pages/recuperateurs/RecuperateurFormPage'
 import OperateursPage    from './pages/operateurs/index'
-import AdministrationPage from './pages/administration/index'
 import NomenclaturePage  from './pages/nomenclature/index'
 import GlossairePage    from './pages/glossaire/index'
 import AlertesPage      from './pages/alertes/index'
@@ -20,8 +17,6 @@ import ProfilPage       from './pages/profil/ProfilPage'
 import DocumentsPage from './pages/documents/index'
 import TracabilitePage from './pages/tracabilite/index'
 import AIAssistantPage from './pages/ai/index'
-import BSDPage from './pages/bsd/index'
-import DeclarationsPage from './pages/declarations/index'
 
 function PrivateRoute({ children }) {
   const user    = useAuthStore(s => s.user)
@@ -64,12 +59,7 @@ export default function App() {
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard"           element={<DashboardPage />} />
-        <Route path="recuperateurs"       element={<RecuperateursPage />} />
-        <Route path="recuperateurs/new"   element={<RecuperateurFormPage />} />
-        <Route path="recuperateurs/:id"   element={<RecuperateurFormPage />} />
-        <Route path="recuperateurs/:id/edit" element={<RecuperateurFormPage />} />
         <Route path="operateurs"          element={<OperateursPage />} />
-        <Route path="administration"      element={<AdministrationPage />} />
         <Route path="nomenclature"        element={<NomenclaturePage />} />
         <Route path="glossaire"           element={<GlossairePage />} />
         <Route path="alertes"             element={<AlertesPage />} />
@@ -80,8 +70,6 @@ export default function App() {
         <Route path="admin/roles"         element={<AdminRoute><AdminRolesPage /></AdminRoute>} />
         <Route path="profil"              element={<ProfilPage />} />
         <Route path="tracabilite"         element={<RequirePermission permission="traceability.view_traceability"><TracabilitePage /></RequirePermission>} />
-        <Route path="bsd"                 element={<BSDPage />} />
-        <Route path="declarations"        element={<DeclarationsPage />} />
         <Route path="assistant-ia"       element={<AIAssistantPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>

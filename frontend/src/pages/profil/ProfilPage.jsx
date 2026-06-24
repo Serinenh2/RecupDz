@@ -819,8 +819,7 @@ export default function ProfilPage() {
         <div className="card p-4 bg-slate-50/50">
           <p className="text-sm text-slate-500 flex items-center gap-2">
             <Shield size={14} className="text-slate-400"/>
-            En tant qu'administrateur, gérez les fiches récupérateurs depuis la page{' '}
-            <a href="/recuperateurs" className="text-primary-600 font-semibold hover:underline">Récupérateurs</a>.
+            En tant qu'administrateur, gérez les fiches récupérateurs depuis l'administration Django.
           </p>
         </div>
       )}

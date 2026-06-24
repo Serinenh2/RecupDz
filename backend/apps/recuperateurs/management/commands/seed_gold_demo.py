@@ -113,16 +113,14 @@ class Command(BaseCommand):
             f"(valide jusqu'au {agrement.date_fin})"
         ))
 
-        # ── 4. Spécialisation — coche plusieurs détails pour tester le filtrage
-        #     de la nomenclature sur plusieurs classes à la fois (S, SD, MA) ──
+        # ── 4. Spécialisation — coche les détails MA (emballage) pour tester
+        #     le type "Déchets ménagers". La structure officielle "Déchets
+        #     spéciaux et spéciaux dangereux" (38 sections du Décret 06-104)
+        #     est assignée séparément par `seed_gold_agrement_excel`, qui
+        #     remplace les anciens détails génériques SD/S (Chimique, Solvants...).
         noms_a_cocher = [
-            'Chimique', 'Solvants', 'Traitement de surface',  # → SD
-            'Piles', 'Médicaux et infectieux',                # → SD (agrément Gold)
-            'Huiles', 'DEEE', 'Pneumatiques', 'Peintures',    # → S
             'PET', 'PEHD', 'PP', 'Films',                     # → MA (emballage plastique)
             'Papier/carton', 'Verre', 'Alu', 'Acier',         # → MA (emballage autres matières)
-            'Bois', 'Textile',                                # → MA (emballage bois / textile)
-            'Composites', 'Mélange',                          # → MA (emballage composite / mélangé)
         ]
         details = DetailSpecialisation.objects.filter(nom__in=noms_a_cocher)
         if details.exists():
@@ -138,10 +136,9 @@ class Command(BaseCommand):
                 "`python manage.py seed_specialisation`."
             ))
 
-        # ── 5. Cascade spécifique à Gold Environment — relie chacun des 12 détails
+        # ── 5. Cascade spécifique à Gold Environment — relie chacun des 8 détails
         #     de la sous-catégorie "Déchets d'emballage" (PET, PEHD, PP, Films,
-        #     Papier/carton, Verre, Alu, Acier, Bois, Textile, Composites, Mélange)
-        #     à SON code précis 15.01.xx (couvre tout 15.01.01 à 15.01.08).
+        #     Papier/carton, Verre, Alu, Acier) à SON code précis 15.01.xx.
         #     C'est CETTE relation (M2M codes_nomenclature) qui permet d'avoir
         #     un mapping différent par récupérateur — un autre récupérateur
         #     pourrait avoir les mêmes détails cochés mais liés à d'autres codes.
@@ -154,10 +151,6 @@ class Command(BaseCommand):
             ('Verre',         '15.01.07'),
             ('Alu',           '15.01.04'),  # metallique
             ('Acier',         '15.01.04'),  # metallique
-            ('Bois',          '15.01.03'),
-            ('Textile',       '15.01.08'),
-            ('Composites',    '15.01.05'),
-            ('Mélange',       '15.01.06'),
         ]
         cascade_ok = 0
         for nom_detail, code in mapping_emballage:
@@ -175,51 +168,6 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(
                 "⚠️  Aucune cascade configurée — vérifiez que `seed_specialisation` "
                 "et la mise à jour de `setup.py` (codes 15.01.xx) ont bien été lancés."
-            ))
-
-        # ── 6. Cascade "Déchets spéciaux et dangereux" — d'après l'agrément
-        #     SARL Gold Environment (décision n°87 du 11/09/2023). Les codes
-        #     déchets de l'agrément y sont listés en arabe avec une numérotation
-        #     décret propre (ex: 1.4.1), différente du code EWC standard utilisé
-        #     dans notre table Nomenclature (ex: 13.02.01). On relie donc chaque
-        #     détail de spécialisation déjà concerné par l'agrément (huiles,
-        #     solvants, peintures, produits chimiques, pneus, batteries, déchets
-        #     médicaux) à son code EWC officiel correspondant — identifié par la
-        #     désignation, pas par la numérotation décret (non fiable en l'état).
-        #     Couvre une partie de l'agrément ; DEEE, traitement de surface,
-        #     boues pétrolières et hydrocarbures répandus n'ont pas encore de
-        #     code EWC correspondant dans la table Nomenclature (à compléter
-        #     en Django Admin une fois les codes confirmés).
-        mapping_dangereux = [
-            ('Chimique',                '16.05.04'),  # Produits chimiques dangereux (dont périmés)
-            ('Solvants',                 '07.01.03'),  # Solvants halogénés organiques
-            ('Solvants',                 '07.01.04'),  # Autres solvants organiques
-            ('Peintures',                '08.01.11'),  # Déchets de peintures et vernis (solvants organiques)
-            ('Huiles',                   '13.01.01'),  # Huiles hydrauliques chlorées
-            ('Huiles',                   '13.01.09'),  # Huiles hydrauliques minérales chlorées
-            ('Huiles',                   '13.02.01'),  # Huiles moteur, boîte de vitesses, lubrification usagées
-            ('Huiles',                   '13.03.01'),  # Huiles isolantes et fluides caloporteurs contenant des PCB
-            ('Pneumatiques',             '16.01.03'),  # Pneus hors d'usage
-            ('Piles',                    '16.06.01'),  # Batteries au plomb
-            ('Piles',                    '16.06.02'),  # Batteries Ni-Cd
-            ('Médicaux et infectieux',   '18.01.03'),  # Déchets dont collecte/élimination font l'objet de prescriptions
-        ]
-        cascade_dangereux_ok = 0
-        for nom_detail, code in mapping_dangereux:
-            detail = DetailSpecialisation.objects.filter(nom=nom_detail).first()
-            code_obj = Nomenclature.objects.filter(code=code).first()
-            if detail and code_obj:
-                detail.codes_nomenclature.add(code_obj)
-                cascade_dangereux_ok += 1
-        if cascade_dangereux_ok:
-            self.stdout.write(self.style.SUCCESS(
-                f"✅ Cascade 'déchets spéciaux et dangereux' configurée : "
-                f"{cascade_dangereux_ok} lien(s) détail→code créés d'après l'agrément Gold"
-            ))
-        else:
-            self.stdout.write(self.style.WARNING(
-                "⚠️  Aucune cascade 'spéciaux/dangereux' configurée — vérifiez "
-                "que `seed_specialisation` a bien été lancé."
             ))
 
         self.stdout.write(self.style.SUCCESS(

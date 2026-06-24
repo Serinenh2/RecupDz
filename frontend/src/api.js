@@ -29,11 +29,6 @@ api.interceptors.response.use(r => r, async e => {
 export default api
 
 export const recuperateursAPI = {
-  getAll:  (p) => api.get('/recuperateurs/', { params: p }),
-  get:     (id)=> api.get(`/recuperateurs/${id}/`),
-  create:  (d) => api.post('/recuperateurs/', d),
-  update:  (id,d)=> api.patch(`/recuperateurs/${id}/`, d),
-  delete:  (id)=> api.delete(`/recuperateurs/${id}/`),
   stats:   ()  => api.get('/recuperateurs/stats/'),
   alerts:  ()  => api.get('/recuperateurs/alerts/'),
 }
@@ -47,18 +42,6 @@ export const traceabilityAPI = {
   update:  (id,d)=> api.patch(`/traceability/${id}/`, d),
   delete:  (id)=> api.delete(`/traceability/${id}/`),
   stats:   ()  => api.get('/traceability/stats/'),
-}
-export const bsdAPI = {
-  getAll:  (p) => api.get('/bsd/', { params: p }),
-  get:     (id)=> api.get(`/bsd/${id}/`),
-  create:  (d) => api.post('/bsd/', d),
-  signer:  (id,actor)=> api.post(`/bsd/${id}/signer/`, { actor }),
-}
-export const declarationsAPI = {
-  getAll:  (p) => api.get('/declarations/', { params: p }),
-  create:  (d) => api.post('/declarations/', d),
-  update:  (id,d)=> api.patch(`/declarations/${id}/`, d),
-  soumettre:(id)=> api.post(`/declarations/${id}/soumettre/`),
 }
 export const inspectionsAPI = {
   getAll:  (p) => api.get('/inspections/', { params: p }),

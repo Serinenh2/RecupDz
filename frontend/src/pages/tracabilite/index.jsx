@@ -13,10 +13,10 @@ import DateInput from '../../components/common/DateInput'
 import toast from 'react-hot-toast'
 
 const opAPI = {
-  getAll:  (p)    => api.get('/traceability/', { params: p }),
-  create:  (d)    => api.post('/traceability/', d),
-  update:  (id,d) => api.patch(`/traceability/${id}/`, d),
-  delete:  (id)   => api.delete(`/traceability/${id}/`),
+  getAll:  (p)    => api.get('/operations/', { params: p }),
+  create:  (d)    => api.post('/operations/', d),
+  update:  (id,d) => api.patch(`/operations/${id}/`, d),
+  delete:  (id)   => api.delete(`/operations/${id}/`),
 }
 const recupAPI  = { getAll: () => api.get('/recuperateurs/?page_size=200&statut=ACTIF') }
 const opListAPI = {
@@ -115,17 +115,18 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
   }, [typeDechet])
 
   const sousCategorieObj = sousCategories.find(sc => String(sc.id) === sousCategorie)
-  // Codes nomenclature (titres) de la sous-catégorie choisie — un seul
-  // intitulé par code (ex: 15.01.01 à 15.01.08), même si plusieurs détails
-  // de spécialisation partagent le même code. La désignation précise (ex:
-  // "Bouteille d'eau PET") se choisit ensuite via la cascade Designation.
+  // Codes nomenclature UNIQUES de la sous-catégorie choisie (un seul par code,
+  // même si plusieurs détails — PET, PEHD, PP, Films... — y sont rattachés ;
+  // ces détails apparaîtront ensuite dans le 4ème dropdown "Désignation précise").
   const codesDisponibles = useMemo(() => {
     if (!sousCategorieObj) return []
-    const parCode = new Map()
+    const seen = new Map()
     sousCategorieObj.details.forEach(d => {
-      d.codes.forEach(c => { if (!parCode.has(c.code)) parCode.set(c.code, c) })
+      d.codes.forEach(c => {
+        if (!seen.has(c.code)) seen.set(c.code, c)
+      })
     })
-    return Array.from(parCode.values()).sort((a,b) => a.code.localeCompare(b.code))
+    return Array.from(seen.values()).sort((a, b) => a.code.localeCompare(b.code))
   }, [sousCategorieObj])
 
   const isRecup    = currentUser?.role === 'RECUPERATEUR'
@@ -252,71 +253,71 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
               </select>
             </F>
 
-            {typeDechet && (
-              <F label="Categorie de dechet" req>
-                {loadingCascade ? (
-                  <p className="text-xs text-slate-400 py-2">Chargement...</p>
-                ) : sousCategories.length === 0 ? (
-                  <p className="text-xs text-amber-600 py-2">
-                    Aucune categorie ne vous a ete assignee pour ce type. Contactez l'administrateur.
-                  </p>
-                ) : (
-                  <select value={sousCategorie} className="input"
-                    onChange={e => {
-                      setSousCategorie(e.target.value)
-                      setCodeDechet('')
-                      setClasse('')
-                      setDesignationChoisie('')
-                      setValue('designation_dechet', '')
-                      setValue('classe_dechet', '')
-                    }}>
-                    <option value="">-- Selectionner une categorie --</option>
-                    {sousCategories.map(sc => (
-                      <option key={sc.id} value={sc.id}>{sc.nom}</option>
-                    ))}
-                  </select>
+            {typeDechet === 'MA' && (
+              <>
+                <F label="Categorie de dechet" req>
+                  {loadingCascade ? (
+                    <p className="text-xs text-slate-400 py-2">Chargement...</p>
+                  ) : sousCategories.length === 0 ? (
+                    <p className="text-xs text-amber-600 py-2">
+                      Aucune categorie ne vous a ete assignee pour ce type. Contactez l'administrateur.
+                    </p>
+                  ) : (
+                    <select value={sousCategorie} className="input"
+                      onChange={e => {
+                        setSousCategorie(e.target.value)
+                        setCodeDechet('')
+                        setClasse('')
+                        setDesignationChoisie('')
+                        setValue('designation_dechet', '')
+                        setValue('classe_dechet', '')
+                      }}>
+                      <option value="">-- Selectionner une categorie --</option>
+                      {sousCategories.map(sc => (
+                        <option key={sc.id} value={sc.id}>{sc.nom}</option>
+                      ))}
+                    </select>
+                  )}
+                </F>
+
+                {sousCategorie && (
+                  <F label="Code reglementaire du dechet" req>
+                    <select
+                      value={codeDechet}
+                      className="input"
+                      onChange={e => {
+                        const code = e.target.value
+                        const c = codesDisponibles.find(x => x.code === code)
+                        setDesignationChoisie('')
+                        if (c) {
+                          setCodeDechet(c.code)
+                          setClasse(c.classe)
+                          setValue('designation_dechet', c.designation_fr)
+                          setValue('classe_dechet', c.classe)
+                        } else {
+                          setCodeDechet('')
+                          setClasse('')
+                          setValue('designation_dechet', '')
+                          setValue('classe_dechet', '')
+                        }
+                      }}>
+                      <option value="">-- Selectionner un code dechet --</option>
+                      {codesDisponibles.map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.code} — {c.designation_fr}
+                        </option>
+                      ))}
+                    </select>
+                    <input type="hidden" {...register('designation_dechet')}/>
+                    <input type="hidden" {...register('classe_dechet')}/>
+                  </F>
                 )}
-              </F>
-            )}
 
-            {sousCategorie && (
-              <F label="Code reglementaire du dechet" req>
-                <select
-                  value={codeDechet}
-                  className="input"
-                  onChange={e => {
-                    const code = e.target.value
-                    const c = codesDisponibles.find(x => x.code === code)
-                    setDesignationChoisie('')
-                    if (c) {
-                      setCodeDechet(c.code)
-                      setClasse(c.classe)
-                      setValue('designation_dechet', c.designation_fr)
-                      setValue('classe_dechet', c.classe)
-                    } else {
-                      setCodeDechet('')
-                      setClasse('')
-                      setValue('designation_dechet', '')
-                      setValue('classe_dechet', '')
-                    }
-                  }}>
-                  <option value="">-- Selectionner un code dechet --</option>
-                  {codesDisponibles.map(c => (
-                    <option key={c.code} value={c.code}>
-                      {c.code} — {c.designation_fr}
-                    </option>
-                  ))}
-                </select>
-                <input type="hidden" {...register('designation_dechet')}/>
-                <input type="hidden" {...register('classe_dechet')}/>
-              </F>
-            )}
-
-            {codeDechet && (
-              <F label="Designation precise">
-                {loadingDesignations ? (
-                  <p className="text-xs text-slate-400 py-2">Chargement...</p>
-                ) : designations.length === 0 ? (
+                {codeDechet && (
+                  <F label="Designation precise">
+                    {loadingDesignations ? (
+                      <p className="text-xs text-slate-400 py-2">Chargement...</p>
+                    ) : designations.length === 0 ? (
                   <p className="text-xs text-slate-400 py-2">
                     Aucune designation precise disponible pour ce code.
                   </p>
@@ -338,9 +339,7 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
                     <option value="">-- Selectionner une designation --</option>
                     {designations.map(d => (
                       <option key={d.id} value={d.id}>
-                        {/* Déchets d'emballage (15.01.xx) : la matière est déjà dans le nom
-                            (ex: "Barquette PET"), pas besoin de la répéter entre parenthèses. */}
-                        {d.designation} {(d.matiere && !codeDechet.startsWith('15.01')) ? `(${d.matiere})` : ''}
+                        {d.designation} {d.matiere ? `(${d.matiere})` : ''}
                       </option>
                     ))}
                   </select>
@@ -349,34 +348,75 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
                 <input type="hidden" {...register('matiere_dechet')}/>
               </F>
             )}
+              </>
+            )}
 
-            {codeDechet === '15.01.02' && (
-              <div className="grid grid-cols-2 gap-3">
-                <F label="Couleur">
-                  <select {...register('couleur')} className="input">
-                    <option value="">-- Selectionner --</option>
-                    <option value="TRANSPARENT">Transparent</option>
-                    <option value="BLANC">Blanc</option>
-                    <option value="NOIR">Noir</option>
-                    <option value="BLEU">Bleu</option>
-                    <option value="VERT">Vert</option>
-                    <option value="ROUGE">Rouge</option>
-                    <option value="JAUNE">Jaune</option>
-                    <option value="GRIS">Gris</option>
-                    <option value="MARRON">Marron</option>
-                    <option value="MULTICOLORE">Multicolore</option>
-                  </select>
+            {typeDechet === 'SD' && (
+              <div className="rounded-xl border-2 border-red-300 bg-red-50/60 dark:bg-red-900/10 p-4 space-y-3">
+                <p className="text-xs font-bold text-red-700 uppercase tracking-wide flex items-center gap-1.5">
+                  <AlertTriangle size={13}/> Dechets speciaux et speciaux dangereux — Codes autorises par l'agrement
+                </p>
+                <p className="text-xs text-red-600/80">
+                  Seuls les codes couverts par l'agrement de {currentUser?.recuperateur_nom || 'votre entreprise'} sont affiches ci-dessous.
+                </p>
+
+                <F label="Categorie de dechet (selon agrement)" req>
+                  {loadingCascade ? (
+                    <p className="text-xs text-slate-400 py-2">Chargement...</p>
+                  ) : sousCategories.length === 0 ? (
+                    <p className="text-xs text-amber-600 py-2">
+                      Aucune categorie de dechets speciaux ne vous a ete assignee. Contactez l'administrateur.
+                    </p>
+                  ) : (
+                    <select value={sousCategorie} className="input"
+                      onChange={e => {
+                        setSousCategorie(e.target.value)
+                        setCodeDechet('')
+                        setClasse('')
+                        setDesignationChoisie('')
+                        setValue('designation_dechet', '')
+                        setValue('classe_dechet', '')
+                      }}>
+                      <option value="">-- Selectionner une categorie --</option>
+                      {sousCategories.map(sc => (
+                        <option key={sc.id} value={sc.id}>{sc.nom}</option>
+                      ))}
+                    </select>
+                  )}
                 </F>
-                <F label="Niveau de propreté">
-                  <select {...register('niveau_proprete')} className="input">
-                    <option value="">-- Selectionner --</option>
-                    <option value="TRES_PROPRE">Très propre</option>
-                    <option value="PROPRE">Propre</option>
-                    <option value="MOYENNEMENT_PROPRE">Moyennement propre</option>
-                    <option value="SALE">Sale</option>
-                    <option value="TRES_SALE">Très sale</option>
-                  </select>
-                </F>
+
+                {sousCategorie && (
+                  <F label="Code reglementaire autorise" req>
+                    <select
+                      value={codeDechet}
+                      className="input"
+                      onChange={e => {
+                        const code = e.target.value
+                        const c = codesDisponibles.find(x => x.code === code)
+                        setDesignationChoisie('')
+                        if (c) {
+                          setCodeDechet(c.code)
+                          setClasse(c.classe)
+                          setValue('designation_dechet', c.designation_fr)
+                          setValue('classe_dechet', c.classe)
+                        } else {
+                          setCodeDechet('')
+                          setClasse('')
+                          setValue('designation_dechet', '')
+                          setValue('classe_dechet', '')
+                        }
+                      }}>
+                      <option value="">-- Selectionner un code dechet --</option>
+                      {codesDisponibles.map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.code} — {c.designation_fr} ({c.classe})
+                        </option>
+                      ))}
+                    </select>
+                    <input type="hidden" {...register('designation_dechet')}/>
+                    <input type="hidden" {...register('classe_dechet')}/>
+                  </F>
+                )}
               </div>
             )}
             {classe&&(
@@ -785,7 +825,6 @@ export default function TracabilitePage() {
               ['Recuperateur',viewing.recuperateur_nom],['Generateur',viewing.generateur_nom],
               ['Code dechet',viewing.code_dechet],['Designation',viewing.designation_dechet],
               ['Classe',viewing.classe_dechet],['Quantite',`${viewing.quantite} ${viewing.unite_display||viewing.unite}`],
-              ['Couleur',viewing.couleur_display],['Niveau de proprete',viewing.niveau_proprete_display],
               ['Date recuperation',viewing.date_recuperation],['Transporteur',viewing.transporteur_nom],
               ['Chauffeur',viewing.chauffeur],['Immatriculation',viewing.immatriculation],
               ['Destination',DESTINATIONS.find(d=>d.key===viewing.destination_type)?.label],

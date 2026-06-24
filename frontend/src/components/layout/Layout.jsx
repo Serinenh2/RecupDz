@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard, Users, Package, FileText,
+  LayoutDashboard, Package, FileText,
   BarChart3, LogOut, ChevronLeft, ChevronRight,
   Menu, Moon, Sun, Recycle, Shield, BookOpen, X, User,
-  Award, Bell, GraduationCap, Building2, Landmark, FolderOpen, Bot
+  Award, Bell, GraduationCap, Building2, FolderOpen, Bot
 } from 'lucide-react'
 import { useAuthStore } from '../../store'
 import AIAssistantPage from '../../pages/ai/index'
@@ -12,9 +12,7 @@ import clsx from 'clsx'
 
 const NAV_BASE = [
   { to: '/dashboard',      icon: LayoutDashboard, label: 'Tableau de bord',     permission: null },
-  { to: '/recuperateurs',  icon: Users,            label: 'Récupérateurs',       permission: 'recuperateurs.view_recuperateur' },
   { to: '/operateurs',     icon: Building2,        label: 'Opérateurs',          permission: 'operateurs.view_operateur' },
-  { to: '/administration', icon: Landmark,         label: 'Administration Env.', permission: 'administration.view_administrationenvironnement' },
   { to: '/tracabilite',    icon: Package,          label: 'Tracabilite',         permission: 'traceability.view_traceability' },
   { to: '/nomenclature',   icon: BookOpen,         label: 'Nomenclature',        permission: null },
   { to: '/glossaire',      icon: GraduationCap,    label: 'Glossaire',           permission: null },
@@ -22,8 +20,6 @@ const NAV_BASE = [
   { to: '/stats',          icon: BarChart3,        label: 'Statistiques',        permission: null },
   { to: '/archive',        icon: FolderOpen,       label: 'Archive',             permission: 'archive.view_document' },
   { to: '/alertes',        icon: Bell,             label: 'Alertes',             permission: null },
-  { to: '/bsd',            icon: FileText,         label: 'BSD',                 permission: 'bsd.view_bordereausuividechet' },
-  { to: '/declarations',   icon: FileText,         label: 'Déclarations',        permission: 'declarations.view_declaration' },
 ]
 
 function getNav(user) {
