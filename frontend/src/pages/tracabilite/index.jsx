@@ -115,10 +115,18 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
   }, [typeDechet])
 
   const sousCategorieObj = sousCategories.find(sc => String(sc.id) === sousCategorie)
-  // Tous les codes nomenclature des détails de la sous-catégorie choisie
-  const codesDisponibles = sousCategorieObj
-    ? sousCategorieObj.details.flatMap(d => d.codes.map(c => ({ ...c, detail_nom: d.nom })))
-    : []
+  // Codes nomenclature (titres) de la sous-catégorie choisie — un seul
+  // intitulé par code (ex: 15.01.01 à 15.01.08), même si plusieurs détails
+  // de spécialisation partagent le même code. La désignation précise (ex:
+  // "Bouteille d'eau PET") se choisit ensuite via la cascade Designation.
+  const codesDisponibles = useMemo(() => {
+    if (!sousCategorieObj) return []
+    const parCode = new Map()
+    sousCategorieObj.details.forEach(d => {
+      d.codes.forEach(c => { if (!parCode.has(c.code)) parCode.set(c.code, c) })
+    })
+    return Array.from(parCode.values()).sort((a,b) => a.code.localeCompare(b.code))
+  }, [sousCategorieObj])
 
   const isRecup    = currentUser?.role === 'RECUPERATEUR'
   const destination = watch('destination_type')
@@ -295,7 +303,7 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
                   <option value="">-- Selectionner un code dechet --</option>
                   {codesDisponibles.map(c => (
                     <option key={c.code} value={c.code}>
-                      {c.code} — {c.designation_fr} ({c.detail_nom})
+                      {c.code} — {c.designation_fr}
                     </option>
                   ))}
                 </select>

@@ -7,7 +7,7 @@ from django.db.models import Count
 from datetime import date, timedelta
 from apps.accounts.permissions import ModulePermission
 from .models import Recuperateur, AgrementRecuperateur
-from .models_specialisation import CategorieSpecialisation, SousCategorieSpecialisation
+from .models_specialisation import CategorieSpecialisation, SousCategorieSpecialisation, DetailSpecialisation
 from .serializers import (
     RecuperateurSerializer, RecuperateurListSerializer, AgrementSerializer,
     CategorieSpecialisationSerializer, SousCategorieAvecDetailsSerializer,
@@ -48,10 +48,20 @@ def mes_types_dechets(request):
     user = request.user
     recuperateur = getattr(user, 'recuperateur', None)
 
-    if recuperateur is None:
+    if recuperateur is not None:
+        # Compte récupérateur : uniquement les détails qui lui ont été
+        # assignés par l'administrateur (comportement historique).
+        assigned = recuperateur.specialisation_details.all()
+    elif user.is_superuser or user.has_role('SUPERADMIN', 'ADMIN'):
+        # Comptes Admin / Super Admin : pas de société récupérateur associée,
+        # donc pas de restriction par assignation — accès à toute la
+        # nomenclature de spécialisation, comme pour la gestion Django Admin.
+        assigned = DetailSpecialisation.objects.all()
+    else:
+        # Autre rôle (collecte, observateur...) sans société associée :
+        # rien à afficher, l'assignation reste un mécanisme par récupérateur.
         return Response({'sous_categories': []})
 
-    assigned = recuperateur.specialisation_details.all()
     if type_param == 'MA':
         assigned = assigned.filter(classe_nomenclature='MA')
     elif type_param == 'SD':

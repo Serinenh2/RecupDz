@@ -25,6 +25,8 @@ DATA = [
             {"nom": "Déchets d'emballage", "details": [
                 ("PET", "MA"), ("PEHD", "MA"), ("PP", "MA"), ("Films", "MA"),
                 ("Papier/carton", "MA"), ("Verre", "MA"), ("Alu", "MA"), ("Acier", "MA"),
+                ("Bois", "MA"), ("Textile", "MA"),
+                ("Composites", "MA"), ("Mélange", "MA"),
             ]},
             {"nom": "Textiles et cuirs", "details": [], "classe": "MA"},
             {"nom": "Encombrants ménagers", "details": [], "classe": "MA"},

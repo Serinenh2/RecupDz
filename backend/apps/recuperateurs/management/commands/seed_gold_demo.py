@@ -120,6 +120,8 @@ class Command(BaseCommand):
             'Huiles', 'DEEE', 'Pneumatiques',                 # → S
             'PET', 'PEHD', 'PP', 'Films',                     # → MA (emballage plastique)
             'Papier/carton', 'Verre', 'Alu', 'Acier',         # → MA (emballage autres matières)
+            'Bois', 'Textile',                                # → MA (emballage bois / textile)
+            'Composites', 'Mélange',                          # → MA (emballage composite / mélangé)
         ]
         details = DetailSpecialisation.objects.filter(nom__in=noms_a_cocher)
         if details.exists():
@@ -135,9 +137,10 @@ class Command(BaseCommand):
                 "`python manage.py seed_specialisation`."
             ))
 
-        # ── 5. Cascade spécifique à Gold Environment — relie chacun des 8 détails
+        # ── 5. Cascade spécifique à Gold Environment — relie chacun des 12 détails
         #     de la sous-catégorie "Déchets d'emballage" (PET, PEHD, PP, Films,
-        #     Papier/carton, Verre, Alu, Acier) à SON code précis 15.01.xx.
+        #     Papier/carton, Verre, Alu, Acier, Bois, Textile, Composites, Mélange)
+        #     à SON code précis 15.01.xx (couvre tout 15.01.01 à 15.01.08).
         #     C'est CETTE relation (M2M codes_nomenclature) qui permet d'avoir
         #     un mapping différent par récupérateur — un autre récupérateur
         #     pourrait avoir les mêmes détails cochés mais liés à d'autres codes.
@@ -150,6 +153,10 @@ class Command(BaseCommand):
             ('Verre',         '15.01.07'),
             ('Alu',           '15.01.04'),  # metallique
             ('Acier',         '15.01.04'),  # metallique
+            ('Bois',          '15.01.03'),
+            ('Textile',       '15.01.08'),
+            ('Composites',    '15.01.05'),
+            ('Mélange',       '15.01.06'),
         ]
         cascade_ok = 0
         for nom_detail, code in mapping_emballage:
