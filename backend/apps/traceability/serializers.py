@@ -13,6 +13,7 @@ class TraceabilitySerializer(serializers.ModelSerializer):
     transporteur_nom    = serializers.SerializerMethodField()
     valorisateur_nom    = serializers.SerializerMethodField()
     eliminateur_nom     = serializers.SerializerMethodField()
+    cet_nom             = serializers.SerializerMethodField()
     recuperateur_nom    = serializers.SerializerMethodField()
 
     class Meta:
@@ -27,5 +28,7 @@ class TraceabilitySerializer(serializers.ModelSerializer):
         return obj.valorisateur.raison_sociale if obj.valorisateur else ''
     def get_eliminateur_nom(self, obj):
         return obj.eliminateur.raison_sociale if obj.eliminateur else ''
+    def get_cet_nom(self, obj):
+        return obj.cet.raison_sociale if obj.cet else ''
     def get_recuperateur_nom(self, obj):
         return obj.recuperateur.nom_raison_sociale if obj.recuperateur else ''

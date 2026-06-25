@@ -7,6 +7,8 @@ class Operateur(models.Model):
         ('ELIMINATEUR',  'Éliminateur de déchets'),
         ('VALORISATEUR', 'Valorisateur de déchets'),
         ('CET',          "Centre d'Enfouissement Technique"),
+        ('DIR_WILAYA',   "Direction de l'Environnement Wilaya"),
+        ('MINISTERE',    "Ministère de l'Environnement"),
     ]
     STATUT_CHOICES = [
         ('ACTIF',    'Actif'),

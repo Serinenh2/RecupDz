@@ -19,6 +19,7 @@ class Traceability(models.Model):
         ('ELIMINATION',  'Élimination (DSD)'),
         ('STOCKAGE',     'Stockage temporaire'),
         ('RECYCLAGE',    'Recyclage'),
+        ('CET',          "Centre d'Enfouissement Technique"),
     ]
     COULEUR_CHOICES = [
         ('TRANSPARENT', 'Transparent'),
@@ -100,6 +101,13 @@ class Traceability(models.Model):
         null=True, blank=True, related_name='traceability_elimination',
         limit_choices_to={'type_operateur': 'ELIMINATEUR'}
     )
+    # Centre d'Enfouissement Technique
+    cet               = models.ForeignKey(
+        'operateurs.Operateur', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='traceability_cet',
+        limit_choices_to={'type_operateur': 'CET'}
+    )
+    quantite_enfouie  = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
     # BSD requis si DSD
     bsd_numero        = models.CharField(max_length=100, blank=True, verbose_name='N° BSD (si DSD)')
 

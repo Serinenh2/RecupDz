@@ -13,10 +13,10 @@ import DateInput from '../../components/common/DateInput'
 import toast from 'react-hot-toast'
 
 const opAPI = {
-  getAll:  (p)    => api.get('/operations/', { params: p }),
-  create:  (d)    => api.post('/operations/', d),
-  update:  (id,d) => api.patch(`/operations/${id}/`, d),
-  delete:  (id)   => api.delete(`/operations/${id}/`),
+  getAll:  (p)    => api.get('/traceability/', { params: p }),
+  create:  (d)    => api.post('/traceability/', d),
+  update:  (id,d) => api.patch(`/traceability/${id}/`, d),
+  delete:  (id)   => api.delete(`/traceability/${id}/`),
 }
 const recupAPI  = { getAll: () => api.get('/recuperateurs/?page_size=200&statut=ACTIF') }
 const opListAPI = {
@@ -150,11 +150,16 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
     if (isRecup && currentUser?.recuperateur_id) data.recuperateur = currentUser.recuperateur_id
     data.code_dechet   = codeDechet
     data.classe_dechet = classe
+    // Champs optionnels date/nombre du modèle : une chaîne vide fait échouer
+    // la validation Django (DateField/DecimalField n'acceptent pas '').
+    if (!data.date_livraison)   delete data.date_livraison
+    if (!data.date_commande)    delete data.date_commande
+    if (!data.quantite_enfouie) delete data.quantite_enfouie
     try {
       if (isEdit) { await opAPI.update(operation.id, data); toast.success('Dossier mis à jour') }
       else        { await opAPI.create(data);                toast.success('Dossier de traçabilité créé') }
       onSave()
-    } catch { toast.error('Erreur') }
+    } catch (e) { console.error('Erreur traçabilité:', e.response?.data); toast.error('Erreur') }
     finally { setSaving(false) }
   }
 
@@ -330,24 +335,49 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
                       if (d) {
                         setValue('designation_dechet', d.designation)
                         setValue('id_recup_dz', d.id_recup_dz)
-                        setValue('matiere_dechet', d.matiere)
                       } else {
                         setValue('id_recup_dz', '')
-                        setValue('matiere_dechet', '')
                       }
                     }}>
                     <option value="">-- Sélectionner une désignation --</option>
                     {designations.map(d => (
-                      <option key={d.id} value={d.id}>
-                        {d.designation} {d.matiere ? `(${d.matiere})` : ''}
-                      </option>
+                      <option key={d.id} value={d.id}>{d.designation}</option>
                     ))}
                   </select>
                 )}
                 <input type="hidden" {...register('id_recup_dz')}/>
-                <input type="hidden" {...register('matiere_dechet')}/>
               </F>
             )}
+
+                {codeDechet === '15.01.02' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <F label="Couleur" col="">
+                      <select {...register('couleur')} className="input">
+                        <option value="">-- Sélectionner --</option>
+                        <option value="TRANSPARENT">Transparent</option>
+                        <option value="BLANC">Blanc</option>
+                        <option value="NOIR">Noir</option>
+                        <option value="BLEU">Bleu</option>
+                        <option value="VERT">Vert</option>
+                        <option value="ROUGE">Rouge</option>
+                        <option value="JAUNE">Jaune</option>
+                        <option value="GRIS">Gris</option>
+                        <option value="MARRON">Marron</option>
+                        <option value="MULTICOLORE">Multicolore</option>
+                      </select>
+                    </F>
+                    <F label="Niveau de propreté" col="">
+                      <select {...register('niveau_proprete')} className="input">
+                        <option value="">-- Sélectionner --</option>
+                        <option value="TRES_PROPRE">Très propre</option>
+                        <option value="PROPRE">Propre</option>
+                        <option value="MOYENNEMENT_PROPRE">Moyennement propre</option>
+                        <option value="SALE">Sale</option>
+                        <option value="TRES_SALE">Très sale</option>
+                      </select>
+                    </F>
+                  </div>
+                )}
               </>
             )}
 
@@ -825,6 +855,7 @@ export default function TracabilitePage() {
               ['Récupérateur',viewing.recuperateur_nom],['Générateur',viewing.generateur_nom],
               ['Code déchet',viewing.code_dechet],['Désignation',viewing.designation_dechet],
               ['Classe',viewing.classe_dechet],['Quantité',`${viewing.quantite} ${viewing.unite_display||viewing.unite}`],
+              ['Couleur',viewing.couleur_display],['Niveau de propreté',viewing.niveau_proprete_display],
               ['Date récupération',viewing.date_recuperation],['Transporteur',viewing.transporteur_nom],
               ['Chauffeur',viewing.chauffeur],['Immatriculation',viewing.immatriculation],
               ['Destination',DESTINATIONS.find(d=>d.key===viewing.destination_type)?.label],

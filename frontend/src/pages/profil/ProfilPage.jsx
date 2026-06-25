@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import {
   User, Shield, Save, Building2, CheckCircle2,
@@ -819,7 +820,9 @@ export default function ProfilPage() {
         <div className="card p-4 bg-slate-50/50">
           <p className="text-sm text-slate-500 flex items-center gap-2">
             <Shield size={14} className="text-slate-400"/>
-            En tant qu'administrateur, gérez les fiches récupérateurs depuis l'administration Django.
+            En tant qu'administrateur, gérez les opérateurs depuis la page{' '}
+            <Link to="/operateurs" className="text-primary-600 font-semibold hover:underline">Opérateurs</Link>.
+            Les agréments sont gérés par chaque récupérateur depuis son propre profil.
           </p>
         </div>
       )}

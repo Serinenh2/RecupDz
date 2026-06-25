@@ -560,7 +560,11 @@ function DSDForm({ dsd, recuperateurs, currentUser, onSave, onClose }) {
 function PVForm({ pv, recuperateurs, currentUser, onSave, onClose }) {
   const isEdit = !!pv?.id
   const { register, handleSubmit, watch, setValue, reset } = useForm({
-    defaultValues: pv || { type_inspection:'ROUTINE', recuperateur: currentUser?.recuperateur_id||'' }
+    defaultValues: pv || {
+      type_inspection:'ROUTINE',
+      recuperateur: currentUser?.recuperateur_id||'',
+      date_inspection: new Date().toISOString().split('T')[0],
+    }
   })
   const [saving,     setSaving]     = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -602,13 +606,15 @@ function PVForm({ pv, recuperateurs, currentUser, onSave, onClose }) {
     finally { setGenerating(false) }
   }
 
-  const F = ({label,children}) => <div><label className="label">{label}</label>{children}</div>
+  const F = ({label,req,children}) => (
+    <div><label className="label">{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>{children}</div>
+  )
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       {!isRecup && (
-        <F label="Récupérateur">
-          <select {...register('recuperateur')} className="input">
+        <F label="Récupérateur" req>
+          <select {...register('recuperateur',{required:true})} className="input">
             <option value="">-- Sélectionner --</option>
             {recuperateurs.map(r=><option key={r.id} value={r.id}>{r.nom_raison_sociale}</option>)}
           </select>
@@ -623,7 +629,7 @@ function PVForm({ pv, recuperateurs, currentUser, onSave, onClose }) {
             <option value="SUIVI">Contrôle de suivi</option>
           </select>
         </F>
-        <F label="Date du contrôle">
+        <F label="Date du contrôle" req>
           <DateInput value={watch('date_inspection')||''} onChange={v=>setValue('date_inspection',v)}/>
         </F>
       </div>

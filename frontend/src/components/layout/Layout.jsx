@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Package, FileText,
   BarChart3, LogOut, ChevronLeft, ChevronRight,
   Menu, Moon, Sun, Recycle, Shield, BookOpen, X, User,
-  Award, Bell, GraduationCap, Building2, FolderOpen, Bot
+  Bell, GraduationCap, Building2, FolderOpen, Bot
 } from 'lucide-react'
 import { useAuthStore } from '../../store'
 import AIAssistantPage from '../../pages/ai/index'

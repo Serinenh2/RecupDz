@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Calendar, CalendarRange, CalendarDays, CalendarClock, Package, Download, Loader2 } from 'lucide-react'
 import api from '../../api'
 import DateInput from '../../components/common/DateInput'
@@ -16,6 +16,8 @@ const MOIS = [
   'Juillet','Août','Septembre','Octobre','Novembre','Décembre',
 ]
 
+const UNITE_LABELS = { KG: 'kg', TONNE: 't', M3: 'm³', LITRE: 'L', UNITE: 'unité' }
+
 const today = () => new Date().toISOString().split('T')[0]
 const thisYear = () => new Date().getFullYear()
 
@@ -28,8 +30,18 @@ export default function StatsPage() {
   const [annee,       setAnnee]       = useState(thisYear())
 
   const [rows,    setRows]    = useState([])
-  const [total,   setTotal]   = useState(0)
   const [loading, setLoading] = useState(false)
+
+  const totauxParUnite = useMemo(() => {
+    const m = new Map()
+    rows.forEach(r => {
+      const key = r.unite || 'KG'
+      const label = UNITE_LABELS[key] || r.unite_display || key
+      const prev = m.get(key)?.value || 0
+      m.set(key, { label, value: prev + Number(r.quantite || 0) })
+    })
+    return Array.from(m.values())
+  }, [rows])
 
   const buildParams = () => {
     const p = { page_size: 500, ordering: '-date_recuperation' }
@@ -48,9 +60,8 @@ export default function StatsPage() {
       const res = await api.get('/traceability/', { params })
       const data = res.data.results || res.data
       setRows(data)
-      setTotal(data.reduce((s, r) => s + Number(r.quantite || 0), 0))
     } catch {
-      setRows([]); setTotal(0)
+      setRows([])
     } finally {
       setLoading(false)
     }
@@ -147,19 +158,26 @@ export default function StatsPage() {
       </div>
 
       {/* Résumé */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         <div className="card p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary-500 flex items-center justify-center flex-shrink-0">
             <Package size={18} className="text-white"/>
           </div>
           <div><p className="text-2xl font-black text-slate-900 dark:text-white">{rows.length}</p><p className="text-xs text-slate-500">Dossier(s)</p></div>
         </div>
-        <div className="card p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0">
-            <Package size={18} className="text-white"/>
+        {totauxParUnite.map(t => (
+          <div key={t.label} className="card p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0">
+              <Package size={18} className="text-white"/>
+            </div>
+            <div>
+              <p className="text-2xl font-black text-slate-900 dark:text-white">
+                {t.value.toLocaleString('fr-FR')}
+              </p>
+              <p className="text-xs text-slate-500">Quantité totale ({t.label})</p>
+            </div>
           </div>
-          <div><p className="text-2xl font-black text-slate-900 dark:text-white">{total.toLocaleString('fr-FR')}</p><p className="text-xs text-slate-500">Quantité totale (kg)</p></div>
-        </div>
+        ))}
       </div>
 
       {/* Tableau */}
