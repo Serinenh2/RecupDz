@@ -35,6 +35,7 @@ const pvAPI = {
   pdfById: (id)   => api.get(`/inspections/${id}/generer_pdf/`, { responseType:'blob' }),
 }
 const recupAPI = { getAll: () => api.get('/recuperateurs/?page_size=200') }
+const tracaAPI = { getAll: (p) => api.get('/traceability/', { params: p }) }
 
 const TABS = [
   { key:'bsd',      label:'BSD',      icon:FileText,      desc:'Bordereaux de Suivi des Déchets — documents de traçabilité obligatoires' },
@@ -130,8 +131,41 @@ function CodeDechetPicker({ value, onChange }) {
   )
 }
 
+// ── Dossier de traçabilité Picker (import depuis un dossier S/SD existant) ────
+function DossierPicker({ dossiers = [], onSelect }) {
+  const [selected, setSelected] = useState('')
+
+  const handleChange = (e) => {
+    const id = e.target.value
+    setSelected(id)
+    const d = dossiers.find(x => String(x.id) === id)
+    if (d) onSelect(d)
+  }
+
+  if (dossiers.length === 0) return null
+
+  return (
+    <div className="card p-3 bg-blue-50/50 border-blue-200 space-y-2">
+      <label className="label flex items-center gap-1.5">
+        <Shield size={12} className="text-blue-500"/> Importer depuis un dossier de traçabilité (déchets spéciaux / dangereux)
+      </label>
+      <select value={selected} onChange={handleChange} className="input">
+        <option value="">-- Sélectionner un dossier pour pré-remplir le formulaire --</option>
+        {dossiers.map(d => (
+          <option key={d.id} value={d.id}>
+            {d.numero} — {d.code_dechet} {d.designation_dechet?.slice(0,40)} ({d.quantite} {d.unite_display||d.unite})
+          </option>
+        ))}
+      </select>
+      <p className="text-[10px] text-blue-600">
+        Les informations du dossier sont importées automatiquement — complétez le reste ci-dessous.
+      </p>
+    </div>
+  )
+}
+
 // ── BSD Form ──────────────────────────────────────────────────────────────────
-function BSDForm({ bsd, recuperateurs, currentUser, onSave, onClose }) {
+function BSDForm({ bsd, recuperateurs, dossiers, currentUser, onSave, onClose }) {
   const isEdit = !!bsd?.id
   const { register, handleSubmit, watch, setValue, reset } = useForm({
     defaultValues: bsd || {
@@ -146,6 +180,19 @@ function BSDForm({ bsd, recuperateurs, currentUser, onSave, onClose }) {
   const isRecup = currentUser?.role === 'RECUPERATEUR'
 
   useEffect(() => { if (bsd) reset(bsd) }, [bsd])
+
+  const importerDossier = (d) => {
+    setCodeDechet(d.code_dechet || '')
+    setValue('designation', d.designation_dechet || '')
+    setValue('classe', d.classe_dechet || '')
+    setValue('quantite', d.quantite || '')
+    setValue('unite', d.unite || 'KG')
+    setValue('generateur_nom', d.generateur_nom || '')
+    setValue('transporteur_nom', d.transporteur_nom || '')
+    setValue('recepteur_nom', d.valorisateur_nom || d.eliminateur_nom || d.cet_nom || '')
+    if (!isRecup && d.recuperateur) setValue('recuperateur', d.recuperateur)
+    toast.success(`Dossier ${d.numero} importé`)
+  }
 
   const onSubmit = async (data) => {
     setSaving(true)
@@ -200,6 +247,7 @@ function BSDForm({ bsd, recuperateurs, currentUser, onSave, onClose }) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      {!isEdit && <DossierPicker dossiers={dossiers} onSelect={importerDossier}/>}
       {isRecup ? (
         <div className="card p-3 bg-primary-50 border-primary-200 flex items-center gap-2">
           <Shield size={14} className="text-primary-600 flex-shrink-0"/>
@@ -225,7 +273,8 @@ function BSDForm({ bsd, recuperateurs, currentUser, onSave, onClose }) {
 
       <F label="Code déchet (S ou SD)" req>
         <CodeDechetPicker
-          value={bsd ? `${bsd.code_dechet} — ${bsd.designation||''}` : ''}
+          key={codeDechet}
+          value={codeDechet ? `${codeDechet} — ${watch('designation')||''}` : ''}
           onChange={(code, nom, classe) => {
             setCodeDechet(code)
             setValue('designation', nom)
@@ -312,7 +361,7 @@ function BSDForm({ bsd, recuperateurs, currentUser, onSave, onClose }) {
 }
 
 // ── DSD Form ──────────────────────────────────────────────────────────────────
-function DSDForm({ dsd, recuperateurs, currentUser, onSave, onClose }) {
+function DSDForm({ dsd, recuperateurs, dossiers, currentUser, onSave, onClose }) {
   const isEdit = !!dsd?.id
   const { register, handleSubmit, watch, setValue, reset } = useForm({
     defaultValues: dsd || {
@@ -331,6 +380,15 @@ function DSDForm({ dsd, recuperateurs, currentUser, onSave, onClose }) {
   const isRecup = currentUser?.role === 'RECUPERATEUR'
 
   useEffect(() => { if (dsd) reset(dsd) }, [dsd])
+
+  const importerDossier = (d) => {
+    setCodeDechet(d.code_dechet || '')
+    setValue('denomination_dechet', d.designation_dechet || '')
+    setValue('quantite_generee', d.quantite || '')
+    setValue('denomination', d.recuperateur_nom || currentUser?.recuperateur_nom || '')
+    if (!isRecup && d.recuperateur) setValue('recuperateur', d.recuperateur)
+    toast.success(`Dossier ${d.numero} importé`)
+  }
 
   const onSubmit = async (data) => {
     setSaving(true)
@@ -415,6 +473,7 @@ function DSDForm({ dsd, recuperateurs, currentUser, onSave, onClose }) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      {!isEdit && <DossierPicker dossiers={dossiers} onSelect={importerDossier}/>}
       <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200">
         <AlertTriangle size={14} className="text-amber-500 flex-shrink-0 mt-0.5"/>
         <p className="text-xs text-amber-700">
@@ -465,7 +524,8 @@ function DSDForm({ dsd, recuperateurs, currentUser, onSave, onClose }) {
         {/* Code déchet with picker — same as BSD */}
         <F label="Code du déchet (S ou SD)" req col="col-span-2">
           <CodeDechetPicker
-            value={dsd ? `${dsd.code_dechet||''} — ${dsd.denomination_dechet||''}` : ''}
+            key={codeDechet}
+            value={codeDechet ? `${codeDechet} — ${watch('denomination_dechet')||''}` : ''}
             onChange={(code, nom, classe) => {
               setCodeDechet(code)
               setValue('code_dechet', code)
@@ -557,7 +617,7 @@ function DSDForm({ dsd, recuperateurs, currentUser, onSave, onClose }) {
 }
 
 // ── PV Form ───────────────────────────────────────────────────────────────────
-function PVForm({ pv, recuperateurs, currentUser, onSave, onClose }) {
+function PVForm({ pv, recuperateurs, dossiers, currentUser, onSave, onClose }) {
   const isEdit = !!pv?.id
   const { register, handleSubmit, watch, setValue, reset } = useForm({
     defaultValues: pv || {
@@ -571,6 +631,13 @@ function PVForm({ pv, recuperateurs, currentUser, onSave, onClose }) {
   const isRecup = currentUser?.role === 'RECUPERATEUR'
 
   useEffect(() => { if (pv) reset(pv) }, [pv])
+
+  const importerDossier = (d) => {
+    if (!isRecup && d.recuperateur) setValue('recuperateur', d.recuperateur)
+    const note = `Dossier ${d.numero} — ${d.code_dechet} ${d.designation_dechet||''} (${d.quantite} ${d.unite_display||d.unite})`
+    if (!watch('observations')) setValue('observations', note)
+    toast.success(`Dossier ${d.numero} importé`)
+  }
 
   const onSubmit = async (data) => {
     setSaving(true)
@@ -612,6 +679,7 @@ function PVForm({ pv, recuperateurs, currentUser, onSave, onClose }) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      {!isEdit && <DossierPicker dossiers={dossiers} onSelect={importerDossier}/>}
       {!isRecup && (
         <F label="Récupérateur" req>
           <select {...register('recuperateur',{required:true})} className="input">
@@ -795,11 +863,18 @@ export default function DocumentsPage() {
   const [editing,  setEditing]  = useState(null)
   const [search,   setSearch]   = useState('')
   const [recuperateurs, setRecuperateurs] = useState([])
+  const [dossiers,      setDossiers]      = useState([])
 
   const isRecup = user?.role === 'RECUPERATEUR'
 
   useEffect(() => {
     recupAPI.getAll().then(r => setRecuperateurs(r.data.results||r.data)).catch(()=>{})
+    const p = { page_size: 200 }
+    if (isRecup && user?.recuperateur_id) p.recuperateur = user.recuperateur_id
+    tracaAPI.getAll(p).then(r => {
+      const data = r.data.results || r.data
+      setDossiers(data.filter(d => ['S','SD'].includes(d.classe_dechet)))
+    }).catch(()=>{})
   }, [])
 
   const load = async () => {
@@ -949,15 +1024,15 @@ export default function DocumentsPage() {
         title={editing ? `Modifier ${tab.toUpperCase()}` : getBtnLabel()}
         size={tab==='dsd' ? 'max-w-3xl' : 'max-w-2xl'}>
         {tab==='bsd' && (
-          <BSDForm bsd={editing} recuperateurs={recuperateurs} currentUser={user}
+          <BSDForm bsd={editing} recuperateurs={recuperateurs} dossiers={dossiers} currentUser={user}
             onSave={handleSave} onClose={()=>{setShowForm(false);setEditing(null)}}/>
         )}
         {tab==='dsd' && (
-          <DSDForm dsd={editing} recuperateurs={recuperateurs} currentUser={user}
+          <DSDForm dsd={editing} recuperateurs={recuperateurs} dossiers={dossiers} currentUser={user}
             onSave={handleSave} onClose={()=>{setShowForm(false);setEditing(null)}}/>
         )}
         {(tab==='pv'||tab==='rapports') && (
-          <PVForm pv={editing} recuperateurs={recuperateurs} currentUser={user}
+          <PVForm pv={editing} recuperateurs={recuperateurs} dossiers={dossiers} currentUser={user}
             onSave={handleSave} onClose={()=>{setShowForm(false);setEditing(null)}}/>
         )}
       </Modal>

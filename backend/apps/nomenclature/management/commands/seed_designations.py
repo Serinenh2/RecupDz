@@ -136,13 +136,12 @@ DATA = [
     ('MEL-006', '15.01.06', 'Sachet multicouche', 'Mélange de matériaux'),
     ('MEL-007', '15.01.06', 'Emballage complexe non séparable', 'Mélange de matériaux'),
     ('MEL-008', '15.01.06', 'Étiquette composite', 'Papier/Plastique'),
-    ('PAP-011', '15.01.01', 'CARTONS DECHETS', 'CARTON'),
-    ('PAP-012', '15.01.01', 'CEINTURE CARTON REBUT 1', 'CARTON'),
-    ('PAP-013', '15.01.01', 'MANDRIN REBUT', 'CARTON'),
-    ('PAP-014', '15.01.01', 'CEINTURE CARTON REBUT', 'CARTON'),
-    ('PLA-011', '15.01.02', 'SACHETS USAGEES', 'PLASTIQUE'),
-    ('BOIS-025', '15.01.03', 'PALETTE BOIS REBUT', 'BOIS'),
-    ('PLA-012', '15.01.02', 'PALATTE DE PEHD', 'PEHD'),
+    ('PAP-011', '15.01.01', 'Cartons dechets', 'CARTON'),
+    ('PAP-013', '15.01.01', 'Mandrin rebut', 'CARTON'),
+    ('PAP-014', '15.01.01', 'Ceinture carton rebut', 'CARTON'),
+    ('PLA-011', '15.01.02', 'Sachets usagees', 'PLASTIQUE'),
+    ('BOIS-025', '15.01.03', 'Palette bois rebut', 'BOIS'),
+    ('PLA-012', '15.01.02', 'Palatte de PEHD', 'PEHD'),
 ]
 
 
