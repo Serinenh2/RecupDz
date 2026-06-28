@@ -8,6 +8,9 @@ from apps.accounts.permissions import ModulePermission
 from .models import Inspection
 from .serializers import InspectionSerializer
 from .generate_pv import generate_pv_pdf
+from .generate_pv_word import generate_pv_docx
+
+WORD_CT = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
 class InspectionViewSet(viewsets.ModelViewSet):
     module_label     = 'inspections'
@@ -35,6 +38,20 @@ class InspectionViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': str(e)}, status=500)
 
+    @action(detail=True, methods=['get'])
+    def generer_word(self, request, pk=None):
+        insp = self.get_object()
+        data = InspectionSerializer(insp).data
+        data['recuperateur_nom'] = insp.recuperateur.nom_raison_sociale if insp.recuperateur else ''
+        try:
+            docx_bytes = generate_pv_docx(data)
+            nom  = insp.pv_numero or f'PV_{insp.pk}'
+            resp = HttpResponse(docx_bytes, content_type=WORD_CT)
+            resp['Content-Disposition'] = f'attachment; filename="{nom}.docx"'
+            return resp
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -44,6 +61,19 @@ def generate_pv(request):
         nom  = request.data.get('pv_numero', 'PV')[:30].replace(' ','_')
         resp = HttpResponse(pdf, content_type='application/pdf')
         resp['Content-Disposition'] = f'attachment; filename="PV_{nom}.pdf"'
+        return resp
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def generate_pv_word(request):
+    try:
+        docx_bytes = generate_pv_docx(request.data)
+        nom  = request.data.get('pv_numero', 'PV')[:30].replace(' ','_')
+        resp = HttpResponse(docx_bytes, content_type=WORD_CT)
+        resp['Content-Disposition'] = f'attachment; filename="PV_{nom}.docx"'
         return resp
     except Exception as e:
         return Response({'error': str(e)}, status=500)

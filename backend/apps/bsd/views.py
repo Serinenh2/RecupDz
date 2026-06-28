@@ -8,6 +8,9 @@ from apps.accounts.permissions import ModulePermission
 from .models import BordereauSuiviDechet
 from .serializers import BSDSerializer
 from .generate_bsd import generate_bsd_pdf
+from .generate_bsd_word import generate_bsd_docx
+
+WORD_CT = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
 class BSDViewSet(viewsets.ModelViewSet):
     module_label     = 'bsd'
@@ -33,6 +36,18 @@ class BSDViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': str(e)}, status=500)
 
+    @action(detail=True, methods=['get'])
+    def generer_word(self, request, pk=None):
+        bsd = self.get_object()
+        data = BSDSerializer(bsd).data
+        try:
+            docx_bytes = generate_bsd_docx(data)
+            resp = HttpResponse(docx_bytes, content_type=WORD_CT)
+            resp['Content-Disposition'] = f'attachment; filename="BSD_{bsd.numero}.docx"'
+            return resp
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+
     @action(detail=True, methods=['post'])
     def signer(self, request, pk=None):
         bsd = self.get_object()
@@ -54,6 +69,19 @@ def generate_bsd(request):
         num  = request.data.get('numero', 'BSD')[:30].replace(' ','_')
         resp = HttpResponse(pdf, content_type='application/pdf')
         resp['Content-Disposition'] = f'attachment; filename="BSD_{num}.pdf"'
+        return resp
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def generate_bsd_word(request):
+    try:
+        docx_bytes = generate_bsd_docx(request.data)
+        num  = request.data.get('numero', 'BSD')[:30].replace(' ','_')
+        resp = HttpResponse(docx_bytes, content_type=WORD_CT)
+        resp['Content-Disposition'] = f'attachment; filename="BSD_{num}.docx"'
         return resp
     except Exception as e:
         return Response({'error': str(e)}, status=500)

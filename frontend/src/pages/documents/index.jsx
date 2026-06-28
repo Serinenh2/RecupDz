@@ -17,6 +17,7 @@ const bsdAPI = {
   update:  (id,d) => api.patch(`/bsd/${id}/`, d),
   delete:  (id)   => api.delete(`/bsd/${id}/`),
   pdf:     (d)    => api.post('/bsd/generate-bsd/', d, { responseType:'blob' }),
+  word:    (d)    => api.post('/bsd/generate-bsd-word/', d, { responseType:'blob' }),
 }
 const dsdAPI = {
   getAll:  (p)    => api.get('/declarations/', { params: p }),
@@ -25,6 +26,8 @@ const dsdAPI = {
   delete:  (id)   => api.delete(`/declarations/${id}/`),
   pdf:     (d)    => api.post('/declarations/generate-dsd/', d, { responseType:'blob' }),
   pdfById: (id)   => api.get(`/declarations/${id}/generer_pdf/`, { responseType:'blob' }),
+  word:    (d)    => api.post('/declarations/generate-dsd-word/', d, { responseType:'blob' }),
+  wordById:(id)   => api.post(`/declarations/${id}/generer_word/`, {}, { responseType:'blob' }),
 }
 const pvAPI = {
   getAll:  (p)    => api.get('/inspections/', { params: p }),
@@ -33,6 +36,8 @@ const pvAPI = {
   delete:  (id)   => api.delete(`/inspections/${id}/`),
   pdf:     (d)    => api.post('/inspections/generate-pv/', d, { responseType:'blob' }),
   pdfById: (id)   => api.get(`/inspections/${id}/generer_pdf/`, { responseType:'blob' }),
+  word:    (d)    => api.post('/inspections/generate-pv-word/', d, { responseType:'blob' }),
+  wordById:(id)   => api.get(`/inspections/${id}/generer_word/`, { responseType:'blob' }),
 }
 const recupAPI = { getAll: () => api.get('/recuperateurs/?page_size=200') }
 const tracaAPI = { getAll: (p) => api.get('/traceability/', { params: p }) }
@@ -207,27 +212,29 @@ function BSDForm({ bsd, recuperateurs, dossiers, currentUser, onSave, onClose })
     finally { setSaving(false) }
   }
 
+  const buildBsdData = () => ({
+    numero:               bsd?.numero || '',
+    generateur_nom:       watch('generateur_nom'),
+    generateur_adresse:   watch('generateur_adresse'),
+    code_dechet:          codeDechet || watch('code_dechet'),
+    designation:          watch('designation'),
+    classe:               watch('classe'),
+    quantite:             watch('quantite'),
+    unite:                watch('unite'),
+    emballage:            watch('emballage'),
+    transporteur_nom:     watch('transporteur_nom'),
+    transporteur_vehicule:watch('transporteur_vehicule'),
+    recepteur_nom:        watch('recepteur_nom'),
+    type_traitement:      watch('type_traitement'),
+    date_emission:        watch('date_emission'),
+    date_reception:       watch('date_reception'),
+    statut:               watch('statut'),
+  })
+
   const downloadPdf = async () => {
     setGenerating(true)
     try {
-      const formData = {
-        numero:               bsd?.numero || '',
-        generateur_nom:       watch('generateur_nom'),
-        generateur_adresse:   watch('generateur_adresse'),
-        code_dechet:          codeDechet || watch('code_dechet'),
-        designation:          watch('designation'),
-        classe:               watch('classe'),
-        quantite:             watch('quantite'),
-        unite:                watch('unite'),
-        emballage:            watch('emballage'),
-        transporteur_nom:     watch('transporteur_nom'),
-        transporteur_vehicule:watch('transporteur_vehicule'),
-        recepteur_nom:        watch('recepteur_nom'),
-        type_traitement:      watch('type_traitement'),
-        date_emission:        watch('date_emission'),
-        date_reception:       watch('date_reception'),
-        statut:               watch('statut'),
-      }
+      const formData = buildBsdData()
       const res = await bsdAPI.pdf(formData)
       const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/pdf'}))
       const a   = document.createElement('a')
@@ -236,6 +243,21 @@ function BSDForm({ bsd, recuperateurs, dossiers, currentUser, onSave, onClose })
       window.URL.revokeObjectURL(url)
       toast.success('BSD téléchargé !')
     } catch { toast.error('Erreur génération PDF') }
+    finally { setGenerating(false) }
+  }
+
+  const downloadWord = async () => {
+    setGenerating(true)
+    try {
+      const formData = buildBsdData()
+      const res = await bsdAPI.word(formData)
+      const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}))
+      const a   = document.createElement('a')
+      a.href = url; a.setAttribute('download', `${formData.numero||'BSD'}.docx`)
+      document.body.appendChild(a); a.click(); a.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success('BSD téléchargé (Word) !')
+    } catch { toast.error('Erreur génération Word') }
     finally { setGenerating(false) }
   }
 
@@ -355,6 +377,9 @@ function BSDForm({ bsd, recuperateurs, dossiers, currentUser, onSave, onClose })
             : <><Download size={15}/>Télécharger PDF</>
           }
         </button>
+        <button type="button" onClick={downloadWord} disabled={saving||generating} className="btn-secondary flex items-center gap-2">
+          <Download size={15}/>Télécharger Word
+        </button>
         <button type="button" onClick={onClose} className="btn-secondary">Annuler</button>
       </div>
     </form>
@@ -403,51 +428,53 @@ function DSDForm({ dsd, recuperateurs, dossiers, currentUser, onSave, onClose })
     finally { setSaving(false) }
   }
 
+  const buildDsdData = () => ({
+    annee:               watch('annee'),
+    date_transmission:   watch('date_transmission'),
+    statut:              watch('statut_juridique'),
+    denomination:        watch('denomination'),
+    siege_social:        watch('siege_social'),
+    domaine_activite:    watch('domaine_activite'),
+    certification:       watch('certification'),
+    responsable_dechets: watch('responsable_dechets'),
+    matiere_premiere:    watch('matiere_premiere'),
+    denomination_dechet: watch('denomination_dechet'),
+    code_dechet:         codeDechet || watch('code_dechet'),
+    consistance:         watch('consistance'),
+    autres_precisions:   watch('autres_precisions'),
+    quantite_generee:    watch('quantite_generee'),
+    composition_chimique:watch('composition_chimique'),
+    critere_dangerosite: watch('critere_dangerosite'),
+    stockage_temporaire_qte: watch('stockage_temporaire_qte'),
+    stockage_permanent_qte:  watch('stockage_permanent_qte'),
+    modalites_stockage:  watch('modalites_stockage'),
+    modalites_gestion:   watch('modalites_gestion'),
+    modalites_controle:  watch('modalites_controle'),
+    modalites_elimination: watch('modalites_elimination'),
+    types_installation:  watch('types_installation'),
+    types_traitement:    watch('types_traitement'),
+    quantites_traitees:  watch('quantites_traitees'),
+    rendement_traitement:watch('rendement_traitement'),
+    reutilisation_qte:   watch('reutilisation_qte'),
+    recyclage_qte:       watch('recyclage_qte'),
+    valorisation_qte:    watch('valorisation_qte'),
+    elimination_qte:     watch('elimination_qte'),
+    mesures_min_prises:       watch('mesures_min_prises'),
+    mesures_min_envisager:    watch('mesures_min_envisager'),
+    mesures_bpe_prises:       watch('mesures_bpe_prises'),
+    mesures_bpe_envisager:    watch('mesures_bpe_envisager'),
+    mesures_tech_prises:      watch('mesures_tech_prises'),
+    mesures_tech_envisager:   watch('mesures_tech_envisager'),
+    mesures_pp_prises:        watch('mesures_pp_prises'),
+    mesures_pp_envisager:     watch('mesures_pp_envisager'),
+    mesures_risques_prises:   watch('mesures_risques_prises'),
+    mesures_risques_envisager:watch('mesures_risques_envisager'),
+  })
+
   const downloadPdf = async () => {
     setGenerating(true)
     try {
-      const currentData = {
-        annee:               watch('annee'),
-        date_transmission:   watch('date_transmission'),
-        statut:              watch('statut_juridique'),
-        denomination:        watch('denomination'),
-        siege_social:        watch('siege_social'),
-        domaine_activite:    watch('domaine_activite'),
-        certification:       watch('certification'),
-        responsable_dechets: watch('responsable_dechets'),
-        matiere_premiere:    watch('matiere_premiere'),
-        denomination_dechet: watch('denomination_dechet'),
-        code_dechet:         codeDechet || watch('code_dechet'),
-        consistance:         watch('consistance'),
-        autres_precisions:   watch('autres_precisions'),
-        quantite_generee:    watch('quantite_generee'),
-        composition_chimique:watch('composition_chimique'),
-        critere_dangerosite: watch('critere_dangerosite'),
-        stockage_temporaire_qte: watch('stockage_temporaire_qte'),
-        stockage_permanent_qte:  watch('stockage_permanent_qte'),
-        modalites_stockage:  watch('modalites_stockage'),
-        modalites_gestion:   watch('modalites_gestion'),
-        modalites_controle:  watch('modalites_controle'),
-        modalites_elimination: watch('modalites_elimination'),
-        types_installation:  watch('types_installation'),
-        types_traitement:    watch('types_traitement'),
-        quantites_traitees:  watch('quantites_traitees'),
-        rendement_traitement:watch('rendement_traitement'),
-        reutilisation_qte:   watch('reutilisation_qte'),
-        recyclage_qte:       watch('recyclage_qte'),
-        valorisation_qte:    watch('valorisation_qte'),
-        elimination_qte:     watch('elimination_qte'),
-        mesures_min_prises:       watch('mesures_min_prises'),
-        mesures_min_envisager:    watch('mesures_min_envisager'),
-        mesures_bpe_prises:       watch('mesures_bpe_prises'),
-        mesures_bpe_envisager:    watch('mesures_bpe_envisager'),
-        mesures_tech_prises:      watch('mesures_tech_prises'),
-        mesures_tech_envisager:   watch('mesures_tech_envisager'),
-        mesures_pp_prises:        watch('mesures_pp_prises'),
-        mesures_pp_envisager:     watch('mesures_pp_envisager'),
-        mesures_risques_prises:   watch('mesures_risques_prises'),
-        mesures_risques_envisager:watch('mesures_risques_envisager'),
-      }
+      const currentData = buildDsdData()
       const res = await dsdAPI.pdf(currentData)
       const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/pdf'}))
       const a   = document.createElement('a')
@@ -457,6 +484,22 @@ function DSDForm({ dsd, recuperateurs, dossiers, currentUser, onSave, onClose })
       window.URL.revokeObjectURL(url)
       toast.success('PDF DSD téléchargé !')
     } catch { toast.error('Erreur génération PDF') }
+    finally { setGenerating(false) }
+  }
+
+  const downloadWord = async () => {
+    setGenerating(true)
+    try {
+      const currentData = buildDsdData()
+      const res = await dsdAPI.word(currentData)
+      const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}))
+      const a   = document.createElement('a')
+      a.href = url
+      a.setAttribute('download', `DSD_${currentData.denomination||'document'}_${currentData.annee||'2024'}.docx`)
+      document.body.appendChild(a); a.click(); a.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success('DSD téléchargé (Word) !')
+    } catch { toast.error('Erreur génération Word') }
     finally { setGenerating(false) }
   }
 
@@ -611,6 +654,9 @@ function DSDForm({ dsd, recuperateurs, dossiers, currentUser, onSave, onClose })
         <button type="button" onClick={downloadPdf} disabled={generating} className="btn-secondary">
           <Download size={15}/> {generating?'Génération...':'Télécharger PDF'}
         </button>
+        <button type="button" onClick={downloadWord} disabled={generating} className="btn-secondary">
+          <Download size={15}/> Télécharger Word
+        </button>
         <button type="button" onClick={onClose} className="btn-secondary">Annuler</button>
       </div>
     </form>
@@ -686,37 +732,41 @@ function PVForm({ pv, recuperateurs, dossiers, eliminateurs, currentUser, onSave
     finally { setSaving(false) }
   }
 
+  const buildPvData = () => {
+    const recup = recuperateurs.find(x => String(x.id) === String(watch('recuperateur')))
+    return {
+      pv_numero:           watch('pv_numero'),
+      type_inspection:     watch('type_inspection'),
+      date_inspection:     watch('date_inspection'),
+      resultat:            watch('resultat'),
+      observations:        watch('observations'),
+      actions_correctives: watch('actions_correctives'),
+      recuperateur:        watch('recuperateur'),
+      recuperateur_nom:    isRecup ? currentUser?.recuperateur_nom : recup?.nom_raison_sociale,
+      recuperateur_adresse:      watch('recuperateur_adresse'),
+      recuperateur_agrement:     watch('recuperateur_agrement'),
+      recuperateur_agrement_date:watch('recuperateur_agrement_date'),
+      generateur_nom:      watch('generateur_nom'),
+      generateur_adresse:  watch('generateur_adresse'),
+      designation_dechet:  watch('designation_dechet'),
+      quantite:            watch('quantite'),
+      unite:               watch('unite'),
+      raison_sociale:      watch('raison_sociale'),
+      agrement_exploitation: watch('agrement_exploitation'),
+      adresse:             watch('adresse'),
+      rc:                  watch('rc'),
+      nif:                 watch('nif'),
+      nis:                 watch('nis'),
+      art:                 watch('art'),
+      telephone:           watch('telephone'),
+      site_incineration:   watch('site_incineration'),
+    }
+  }
+
   const downloadPdf = async () => {
     setGenerating(true)
     try {
-      const recup = recuperateurs.find(x => String(x.id) === String(watch('recuperateur')))
-      const formData = {
-        pv_numero:           watch('pv_numero'),
-        type_inspection:     watch('type_inspection'),
-        date_inspection:     watch('date_inspection'),
-        resultat:            watch('resultat'),
-        observations:        watch('observations'),
-        actions_correctives: watch('actions_correctives'),
-        recuperateur:        watch('recuperateur'),
-        recuperateur_nom:    isRecup ? currentUser?.recuperateur_nom : recup?.nom_raison_sociale,
-        recuperateur_adresse:      watch('recuperateur_adresse'),
-        recuperateur_agrement:     watch('recuperateur_agrement'),
-        recuperateur_agrement_date:watch('recuperateur_agrement_date'),
-        generateur_nom:      watch('generateur_nom'),
-        generateur_adresse:  watch('generateur_adresse'),
-        designation_dechet:  watch('designation_dechet'),
-        quantite:            watch('quantite'),
-        unite:               watch('unite'),
-        raison_sociale:      watch('raison_sociale'),
-        agrement_exploitation: watch('agrement_exploitation'),
-        adresse:             watch('adresse'),
-        rc:                  watch('rc'),
-        nif:                 watch('nif'),
-        nis:                 watch('nis'),
-        art:                 watch('art'),
-        telephone:           watch('telephone'),
-        site_incineration:   watch('site_incineration'),
-      }
+      const formData = buildPvData()
       const res = await pvAPI.pdf(formData)
       const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/pdf'}))
       const a   = document.createElement('a')
@@ -725,6 +775,21 @@ function PVForm({ pv, recuperateurs, dossiers, eliminateurs, currentUser, onSave
       window.URL.revokeObjectURL(url)
       toast.success('PV téléchargé !')
     } catch { toast.error('Erreur génération PDF') }
+    finally { setGenerating(false) }
+  }
+
+  const downloadWord = async () => {
+    setGenerating(true)
+    try {
+      const formData = buildPvData()
+      const res = await pvAPI.word(formData)
+      const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}))
+      const a   = document.createElement('a')
+      a.href = url; a.setAttribute('download', `PV_${formData.pv_numero||'incineration'}.docx`)
+      document.body.appendChild(a); a.click(); a.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success('PV téléchargé (Word) !')
+    } catch { toast.error('Erreur génération Word') }
     finally { setGenerating(false) }
   }
 
@@ -827,6 +892,9 @@ function PVForm({ pv, recuperateurs, dossiers, eliminateurs, currentUser, onSave
             : <><Download size={15}/>Télécharger PDF</>
           }
         </button>
+        <button type="button" onClick={downloadWord} disabled={saving||generating} className="btn-secondary flex items-center gap-2">
+          <Download size={15}/>Télécharger Word
+        </button>
         <button type="button" onClick={onClose} className="btn-secondary">Annuler</button>
       </div>
     </form>
@@ -834,7 +902,7 @@ function PVForm({ pv, recuperateurs, dossiers, eliminateurs, currentUser, onSave
 }
 
 // ── Cards ─────────────────────────────────────────────────────────────────────
-function BSDCard({ doc, onEdit, onDelete, onPdf }) {
+function BSDCard({ doc, onEdit, onDelete, onPdf, onWord }) {
   const st = BSD_ST[doc.statut] || BSD_ST.BROUILLON
   const Icon = st.icon
   return (
@@ -868,6 +936,9 @@ function BSDCard({ doc, onEdit, onDelete, onPdf }) {
           <button onClick={()=>onPdf(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600" title="PDF">
             <Download size={13}/>
           </button>
+          <button onClick={()=>onWord(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-indigo-600" title="Word">
+            <FileText size={13}/>
+          </button>
           <button onClick={()=>onEdit(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-blue-600">
             <Edit size={13}/>
           </button>
@@ -880,7 +951,7 @@ function BSDCard({ doc, onEdit, onDelete, onPdf }) {
   )
 }
 
-function DSDCard({ doc, onEdit, onDelete, onPdf }) {
+function DSDCard({ doc, onEdit, onDelete, onPdf, onWord }) {
   const st = DSD_ST[doc.statut] || DSD_ST.BROUILLON
   const Icon = st.icon
   return (
@@ -907,6 +978,9 @@ function DSDCard({ doc, onEdit, onDelete, onPdf }) {
           <button onClick={()=>onPdf(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600" title="PDF">
             <Download size={13}/>
           </button>
+          <button onClick={()=>onWord(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-indigo-600" title="Word">
+            <FileText size={13}/>
+          </button>
           <button onClick={()=>onEdit(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-blue-600">
             <Edit size={13}/>
           </button>
@@ -919,7 +993,7 @@ function DSDCard({ doc, onEdit, onDelete, onPdf }) {
   )
 }
 
-function PVCard({ doc, onEdit, onDelete, onPdf }) {
+function PVCard({ doc, onEdit, onDelete, onPdf, onWord }) {
   const RES = {
     CONFORME:    { badge:'badge-green'  },
     NON_CONFORME:{ badge:'badge-red'    },
@@ -947,6 +1021,9 @@ function PVCard({ doc, onEdit, onDelete, onPdf }) {
         <div className="flex gap-1">
           <button onClick={()=>onPdf(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600" title="PDF">
             <Download size={13}/>
+          </button>
+          <button onClick={()=>onWord(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-indigo-600" title="Word">
+            <FileText size={13}/>
           </button>
           <button onClick={()=>onEdit(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-blue-600"><Edit size={13}/></button>
           <button onClick={()=>onDelete(doc.id,'pv')} className="btn-ghost p-1.5 text-slate-400 hover:text-red-600"><Trash2 size={13}/></button>
@@ -1021,6 +1098,18 @@ export default function DocumentsPage() {
     } catch { toast.error('Erreur PDF') }
   }
 
+  const handleBsdWord = async (doc) => {
+    try {
+      const res = await bsdAPI.word(doc)
+      const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}))
+      const a   = document.createElement('a')
+      a.href = url; a.setAttribute('download',`${doc.numero||'BSD'}.docx`)
+      document.body.appendChild(a); a.click(); a.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success('BSD téléchargé (Word)')
+    } catch { toast.error('Erreur Word') }
+  }
+
   const handleDsdPdf = async (doc) => {
     try {
       const res = await dsdAPI.pdfById(doc.id)
@@ -1033,6 +1122,18 @@ export default function DocumentsPage() {
     } catch { toast.error('Erreur PDF') }
   }
 
+  const handleDsdWord = async (doc) => {
+    try {
+      const res = await dsdAPI.wordById(doc.id)
+      const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}))
+      const a   = document.createElement('a')
+      a.href = url; a.setAttribute('download',`DSD_${doc.denomination}_${doc.annee}.docx`)
+      document.body.appendChild(a); a.click(); a.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success('DSD téléchargé (Word)')
+    } catch { toast.error('Erreur Word') }
+  }
+
   const handlePvPdf = async (doc) => {
     try {
       const res = await pvAPI.pdfById(doc.id)
@@ -1043,6 +1144,18 @@ export default function DocumentsPage() {
       window.URL.revokeObjectURL(url)
       toast.success('PV téléchargé')
     } catch { toast.error('Erreur PDF') }
+  }
+
+  const handlePvWord = async (doc) => {
+    try {
+      const res = await pvAPI.wordById(doc.id)
+      const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}))
+      const a   = document.createElement('a')
+      a.href = url; a.setAttribute('download',`PV_${doc.pv_numero||doc.id}.docx`)
+      document.body.appendChild(a); a.click(); a.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success('PV téléchargé (Word)')
+    } catch { toast.error('Erreur Word') }
   }
 
   const handleSave  = () => { setShowForm(false); setEditing(null); load() }
@@ -1117,9 +1230,9 @@ export default function DocumentsPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {tab==='bsd'     && items.map(doc=><BSDCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleBsdPdf}/>)}
-          {tab==='dsd'     && items.map(doc=><DSDCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleDsdPdf}/>)}
-          {(tab==='pv'||tab==='rapports') && items.map(doc=><PVCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handlePvPdf}/>)}
+          {tab==='bsd'     && items.map(doc=><BSDCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleBsdPdf} onWord={handleBsdWord}/>)}
+          {tab==='dsd'     && items.map(doc=><DSDCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleDsdPdf} onWord={handleDsdWord}/>)}
+          {(tab==='pv'||tab==='rapports') && items.map(doc=><PVCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handlePvPdf} onWord={handlePvWord}/>)}
         </div>
       )}
 
