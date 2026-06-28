@@ -16,6 +16,13 @@ class Operateur(models.Model):
         ('SUSPENDU', 'Suspendu'),
     ]
 
+    # Opérateur privé d'un récupérateur (son propre carnet d'adresses) — vide
+    # pour les opérateurs partagés/institutionnels créés par un administrateur
+    # (ex: Direction de l'Environnement, Ministère), visibles par tout le monde.
+    recuperateur            = models.ForeignKey(
+        'recuperateurs.Recuperateur', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='operateurs',
+    )
     type_operateur          = models.CharField(max_length=20, choices=TYPE_CHOICES)
     raison_sociale          = models.CharField(max_length=300)
     nin                     = models.CharField(max_length=50, blank=True)

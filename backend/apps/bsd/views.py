@@ -21,8 +21,20 @@ class BSDViewSet(viewsets.ModelViewSet):
     search_fields    = ['numero','generateur_nom','code_dechet','designation']
     filterset_fields = ['recuperateur','statut','classe']
 
+    def get_queryset(self):
+        qs = BordereauSuiviDechet.objects.select_related('recuperateur').all()
+        user = self.request.user
+        if user.is_superuser or user.has_role('SUPERADMIN', 'ADMIN'):
+            return qs
+        recuperateur = getattr(user, 'recuperateur', None)
+        return qs.filter(recuperateur=recuperateur) if recuperateur else qs
+
     def perform_create(self, s):
-        s.save(created_by=self.request.user)
+        recuperateur = getattr(self.request.user, 'recuperateur', None)
+        if recuperateur:
+            s.save(created_by=self.request.user, recuperateur=recuperateur)
+        else:
+            s.save(created_by=self.request.user)
 
     @action(detail=True, methods=['get'])
     def generer_pdf(self, request, pk=None):

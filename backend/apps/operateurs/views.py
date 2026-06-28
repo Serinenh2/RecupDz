@@ -2,7 +2,7 @@ from rest_framework import viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Count
+from django.db.models import Count, Q
 from apps.accounts.permissions import ModulePermission
 from .models import Operateur
 from .serializers import OperateurSerializer, OperateurListSerializer
@@ -18,9 +18,24 @@ class OperateurViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return OperateurListSerializer if self.action == 'list' else OperateurSerializer
 
+    def get_queryset(self):
+        qs = Operateur.objects.all()
+        user = self.request.user
+        if user.is_superuser or user.has_role('SUPERADMIN', 'ADMIN'):
+            return qs
+        recuperateur = getattr(user, 'recuperateur', None)
+        if recuperateur:
+            # Ses propres opérateurs + les opérateurs partagés/institutionnels (sans propriétaire)
+            return qs.filter(Q(recuperateur=recuperateur) | Q(recuperateur__isnull=True))
+        return qs.filter(recuperateur__isnull=True)
+
+    def perform_create(self, serializer):
+        recuperateur = getattr(self.request.user, 'recuperateur', None)
+        serializer.save(recuperateur=recuperateur)
+
     @action(detail=False, methods=['get'])
     def stats(self, request):
-        qs = Operateur.objects.all()
+        qs = self.get_queryset()
         return Response({
             'total':    qs.count(),
             'par_type': list(qs.values('type_operateur').annotate(count=Count('id'))),

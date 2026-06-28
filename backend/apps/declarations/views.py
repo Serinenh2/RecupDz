@@ -21,8 +21,20 @@ class DeclarationViewSet(viewsets.ModelViewSet):
     filterset_fields = ['recuperateur', 'annee', 'statut']
     search_fields    = ['denomination', 'code_dechet', 'annee']
 
+    def get_queryset(self):
+        qs = Declaration.objects.select_related('recuperateur').all()
+        user = self.request.user
+        if user.is_superuser or user.has_role('SUPERADMIN', 'ADMIN'):
+            return qs
+        recuperateur = getattr(user, 'recuperateur', None)
+        return qs.filter(recuperateur=recuperateur) if recuperateur else qs
+
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        recuperateur = getattr(self.request.user, 'recuperateur', None)
+        if recuperateur:
+            serializer.save(created_by=self.request.user, recuperateur=recuperateur)
+        else:
+            serializer.save(created_by=self.request.user)
 
     @action(detail=True, methods=['post'])
     def generer_pdf(self, request, pk=None):
