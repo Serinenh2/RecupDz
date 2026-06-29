@@ -58,10 +58,10 @@ export default function SpecialisationReadOnly({ assignedIds = [] }) {
         )
         return (
           <div key={cat.id} className={`rounded-xl border overflow-hidden
-            ${catAssignedCount > 0 ? 'border-primary-200' : 'border-[#E2E8F0] dark:border-[#334155]'}`}>
+            ${catAssignedCount > 0 ? 'border-primary-200' : 'border-[#E2E8F0] dark:border-[#2B3D1E]'}`}>
             <button type="button" onClick={() => toggleCat(cat.id)}
               className={`w-full flex items-center justify-between px-4 py-3 transition-colors
-                ${catAssignedCount > 0 ? 'bg-primary-50/60 dark:bg-primary-900/10' : 'bg-slate-50 dark:bg-slate-800/40'}`}>
+                ${catAssignedCount > 0 ? 'bg-primary-50/60 dark:bg-primary-900/10' : 'bg-slate-50 dark:bg-[#16240D]/40'}`}>
               <span className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
                 <span className="text-base">{cat.icone}</span> {cat.nom}
                 {catAssignedCount > 0 && (
@@ -74,7 +74,7 @@ export default function SpecialisationReadOnly({ assignedIds = [] }) {
             </button>
 
             {isOpen && (
-              <div className="px-4 py-3 space-y-3 bg-white dark:bg-[#1E293B]">
+              <div className="px-4 py-3 space-y-3 bg-white dark:bg-[#16240D]">
                 {cat.sous_categories.map(sc => (
                   <div key={sc.id}>
                     <p className="text-xs font-bold text-slate-500 mb-1.5">{sc.nom}</p>
@@ -89,7 +89,7 @@ export default function SpecialisationReadOnly({ assignedIds = [] }) {
                               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold
                                 ${checked
                                   ? 'bg-primary-600 text-white'
-                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-400 line-through opacity-50'}`}>
+                                  : 'bg-slate-100 dark:bg-[#16240D] text-slate-400 line-through opacity-50'}`}>
                               {checked && <CheckCircle2 size={11}/>}
                               {d.nom}
                             </span>

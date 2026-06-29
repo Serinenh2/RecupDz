@@ -4,7 +4,7 @@ import { GLOSSAIRE, CATEGORIES } from './glossaireData'
 
 // ── Class badge colors ────────────────────────────────────────────────────────
 const CLASSE_CFG = {
-  MA: 'bg-blue-100 text-blue-700 border border-blue-200',
+  MA: 'bg-primary-100 text-primary-700 border border-primary-200',
   I:  'bg-emerald-100 text-emerald-700 border border-emerald-200',
   S:  'bg-amber-100 text-amber-700 border border-amber-200',
   SD: 'bg-red-100 text-red-700 border border-red-200',
@@ -14,7 +14,7 @@ const CAT_COLORS = {
   general:       'bg-primary-500',
   types:         'bg-teal-500',
   acteurs:       'bg-violet-500',
-  documents:     'bg-blue-500',
+  documents:     'bg-primary-500',
   operations:    'bg-emerald-500',
   danger:        'bg-red-500',
   juridique:     'bg-amber-500',
@@ -32,7 +32,7 @@ function TermCard({ terme, lang }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-start gap-4 p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+        className="w-full flex items-start gap-4 p-4 text-left hover:bg-slate-50 dark:hover:bg-[#16240D]/50 transition-colors"
       >
         {/* Number */}
         <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -70,12 +70,12 @@ function TermCard({ terme, lang }) {
 
       {/* Expanded definition */}
       {open && (
-        <div className="border-t border-[#E2E8F0] dark:border-[#334155]">
+        <div className="border-t border-[#E2E8F0] dark:border-[#2B3D1E]">
           {showFr && (
-            <div className="px-5 py-4 bg-blue-50/30 dark:bg-blue-900/10">
+            <div className="px-5 py-4 bg-primary-50/30 dark:bg-primary-900/10">
               <div className="flex items-center gap-2 mb-2">
-                <span className="w-5 h-5 rounded bg-blue-500 flex items-center justify-center text-white text-[9px] font-black flex-shrink-0">FR</span>
-                <span className="text-xs font-bold text-blue-700 dark:text-blue-300">Français</span>
+                <span className="w-5 h-5 rounded bg-primary-500 flex items-center justify-center text-white text-[9px] font-black flex-shrink-0">FR</span>
+                <span className="text-xs font-bold text-primary-700 dark:text-primary-300">Français</span>
               </div>
               <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
                 {terme.definition_fr}
@@ -83,7 +83,7 @@ function TermCard({ terme, lang }) {
             </div>
           )}
           {showAr && (
-            <div className="px-5 py-4 bg-emerald-50/30 dark:bg-emerald-900/10 border-t border-[#E2E8F0] dark:border-[#334155]">
+            <div className="px-5 py-4 bg-emerald-50/30 dark:bg-emerald-900/10 border-t border-[#E2E8F0] dark:border-[#2B3D1E]">
               <div className="flex items-center justify-end gap-2 mb-2">
                 <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">العربية</span>
                 <span className="w-5 h-5 rounded bg-emerald-600 flex items-center justify-center text-white text-[9px] font-black flex-shrink-0">AR</span>
@@ -96,7 +96,7 @@ function TermCard({ terme, lang }) {
           )}
           {/* Reference */}
           {terme.reference && (
-            <div className="px-5 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-t border-[#E2E8F0] dark:border-[#334155] flex items-center justify-between">
+            <div className="px-5 py-2.5 bg-slate-50 dark:bg-[#16240D]/50 border-t border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-between">
               <span className="text-[10px] text-slate-400 font-mono">Réf: {terme.reference}</span>
               {terme.classe && (
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${CLASSE_CFG[terme.classe]}`}>
@@ -133,7 +133,7 @@ function CategorySection({ category, termes, lang, defaultOpen }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500">
+          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-[#2B3D1E] text-slate-500">
             {termes.length}
           </span>
           {open
@@ -144,7 +144,7 @@ function CategorySection({ category, termes, lang, defaultOpen }) {
       </button>
 
       {open && (
-        <div className="space-y-2 pl-4 border-l-2 border-slate-100 dark:border-slate-700">
+        <div className="space-y-2 pl-4 border-l-2 border-slate-100 dark:border-[#2B3D1E]">
           {termes.length === 0 ? (
             <p className="text-sm text-slate-400 py-2">Aucun terme dans cette catégorie</p>
           ) : (
@@ -205,7 +205,7 @@ export default function GlossairePage() {
           </p>
         </div>
         {/* Lang switcher */}
-        <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
+        <div className="flex gap-1 bg-slate-100 dark:bg-[#16240D] rounded-xl p-1">
           {[
             { key: 'both', label: 'FR / AR', icon: '🌐' },
             { key: 'fr',   label: 'Français', icon: '🇫🇷' },
@@ -214,7 +214,7 @@ export default function GlossairePage() {
             <button key={l.key} onClick={() => setLang(l.key)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
                 ${lang === l.key
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                  ? 'bg-white dark:bg-[#2B3D1E] text-slate-900 dark:text-white shadow-sm'
                   : 'text-slate-500 hover:text-slate-700'}`}>
               {l.icon} {l.label}
             </button>
@@ -233,7 +233,7 @@ export default function GlossairePage() {
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all
                 ${catFilter === cat.id
                   ? `${color} text-white border-transparent`
-                  : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white dark:bg-[#1E293B] dark:border-[#334155] dark:text-slate-300'}`}>
+                  : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white dark:bg-[#16240D] dark:border-[#2B3D1E] dark:text-slate-300'}`}>
               {cat.label_fr}
               <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black
                 ${catFilter === cat.id ? 'bg-white/30 text-white' : 'bg-slate-100 text-slate-500'}`}>
@@ -269,15 +269,15 @@ export default function GlossairePage() {
           <option value="S">S — Spéciaux</option>
           <option value="SD">SD — Dangereux</option>
         </select>
-        <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 ml-auto">
+        <div className="flex gap-1 bg-slate-100 dark:bg-[#16240D] rounded-xl p-1 ml-auto">
           <button onClick={() => setViewMode('grouped')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
-              ${viewMode === 'grouped' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900' : 'text-slate-500'}`}>
+              ${viewMode === 'grouped' ? 'bg-white dark:bg-[#2B3D1E] shadow-sm text-slate-900' : 'text-slate-500'}`}>
             Par catégorie
           </button>
           <button onClick={() => setViewMode('flat')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
-              ${viewMode === 'flat' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900' : 'text-slate-500'}`}>
+              ${viewMode === 'flat' ? 'bg-white dark:bg-[#2B3D1E] shadow-sm text-slate-900' : 'text-slate-500'}`}>
             Tout afficher
           </button>
         </div>
@@ -330,7 +330,7 @@ export default function GlossairePage() {
       )}
 
       {/* Footer note */}
-      <div className="card p-4 bg-slate-50/50 dark:bg-slate-800/30">
+      <div className="card p-4 bg-slate-50/50 dark:bg-[#16240D]/30">
         <p className="text-xs text-slate-400 leading-relaxed">
           <span className="font-semibold text-slate-500">Références réglementaires :</span>{' '}
           Loi n°01-19 du 12 décembre 2001 relative à la gestion, au contrôle et à l'élimination des déchets —

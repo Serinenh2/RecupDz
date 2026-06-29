@@ -124,7 +124,7 @@ function Rubrique({ titre, icon: Icon, accent, rows, loading, fichierCsv, vue })
         ))}
       </div>
 
-      <div className="rounded-xl overflow-x-auto border border-[#E2E8F0] dark:border-[#334155]">
+      <div className="rounded-xl overflow-x-auto border border-[#E2E8F0] dark:border-[#2B3D1E]">
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="w-7 h-7 text-primary-500 animate-spin"/></div>
         ) : rows.length === 0 ? (
@@ -135,7 +135,7 @@ function Rubrique({ titre, icon: Icon, accent, rows, loading, fichierCsv, vue })
         ) : isGroupee ? (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#E2E8F0] dark:border-[#334155] text-left bg-slate-50 dark:bg-slate-800/50">
+              <tr className="border-b border-[#E2E8F0] dark:border-[#2B3D1E] text-left bg-slate-50 dark:bg-[#16240D]/50">
                 <th className="px-4 py-2.5 font-semibold text-slate-500 text-xs uppercase">{COLONNE_LABELS[vue]}</th>
                 <th className="px-4 py-2.5 font-semibold text-slate-500 text-xs uppercase">Dossier(s)</th>
                 <th className="px-4 py-2.5 font-semibold text-slate-500 text-xs uppercase">Quantité totale</th>
@@ -143,7 +143,7 @@ function Rubrique({ titre, icon: Icon, accent, rows, loading, fichierCsv, vue })
             </thead>
             <tbody>
               {groupes.map(g => (
-                <tr key={g.label} className="border-b border-slate-50 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                <tr key={g.label} className="border-b border-slate-50 dark:border-[#16240D] last:border-0 hover:bg-slate-50 dark:hover:bg-[#16240D]/50">
                   <td className="px-4 py-2.5 font-medium text-slate-700 dark:text-slate-200">{g.label}</td>
                   <td className="px-4 py-2.5 text-slate-600 dark:text-slate-300">{g.count}</td>
                   <td className="px-4 py-2.5 font-semibold text-slate-700 dark:text-slate-200">
@@ -156,7 +156,7 @@ function Rubrique({ titre, icon: Icon, accent, rows, loading, fichierCsv, vue })
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#E2E8F0] dark:border-[#334155] text-left bg-slate-50 dark:bg-slate-800/50">
+              <tr className="border-b border-[#E2E8F0] dark:border-[#2B3D1E] text-left bg-slate-50 dark:bg-[#16240D]/50">
                 <th className="px-4 py-2.5 font-semibold text-slate-500 text-xs uppercase">Désignation déchet récupéré</th>
                 <th className="px-4 py-2.5 font-semibold text-slate-500 text-xs uppercase">Quantité récupérée</th>
                 <th className="px-4 py-2.5 font-semibold text-slate-500 text-xs uppercase">Générateur des déchets</th>
@@ -165,7 +165,7 @@ function Rubrique({ titre, icon: Icon, accent, rows, loading, fichierCsv, vue })
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.id} className="border-b border-slate-50 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                <tr key={r.id} className="border-b border-slate-50 dark:border-[#16240D] last:border-0 hover:bg-slate-50 dark:hover:bg-[#16240D]/50">
                   <td className="px-4 py-2.5">
                     <span className="font-mono text-xs text-slate-400 mr-2">{r.code_dechet}</span>
                     {r.designation_dechet}
@@ -242,11 +242,11 @@ export default function StatsPage() {
 
       {/* Sélecteur de période */}
       <div className="card p-4 space-y-4">
-        <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 flex-wrap">
+        <div className="flex gap-1 bg-slate-100 dark:bg-[#16240D] rounded-xl p-1 flex-wrap">
           {PERIODES.map(p => (
             <button key={p.key} onClick={() => setPeriode(p.key)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
-                ${periode===p.key?'bg-white dark:bg-slate-700 text-primary-700 shadow-sm':'text-slate-500'}`}>
+                ${periode===p.key?'bg-white dark:bg-[#2B3D1E] text-primary-700 shadow-sm':'text-slate-500'}`}>
               <p.icon size={13}/> {p.label}
             </button>
           ))}
@@ -298,7 +298,7 @@ export default function StatsPage() {
           </div>
         )}
 
-        <div className="max-w-sm pt-2 border-t border-[#E2E8F0] dark:border-[#334155]">
+        <div className="max-w-sm pt-2 border-t border-[#E2E8F0] dark:border-[#2B3D1E]">
           <label className="label">Vue</label>
           <select value={vue} onChange={e=>setVue(e.target.value)} className="input">
             {VUES.map(v => <option key={v.key} value={v.key}>{v.label}</option>)}

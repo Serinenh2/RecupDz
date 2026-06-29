@@ -4,7 +4,7 @@ import { NOMENCLATURE, FAMILLES } from './nomenclatureData'
 
 // ── Class config ──────────────────────────────────────────────────────────────
 const CLASSE_CFG = {
-  MA: { label:'Ménagers et Assimilés', color:'bg-blue-500',   text:'text-blue-700',   bg:'bg-blue-50',   badge:'badge-blue'   },
+  MA: { label:'Ménagers et Assimilés', color:'bg-primary-500',   text:'text-primary-700',   bg:'bg-primary-50',   badge:'badge-blue'   },
   I:  { label:'Inertes',              color:'bg-emerald-500', text:'text-emerald-700',bg:'bg-emerald-50', badge:'badge-green'  },
   S:  { label:'Spéciaux',             color:'bg-amber-500',   text:'text-amber-700',  bg:'bg-amber-50',  badge:'badge-yellow' },
   SD: { label:'Spéciaux Dangereux',   color:'bg-red-500',     text:'text-red-700',    bg:'bg-red-50',    badge:'badge-red'    },
@@ -22,7 +22,7 @@ const DANGER_COLORS = {
   'Irritante':                          'bg-yellow-100 text-yellow-800',
   'Nocive':                             'bg-amber-100 text-amber-800',
   'Infectieuse':                        'bg-red-100 text-red-800',
-  'Comburante':                         'bg-blue-100 text-blue-800',
+  'Comburante':                         'bg-primary-100 text-primary-800',
   "Dangereuse pour l'environnement":    'bg-green-100 text-green-800',
   'Toxique vis-à-vis de la reproduction':'bg-purple-100 text-purple-800',
 }

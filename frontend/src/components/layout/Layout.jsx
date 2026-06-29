@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Package, FileText,
   BarChart3, LogOut, ChevronLeft, ChevronRight,
-  Menu, Moon, Sun, Recycle, Shield, BookOpen, X, User,
+  Menu, Moon, Sun, Leaf, Shield, BookOpen, X, User,
   Bell, GraduationCap, Building2, FolderOpen, Bot
 } from 'lucide-react'
 import { useAuthStore } from '../../store'
@@ -50,8 +50,8 @@ function Sidebar({ collapsed, onToggle, mobileOpen, onClose }) {
       )}
       <aside className={clsx(
         'fixed top-0 left-0 h-full z-40 flex flex-col',
-        'bg-white dark:bg-[#1E293B]',
-        'border-r border-[#E2E8F0] dark:border-[#334155] shadow-lg',
+        'bg-white dark:bg-[#16240D]',
+        'border-r border-[#E2E8F0] dark:border-[#2B3D1E] shadow-lg',
         'transition-all duration-300',
         collapsed ? 'w-[72px]' : 'w-[260px]',
         'lg:translate-x-0',
@@ -60,20 +60,19 @@ function Sidebar({ collapsed, onToggle, mobileOpen, onClose }) {
 
         {/* Logo */}
         <div className={clsx(
-          'flex items-center h-16 px-4 border-b border-[#E2E8F0] dark:border-[#334155] flex-shrink-0',
+          'flex items-center h-16 px-4 border-b border-[#E2E8F0] dark:border-[#2B3D1E] flex-shrink-0',
           collapsed ? 'justify-center' : 'gap-3'
         )}>
           <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
-            <Recycle className="w-4 h-4 text-white" />
+            <Leaf className="w-4 h-4 text-white" />
           </div>
           {!collapsed && (
             <div className="overflow-hidden flex-1">
-              <span className="font-black text-slate-900 dark:text-white text-sm tracking-tight">RECUP-DZ</span>
-              <p className="text-[0.6rem] text-slate-400 truncate">Gestion des Récupérateurs</p>
+              <span className="font-black text-slate-900 dark:text-white text-sm tracking-tight">Recup <span className="font-arabiya font-normal">نفاية</span></span>
             </div>
           )}
           <button onClick={onToggle}
-            className="hidden lg:flex ml-auto w-6 h-6 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 items-center justify-center">
+            className="hidden lg:flex ml-auto w-6 h-6 rounded-md hover:bg-slate-100 dark:hover:bg-[#2B3D1E] items-center justify-center">
             {collapsed
               ? <ChevronRight className="w-4 h-4 text-slate-400" />
               : <ChevronLeft  className="w-4 h-4 text-slate-400" />
@@ -88,8 +87,8 @@ function Sidebar({ collapsed, onToggle, mobileOpen, onClose }) {
 
         {/* User pill */}
         {!collapsed && (
-          <div className="mx-3 mt-3 p-3 rounded-xl bg-[#F1F5F9] dark:bg-[#334155] flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-violet-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+          <div className="mx-3 mt-3 p-3 rounded-xl bg-[#F1F5F9] dark:bg-[#2B3D1E] flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-800 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
               {initials}
             </div>
             <div className="overflow-hidden flex-1">
@@ -121,7 +120,7 @@ function Sidebar({ collapsed, onToggle, mobileOpen, onClose }) {
         </nav>
 
         {/* Bottom — Profile + Logout */}
-        <div className="px-2 pb-4 border-t border-[#E2E8F0] dark:border-[#334155] pt-2 space-y-0.5">
+        <div className="px-2 pb-4 border-t border-[#E2E8F0] dark:border-[#2B3D1E] pt-2 space-y-0.5">
           <NavLink to="/profil" onClick={onClose}
             className={clsx(
               'nav-item',
@@ -153,12 +152,12 @@ function Header({ onMenu }) {
     setDark(isDark)
   }
   return (
-    <header className="h-16 bg-white dark:bg-[#1E293B] border-b border-[#E2E8F0] dark:border-[#334155] flex items-center px-4 gap-3 sticky top-0 z-20">
+    <header className="h-16 bg-white dark:bg-[#16240D] border-b border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center px-4 gap-3 sticky top-0 z-20">
       <button onClick={onMenu} className="lg:hidden p-2 rounded-xl hover:bg-slate-100">
         <Menu className="w-5 h-5 text-slate-500" />
       </button>
       <div className="flex-1" />
-      <button onClick={toggleDark} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800">
+      <button onClick={toggleDark} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-[#16240D]">
         {dark
           ? <Sun  className="w-4 h-4 text-slate-500" />
           : <Moon className="w-4 h-4 text-slate-500" />
@@ -172,7 +171,7 @@ export default function Layout() {
   const [collapsed,  setCollapsed]  = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0F172A] flex">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0D1B0A] flex">
       <Sidebar
         collapsed={collapsed}
         onToggle={() => setCollapsed(c => !c)}

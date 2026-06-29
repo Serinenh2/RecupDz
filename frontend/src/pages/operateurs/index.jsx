@@ -30,7 +30,7 @@ export const TYPE_CFG = {
   ELIMINATEUR:  { label: 'Éliminateur de déchets',              icon: Flame,      color: 'bg-red-500',      light: 'bg-red-50 text-red-700 border-red-200',              badge: 'bg-red-100 text-red-800'        },
   VALORISATEUR: { label: 'Valorisateur de déchets',             icon: Recycle,    color: 'bg-teal-500',     light: 'bg-teal-50 text-teal-700 border-teal-200',           badge: 'bg-teal-100 text-teal-800'      },
   CET:          { label: "Centre d'Enfouissement Technique",     icon: TreePine,   color: 'bg-slate-500',    light: 'bg-slate-50 text-slate-700 border-slate-200',        badge: 'bg-slate-100 text-slate-700'    },
-  DIR_WILAYA:   { label: "Direction de l'Environnement Wilaya",  icon: Building2,  color: 'bg-blue-500',     light: 'bg-blue-50 text-blue-700 border-blue-200',           badge: 'bg-blue-100 text-blue-800'      },
+  DIR_WILAYA:   { label: "Direction de l'Environnement Wilaya",  icon: Building2,  color: 'bg-primary-500',     light: 'bg-primary-50 text-primary-700 border-primary-200',           badge: 'bg-primary-100 text-primary-800'      },
   MINISTERE:    { label: "Ministère de l'Environnement",         icon: Landmark,   color: 'bg-violet-500',   light: 'bg-violet-50 text-violet-700 border-violet-200',     badge: 'bg-violet-100 text-violet-800'  },
 }
 
@@ -50,8 +50,8 @@ function Modal({ open, onClose, title, size = 'max-w-3xl', children }) {
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className={`bg-white dark:bg-[#1E293B] rounded-2xl shadow-2xl w-full ${size} max-h-[90vh] flex flex-col`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0] dark:border-[#334155] flex-shrink-0">
+      <div className={`bg-white dark:bg-[#16240D] rounded-2xl shadow-2xl w-full ${size} max-h-[90vh] flex flex-col`}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0] dark:border-[#2B3D1E] flex-shrink-0">
           <h3 className="font-bold text-slate-900 dark:text-white">{title}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1"><X size={18} /></button>
         </div>
@@ -401,7 +401,7 @@ function OperateurCard({ op, onEdit, onDelete, onView }) {
         </div>
         <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
           <button onClick={() => onView(op)} className="btn-ghost p-2 text-slate-400 hover:text-primary-600"><Eye size={14} /></button>
-          <button onClick={() => onEdit(op)} className="btn-ghost p-2 text-slate-400 hover:text-blue-600"><Edit size={14} /></button>
+          <button onClick={() => onEdit(op)} className="btn-ghost p-2 text-slate-400 hover:text-primary-600"><Edit size={14} /></button>
           <button onClick={() => onDelete(op.id)} className="btn-ghost p-2 text-slate-400 hover:text-red-600"><Trash2 size={14} /></button>
         </div>
       </div>
@@ -425,7 +425,7 @@ function DetailPanel({ op, onClose, onEdit }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="fixed inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white dark:bg-[#1E293B] h-full overflow-y-auto shadow-2xl">
+      <div className="relative w-full max-w-lg bg-white dark:bg-[#16240D] h-full overflow-y-auto shadow-2xl">
         {/* Header */}
         <div className={`px-6 py-5 flex items-center justify-between border-b border-[#E2E8F0]`}
           style={{ background: `linear-gradient(135deg, ${cfg.color.replace('bg-','var(--')}33, transparent)` }}>
@@ -610,7 +610,7 @@ export default function OperateursPage() {
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border-2 transition-all
                 ${typeFilter === k
                   ? `${v.color} text-white border-transparent`
-                  : `border-slate-200 text-slate-600 bg-white dark:bg-[#1E293B] dark:border-[#334155] dark:text-slate-300`}`}>
+                  : `border-slate-200 text-slate-600 bg-white dark:bg-[#16240D] dark:border-[#2B3D1E] dark:text-slate-300`}`}>
               <Icon size={11} /> {v.label.split(' ')[0]} ({count})
             </button>
           )
@@ -669,7 +669,7 @@ export default function OperateursPage() {
                     {g.operateurs.length}
                   </span>
                 </div>
-                <div className="space-y-2 pl-4 border-l-2 border-slate-100 dark:border-slate-700">
+                <div className="space-y-2 pl-4 border-l-2 border-slate-100 dark:border-[#2B3D1E]">
                   {g.operateurs.map(op => (
                     <OperateurCard key={op.id} op={op} onEdit={handleEdit} onDelete={handleDelete} onView={setViewing} />
                   ))}

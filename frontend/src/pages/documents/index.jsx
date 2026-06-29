@@ -74,8 +74,8 @@ function Modal({ open, onClose, title, children, size='max-w-2xl' }) {
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className={`bg-white dark:bg-[#1E293B] rounded-2xl shadow-2xl w-full ${size} max-h-[90vh] flex flex-col`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0] dark:border-[#334155] flex-shrink-0">
+      <div className={`bg-white dark:bg-[#16240D] rounded-2xl shadow-2xl w-full ${size} max-h-[90vh] flex flex-col`}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0] dark:border-[#2B3D1E] flex-shrink-0">
           <h3 className="font-bold text-slate-900 dark:text-white">{title}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1"><X size={18}/></button>
         </div>
@@ -117,12 +117,12 @@ function CodeDechetPicker({ value, onChange }) {
         className="input"
       />
       {open && (
-        <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-white dark:bg-[#1E293B] border border-[#E2E8F0] rounded-xl shadow-xl max-h-52 overflow-y-auto">
+        <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-white dark:bg-[#16240D] border border-[#E2E8F0] rounded-xl shadow-xl max-h-52 overflow-y-auto">
           {filtered.length === 0 ? (
             <p className="text-center py-4 text-slate-400 text-xs">Aucun résultat</p>
           ) : filtered.map(n => (
             <button key={n.code} type="button" onClick={() => select(n)}
-              className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-xs">
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-[#16240D] text-xs">
               <span className="font-mono font-bold text-primary-700 flex-shrink-0 w-16">{n.code}</span>
               <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold flex-shrink-0
                 ${n.classe==='SD'?'bg-red-100 text-red-700':'bg-amber-100 text-amber-700'}`}>
@@ -151,9 +151,9 @@ function DossierPicker({ dossiers = [], onSelect }) {
   if (dossiers.length === 0) return null
 
   return (
-    <div className="card p-3 bg-blue-50/50 border-blue-200 space-y-2">
+    <div className="card p-3 bg-primary-50/50 border-primary-200 space-y-2">
       <label className="label flex items-center gap-1.5">
-        <Shield size={12} className="text-blue-500"/> Importer depuis un dossier de traçabilité (déchets spéciaux / dangereux)
+        <Shield size={12} className="text-primary-500"/> Importer depuis un dossier de traçabilité (déchets spéciaux / dangereux)
       </label>
       <select value={selected} onChange={handleChange} className="input">
         <option value="">-- Sélectionner un dossier pour pré-remplir le formulaire --</option>
@@ -163,7 +163,7 @@ function DossierPicker({ dossiers = [], onSelect }) {
           </option>
         ))}
       </select>
-      <p className="text-[10px] text-blue-600">
+      <p className="text-[10px] text-primary-600">
         Les informations du dossier sont importées automatiquement — complétez le reste ci-dessous.
       </p>
     </div>
@@ -574,7 +574,7 @@ function DSDForm({ dsd, recuperateurs, dossiers, currentUser, onSave, onClose })
     </div>
   )
   const Sec = ({ children }) => (
-    <div className="bg-slate-100 dark:bg-slate-700 px-4 py-2 rounded-lg">
+    <div className="bg-slate-100 dark:bg-[#2B3D1E] px-4 py-2 rounded-lg">
       <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{children}</p>
     </div>
   )
@@ -711,7 +711,7 @@ function DSDForm({ dsd, recuperateurs, dossiers, currentUser, onSave, onClose })
         </div>
       ))}
 
-      <div className="flex gap-3 pt-3 border-t border-[#E2E8F0] sticky bottom-0 bg-white dark:bg-[#1E293B] py-3">
+      <div className="flex gap-3 pt-3 border-t border-[#E2E8F0] sticky bottom-0 bg-white dark:bg-[#16240D] py-3">
         <button type="submit" disabled={saving} className="btn-primary">
           <Save size={15}/> {saving?'Enregistrement...':isEdit?'Mettre à jour':'Enregistrer la DSD'}
         </button>
@@ -972,8 +972,8 @@ function BSDCard({ doc, onEdit, onDelete, onPdf, onWord }) {
   return (
     <div className="card p-4 hover:shadow-md transition-all">
       <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-          <FileText size={18} className="text-blue-600"/>
+        <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0">
+          <FileText size={18} className="text-primary-600"/>
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -1000,10 +1000,10 @@ function BSDCard({ doc, onEdit, onDelete, onPdf, onWord }) {
           <button onClick={()=>onPdf(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600" title="PDF">
             <Download size={13}/>
           </button>
-          <button onClick={()=>onWord(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-indigo-600" title="Word">
+          <button onClick={()=>onWord(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600" title="Word">
             <FileText size={13}/>
           </button>
-          <button onClick={()=>onEdit(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-blue-600">
+          <button onClick={()=>onEdit(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600">
             <Edit size={13}/>
           </button>
           <button onClick={()=>onDelete(doc.id,'bsd')} className="btn-ghost p-1.5 text-slate-400 hover:text-red-600">
@@ -1042,10 +1042,10 @@ function DSDCard({ doc, onEdit, onDelete, onPdf, onWord }) {
           <button onClick={()=>onPdf(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600" title="PDF">
             <Download size={13}/>
           </button>
-          <button onClick={()=>onWord(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-indigo-600" title="Word">
+          <button onClick={()=>onWord(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600" title="Word">
             <FileText size={13}/>
           </button>
-          <button onClick={()=>onEdit(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-blue-600">
+          <button onClick={()=>onEdit(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600">
             <Edit size={13}/>
           </button>
           <button onClick={()=>onDelete(doc.id,'dsd')} className="btn-ghost p-1.5 text-slate-400 hover:text-red-600">
@@ -1086,10 +1086,10 @@ function PVCard({ doc, onEdit, onDelete, onPdf, onWord }) {
           <button onClick={()=>onPdf(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600" title="PDF">
             <Download size={13}/>
           </button>
-          <button onClick={()=>onWord(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-indigo-600" title="Word">
+          <button onClick={()=>onWord(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600" title="Word">
             <FileText size={13}/>
           </button>
-          <button onClick={()=>onEdit(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-blue-600"><Edit size={13}/></button>
+          <button onClick={()=>onEdit(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600"><Edit size={13}/></button>
           <button onClick={()=>onDelete(doc.id,'pv')} className="btn-ghost p-1.5 text-slate-400 hover:text-red-600"><Trash2 size={13}/></button>
         </div>
       </div>
@@ -1258,7 +1258,7 @@ export default function DocumentsPage() {
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all border-2
                 ${tab===t.key
                   ?'bg-primary-600 text-white border-primary-600 shadow-sm'
-                  :'border-[#E2E8F0] text-slate-600 hover:border-primary-300 bg-white dark:bg-[#1E293B] dark:border-[#334155]'}`}>
+                  :'border-[#E2E8F0] text-slate-600 hover:border-primary-300 bg-white dark:bg-[#16240D] dark:border-[#2B3D1E]'}`}>
               <Icon size={15}/> {t.label}
             </button>
           )

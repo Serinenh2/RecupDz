@@ -222,10 +222,10 @@ function AgrementDisplay({ agrement, onEdit }) {
               </button>
             )}
           </div>
-          <div className="overflow-x-auto rounded-xl border border-[#E2E8F0] dark:border-[#334155]">
+          <div className="overflow-x-auto rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E]">
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-slate-100 dark:bg-slate-700">
+                <tr className="bg-slate-100 dark:bg-[#2B3D1E]">
                   <th className="px-3 py-2 text-left font-bold text-slate-600 w-20">Code</th>
                   <th className="px-3 py-2 text-left font-bold text-slate-600">Désignation (Français)</th>
                   <th className="px-3 py-2 text-center font-bold text-slate-600 w-16">Classe</th>
@@ -239,8 +239,8 @@ function AgrementDisplay({ agrement, onEdit }) {
                   const classe = found?.classe || ''
                   return (
                     <tr key={code}
-                      className={`border-t border-[#E2E8F0] dark:border-[#334155]
-                        ${idx%2===0?'bg-white dark:bg-[#1E293B]':'bg-slate-50/50 dark:bg-slate-800/30'}
+                      className={`border-t border-[#E2E8F0] dark:border-[#2B3D1E]
+                        ${idx%2===0?'bg-white dark:bg-[#16240D]':'bg-slate-50/50 dark:bg-[#16240D]/30'}
                         hover:bg-primary-50/30`}>
                       <td className="px-3 py-1.5">
                         <span className="font-mono font-bold text-primary-700">{code}</span>
@@ -400,7 +400,7 @@ function AgrementForm({ agrement, recuperateurId, onSave, onCancel }) {
                 return (
                   <span key={code}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs
-                      bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
+                      bg-primary-50 text-primary-700 border border-primary-200 font-semibold">
                     W.{code} {w?.nom}
                     <button type="button" onClick={() => {
                       const next = wilayasValue.split(',').map(s=>s.trim()).filter(s=>s&&s!==code)
@@ -561,7 +561,7 @@ export default function ProfilPage() {
 
       {/* Avatar */}
       <div className="card p-5 flex items-center gap-5">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-violet-600
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-800
           flex items-center justify-center text-white text-xl font-black flex-shrink-0">
           {initials}
         </div>
@@ -630,8 +630,8 @@ export default function ProfilPage() {
               <CheckCircle2 size={9}/> Réutilisée dans toutes les opérations
             </span>
           </div>
-          <div className="card p-3 bg-blue-50/50 border-blue-200 mb-4">
-            <p className="text-xs text-blue-700">
+          <div className="card p-3 bg-primary-50/50 border-primary-200 mb-4">
+            <p className="text-xs text-primary-700">
               <strong>ℹ️</strong> Ces informations s'appliquent automatiquement à toutes vos opérations, déclarations et documents.
             </p>
           </div>
@@ -719,8 +719,8 @@ export default function ProfilPage() {
               <Layers size={16} className="text-primary-600"/> Spécialisation — Types de déchets récupérés
             </h3>
           </div>
-          <div className="card p-3 bg-blue-50/50 border-blue-200 mb-4">
-            <p className="text-xs text-blue-700">
+          <div className="card p-3 bg-primary-50/50 border-primary-200 mb-4">
+            <p className="text-xs text-primary-700">
               <strong>ℹ️</strong> Cette spécialisation est attribuée par l'administrateur de la plateforme.
               Seuls les codes de la nomenclature correspondant à votre sélection sont affichés dans la page Nomenclature.
               Pour toute modification, contactez l'administrateur.

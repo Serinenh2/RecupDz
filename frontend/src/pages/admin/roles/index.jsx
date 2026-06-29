@@ -96,7 +96,7 @@ export default function AdminRolesPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Roles list */}
-        <div className="bg-white dark:bg-[#1E293B] rounded-2xl border border-[#E2E8F0] dark:border-[#334155] p-4">
+        <div className="bg-white dark:bg-[#16240D] rounded-2xl border border-[#E2E8F0] dark:border-[#2B3D1E] p-4">
           <h2 className="font-semibold text-slate-900 dark:text-white mb-3">Rôles</h2>
           <div className="space-y-2">
             {roles.map(role => (
@@ -107,7 +107,7 @@ export default function AdminRolesPage() {
                   'w-full text-left px-4 py-3 rounded-xl border transition-all',
                   selectedRole?.id === role.id
                     ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-300 dark:border-primary-700'
-                    : 'bg-[#F8FAFC] dark:bg-[#0F172A] border-[#E2E8F0] dark:border-[#334155] hover:bg-slate-50 dark:hover:bg-slate-800'
+                    : 'bg-[#F8FAFC] dark:bg-[#0D1B0A] border-[#E2E8F0] dark:border-[#2B3D1E] hover:bg-slate-50 dark:hover:bg-[#16240D]'
                 )}>
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-sm text-slate-900 dark:text-white">{role.name}</span>
@@ -125,7 +125,7 @@ export default function AdminRolesPage() {
         </div>
 
         {/* Permissions matrix */}
-        <div className="lg:col-span-2 bg-white dark:bg-[#1E293B] rounded-2xl border border-[#E2E8F0] dark:border-[#334155] p-4">
+        <div className="lg:col-span-2 bg-white dark:bg-[#16240D] rounded-2xl border border-[#E2E8F0] dark:border-[#2B3D1E] p-4">
           {selectedRole ? (
             <>
               <div className="flex items-center justify-between mb-4">
@@ -146,10 +146,10 @@ export default function AdminRolesPage() {
                   const expanded = expandedModules[module]
                   const checkedCount = perms.filter(p => rolePerms.has(`${p.app_label}.${p.codename}`)).length
                   return (
-                    <div key={module} className="border border-[#E2E8F0] dark:border-[#334155] rounded-xl overflow-hidden">
+                    <div key={module} className="border border-[#E2E8F0] dark:border-[#2B3D1E] rounded-xl overflow-hidden">
                       <button
                         onClick={() => setExpandedModules(prev => ({ ...prev, [module]: !prev[module] }))}
-                        className="w-full flex items-center justify-between px-4 py-3 bg-[#F8FAFC] dark:bg-[#0F172A] hover:bg-slate-100 dark:hover:bg-slate-800">
+                        className="w-full flex items-center justify-between px-4 py-3 bg-[#F8FAFC] dark:bg-[#0D1B0A] hover:bg-slate-100 dark:hover:bg-[#16240D]">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm text-slate-900 dark:text-white">
                             {MODULE_LABELS[module] || module}
@@ -173,7 +173,7 @@ export default function AdminRolesPage() {
                                   'flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors text-sm',
                                   checked
                                     ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
-                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'
+                                    : 'hover:bg-slate-50 dark:hover:bg-[#16240D] text-slate-600 dark:text-slate-400'
                                 )}>
                                 <input
                                   type="checkbox"

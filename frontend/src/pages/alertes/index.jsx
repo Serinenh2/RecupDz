@@ -29,7 +29,7 @@ const TYPE_CFG = {
 const SEV_CFG = {
   critical: { badge: 'bg-red-600 text-white',   label: 'CRITIQUE'        },
   warning:  { badge: 'bg-amber-500 text-white',  label: 'AVERTISSEMENT'   },
-  info:     { badge: 'bg-blue-500 text-white',   label: 'INFORMATION'     },
+  info:     { badge: 'bg-primary-500 text-white',   label: 'INFORMATION'     },
 }
 
 // ── Spinner ───────────────────────────────────────────────────────────────────
@@ -190,11 +190,11 @@ function VerificateurDroit({ recuperateurs }) {
               placeholder="Rechercher un code déchet..."
               className="input" />
             {codeSearch && !code && (
-              <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] rounded-xl shadow-xl max-h-52 overflow-y-auto">
+              <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white dark:bg-[#16240D] border border-[#E2E8F0] dark:border-[#2B3D1E] rounded-xl shadow-xl max-h-52 overflow-y-auto">
                 {filteredCodes.map(n => (
                   <button key={n.code} type="button"
                     onClick={() => { setCode(n.code); setCodeSearch(`${n.code} — ${n.nom_fr.slice(0,50)}`); setResult(null) }}
-                    className="w-full flex items-start gap-2 px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-left text-xs">
+                    className="w-full flex items-start gap-2 px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-[#16240D] text-left text-xs">
                     <span className="font-mono font-bold text-primary-700 flex-shrink-0">{n.code}</span>
                     <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold flex-shrink-0
                       ${n.classe === 'SD' ? 'bg-red-100 text-red-700' :
@@ -270,7 +270,7 @@ function VerificateurDroit({ recuperateurs }) {
             </div>
           </div>
           {result.alerte && (
-            <div className="bg-white dark:bg-[#1E293B] rounded-xl p-4">
+            <div className="bg-white dark:bg-[#16240D] rounded-xl p-4">
               <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
                 {result.alerte.message}
               </p>
@@ -401,7 +401,7 @@ export default function AlertesPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 bg-slate-100 dark:bg-[#16240D] rounded-xl p-1 w-fit">
         {[
           { key: 'alertes',  label: `Alertes actives (${alerts.length})`, icon: Bell   },
           { key: 'verifier', label: 'Vérifier un droit',                  icon: Shield },
@@ -409,7 +409,7 @@ export default function AlertesPage() {
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all
               ${tab === t.key
-                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                ? 'bg-white dark:bg-[#2B3D1E] text-slate-900 dark:text-white shadow-sm'
                 : 'text-slate-500 hover:text-slate-700'}`}>
             <t.icon size={14} />{t.label}
           </button>
@@ -473,12 +473,12 @@ export default function AlertesPage() {
       {/* ── TAB VÉRIFIER ──────────────────────────────────────────────── */}
       {tab === 'verifier' && (
         <div className="space-y-4 max-w-3xl">
-          <div className="card p-4 bg-blue-50/50 border-blue-200">
+          <div className="card p-4 bg-primary-50/50 border-primary-200">
             <div className="flex items-start gap-3">
-              <Info size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-blue-800">
+              <Info size={16} className="text-primary-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-primary-800">
                 <p className="font-bold mb-1">Comment fonctionne le vérificateur ?</p>
-                <ul className="space-y-0.5 text-xs text-blue-700 list-disc list-inside">
+                <ul className="space-y-0.5 text-xs text-primary-700 list-disc list-inside">
                   <li>Les déchets MA et I ne nécessitent pas d'agrément</li>
                   <li>Les déchets S et SD exigent un agrément valide</li>
                   <li>Le code déchet doit figurer dans l'agrément du récupérateur</li>

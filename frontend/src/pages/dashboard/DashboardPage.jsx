@@ -5,8 +5,6 @@ import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tool
 import api, { recuperateursAPI } from '../../api'
 import { useAuthStore } from '../../store'
 
-const COLORS = ['#4F46E5','#10b981','#f59e0b','#ef4444','#8b5cf6','#14b8a6','#6b7280']
-
 const CLASSE_LABELS = {
   D:  'Déchets ordinaires',
   S:  'Déchets spéciaux',
@@ -14,6 +12,15 @@ const CLASSE_LABELS = {
   MA: 'Ménagers et assimilés',
   '': 'Non classé',
 }
+
+const CLASSE_COLORS = {
+  MA: '#1C3611',
+  D:  '#10b981',
+  S:  '#f59e0b',
+  SD: '#b91c1c',
+  '': '#6b7280',
+}
+const colorFor = (classe) => CLASSE_COLORS[classe] || '#6b7280'
 
 const MOIS_LABELS = [
   'Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc',
@@ -80,7 +87,7 @@ export default function DashboardPage() {
                   <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip formatter={(v) => [`${v} kg`, 'Quantité']} />
                   <Line type="monotone" dataKey="quantite" name="Quantité récupérée"
-                    stroke="#4F46E5" strokeWidth={2} dot={{ r: 3 }} />
+                    stroke="#1C3611" strokeWidth={2} dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -98,22 +105,39 @@ export default function DashboardPage() {
                 <ResponsiveContainer width="50%" height={180}>
                   <PieChart>
                     <Pie data={parClasse} dataKey="count" cx="50%" cy="50%" outerRadius={70}
-                      label={({ percent }) => `${(percent*100).toFixed(0)}%`} labelLine={false}>
-                      {parClasse.map((_,i) => <Cell key={i} fill={COLORS[i%COLORS.length]} />)}
+                      labelLine={false}
+                      label={({ cx, cy, midAngle, outerRadius: r, percent }) => {
+                        const RADIAN = Math.PI / 180
+                        const radius = r + 14
+                        const x = cx + radius * Math.cos(-midAngle * RADIAN)
+                        const y = cy + radius * Math.sin(-midAngle * RADIAN)
+                        return (
+                          <text x={x} y={y} fill="#1e293b" fontSize={11} fontWeight={700}
+                            textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
+                            {`${(percent*100).toFixed(0)}%`}
+                          </text>
+                        )
+                      }}>
+                      {parClasse.map((r,i) => <Cell key={i} fill={colorFor(r.classe_dechet)} />)}
                     </Pie>
                     <Tooltip formatter={(v,n,p) => [v, p.payload.label]} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="flex-1 space-y-2">
-                  {parClasse.map((r, i) => (
-                    <div key={r.classe_dechet || i} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ background: COLORS[i%COLORS.length] }} />
-                        <span className="text-xs text-slate-600">{r.label}</span>
+                  {(() => {
+                    const total = parClasse.reduce((s, r) => s + r.count, 0)
+                    return parClasse.map((r, i) => (
+                      <div key={r.classe_dechet || i} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: colorFor(r.classe_dechet) }} />
+                          <span className="text-xs text-slate-600 dark:text-slate-300">{r.label}</span>
+                        </div>
+                        <span className="text-xs font-bold text-slate-900 dark:text-white">
+                          {r.count} <span className="text-slate-400 font-normal">({total ? Math.round(r.count/total*100) : 0}%)</span>
+                        </span>
                       </div>
-                      <span className="text-xs font-bold">{r.count}</span>
-                    </div>
-                  ))}
+                    ))
+                  })()}
                 </div>
               </div>
             )}

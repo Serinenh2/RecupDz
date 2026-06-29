@@ -79,7 +79,7 @@ export default function DSDForm({ onClose, prefill = {} }) {
   )
 
   const SectionTitle = ({ children }) => (
-    <div className="bg-slate-100 dark:bg-slate-700 px-4 py-2 rounded-lg">
+    <div className="bg-slate-100 dark:bg-[#2B3D1E] px-4 py-2 rounded-lg">
       <p className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide">{children}</p>
     </div>
   )
@@ -229,7 +229,7 @@ export default function DSDForm({ onClose, prefill = {} }) {
         ))}
 
         {/* Submit */}
-        <div className="flex gap-3 pt-3 border-t border-[#E2E8F0] sticky bottom-0 bg-white dark:bg-[#1E293B] py-3">
+        <div className="flex gap-3 pt-3 border-t border-[#E2E8F0] sticky bottom-0 bg-white dark:bg-[#16240D] py-3">
           <button type="submit" disabled={generating || previewing} className="btn-primary">
             {generating
               ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>Génération...</span>

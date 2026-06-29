@@ -20,7 +20,7 @@ const archiveAPI = {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const CATEGORIES = [
-  { value: 'AGREMENT',       label: 'Agrément',                    color: 'bg-blue-100 text-blue-700'    },
+  { value: 'AGREMENT',       label: 'Agrément',                    color: 'bg-primary-100 text-primary-700'    },
   { value: 'AUTORISATION',   label: 'Autorisation environnementale',color: 'bg-green-100 text-green-700'  },
   { value: 'CONTRAT',        label: 'Contrat',                     color: 'bg-violet-100 text-violet-700' },
   { value: 'RAPPORT',        label: 'Rapport',                     color: 'bg-amber-100 text-amber-700'  },
@@ -33,8 +33,8 @@ const CATEGORIES = [
 
 const EXT_ICONS = {
   pdf:  { icon: FileText, color: 'text-red-500',    bg: 'bg-red-50'    },
-  doc:  { icon: FileText, color: 'text-blue-500',   bg: 'bg-blue-50'   },
-  docx: { icon: FileText, color: 'text-blue-500',   bg: 'bg-blue-50'   },
+  doc:  { icon: FileText, color: 'text-primary-500',   bg: 'bg-primary-50'   },
+  docx: { icon: FileText, color: 'text-primary-500',   bg: 'bg-primary-50'   },
   xls:  { icon: FileText, color: 'text-green-500',  bg: 'bg-green-50'  },
   xlsx: { icon: FileText, color: 'text-green-500',  bg: 'bg-green-50'  },
   png:  { icon: Image,    color: 'text-purple-500', bg: 'bg-purple-50' },
@@ -88,7 +88,7 @@ function UploadZone({ onFileSelect, file }) {
           ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
           : file
             ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
-            : 'border-[#E2E8F0] hover:border-primary-300 hover:bg-primary-50/50 dark:border-[#334155]'
+            : 'border-[#E2E8F0] hover:border-primary-300 hover:bg-primary-50/50 dark:border-[#2B3D1E]'
         }`}>
       <input ref={inputRef} type="file" className="hidden"
         onChange={e => e.target.files[0] && onFileSelect(e.target.files[0])} />
@@ -242,7 +242,7 @@ function DocumentCard({ doc, onEdit, onDelete, onPreview }) {
                 <Download size={14} />
               </a>
               <button onClick={() => onEdit(doc)}
-                className="btn-ghost p-2 text-slate-400 hover:text-blue-600" title="Modifier">
+                className="btn-ghost p-2 text-slate-400 hover:text-primary-600" title="Modifier">
                 <Edit size={14} />
               </button>
               <button onClick={() => onDelete(doc.id)}
@@ -264,7 +264,7 @@ function DocumentCard({ doc, onEdit, onDelete, onPreview }) {
             <div className="flex flex-wrap gap-1 mt-2">
               {tags.map(tag => (
                 <span key={tag} className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px]
-                  bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+                  bg-slate-100 text-slate-500 dark:bg-[#2B3D1E] dark:text-slate-400">
                   <Tag size={8} /> {tag}
                 </span>
               ))}
@@ -433,8 +433,8 @@ export default function ArchivePage() {
       {/* Upload modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-[#1E293B] rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0] dark:border-[#334155] flex-shrink-0">
+          <div className="bg-white dark:bg-[#16240D] rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0] dark:border-[#2B3D1E] flex-shrink-0">
               <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Upload size={18} className="text-primary-600" />
                 {editing ? 'Modifier le document' : 'Importer un document'}

@@ -52,8 +52,8 @@ function Modal({ open, onClose, title, children, size='max-w-3xl' }) {
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className={`bg-white dark:bg-[#1E293B] rounded-2xl shadow-2xl w-full ${size} max-h-[92vh] flex flex-col`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0] dark:border-[#334155] flex-shrink-0">
+      <div className={`bg-white dark:bg-[#16240D] rounded-2xl shadow-2xl w-full ${size} max-h-[92vh] flex flex-col`}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0] dark:border-[#2B3D1E] flex-shrink-0">
           <h3 className="font-bold text-slate-900 dark:text-white">{title}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1"><X size={18}/></button>
         </div>
@@ -671,10 +671,10 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
                 <option value="ANNULE">Annulé</option>
               </select>
             </F>
-            <div className="card p-3 bg-blue-50 border-blue-200">
-              <p className="text-xs font-bold text-blue-700 mb-2 flex items-center gap-1"><FileText size={11}/>Documents générés automatiquement à la clôture</p>
+            <div className="card p-3 bg-primary-50 border-primary-200">
+              <p className="text-xs font-bold text-primary-700 mb-2 flex items-center gap-1"><FileText size={11}/>Documents générés automatiquement à la clôture</p>
               {['BSD clôturé','Certificat de valorisation ou d\'élimination','Historique complet du déchet','Registre de collecte','Rapport de mouvement du déchet'].map(d=>(
-                <p key={d} className="text-xs text-blue-600 flex items-center gap-1"><CheckCircle2 size={9}/>{d}</p>
+                <p key={d} className="text-xs text-primary-600 flex items-center gap-1"><CheckCircle2 size={9}/>{d}</p>
               ))}
             </div>
             <F label="Observations générales"><textarea {...register('observations')} className="input" rows={3} placeholder="Notes, observations..."/></F>
@@ -722,7 +722,7 @@ function OperationCard({ op, onEdit, onDelete, onView }) {
         </div>
         <div className="flex gap-1 flex-shrink-0" onClick={e=>e.stopPropagation()}>
           <button onClick={()=>onView(op)} className="btn-ghost p-2 text-slate-400 hover:text-primary-600"><Eye size={14}/></button>
-          <button onClick={()=>onEdit(op)} className="btn-ghost p-2 text-slate-400 hover:text-blue-600"><Edit size={14}/></button>
+          <button onClick={()=>onEdit(op)} className="btn-ghost p-2 text-slate-400 hover:text-primary-600"><Edit size={14}/></button>
           <button onClick={()=>onDelete(op.id)} className="btn-ghost p-2 text-slate-400 hover:text-red-600"><Trash2 size={14}/></button>
         </div>
       </div>
@@ -812,9 +812,9 @@ export default function TracabilitePage() {
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="N° dossier, code déchet, générateur..." className="input pl-9 text-sm"/>
           {search&&<button onClick={()=>setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2"><X size={13} className="text-slate-400"/></button>}
         </div>
-        <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
+        <div className="flex gap-1 bg-slate-100 dark:bg-[#16240D] rounded-xl p-1">
           {[{k:'',l:'Tous'},{k:'EN_COURS',l:'En cours'},{k:'TERMINEE',l:'Terminés'},{k:'ANNULE',l:'Annulés'}].map(t=>(
-            <button key={t.k} onClick={()=>setStatut(t.k)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${statut===t.k?'bg-white dark:bg-slate-700 text-slate-900 shadow-sm':'text-slate-500'}`}>{t.l}</button>
+            <button key={t.k} onClick={()=>setStatut(t.k)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${statut===t.k?'bg-white dark:bg-[#2B3D1E] text-slate-900 shadow-sm':'text-slate-500'}`}>{t.l}</button>
           ))}
         </div>
       </div>
@@ -840,7 +840,7 @@ export default function TracabilitePage() {
       {viewing&&(
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="fixed inset-0 bg-black/30" onClick={()=>setViewing(null)}/>
-          <div className="relative w-full max-w-lg bg-white dark:bg-[#1E293B] h-full overflow-y-auto shadow-2xl p-6">
+          <div className="relative w-full max-w-lg bg-white dark:bg-[#16240D] h-full overflow-y-auto shadow-2xl p-6">
             <div className="flex items-center justify-between mb-5">
               <div>
                 <p className="font-bold font-mono text-primary-700 text-lg">{viewing.numero}</p>
@@ -861,7 +861,7 @@ export default function TracabilitePage() {
               ['Destination',DESTINATIONS.find(d=>d.key===viewing.destination_type)?.label],
               ['N° BSD',viewing.bsd_numero],['Observations',viewing.observations],
             ].filter(([,v])=>v).map(([l,v])=>(
-              <div key={l} className="flex gap-3 text-sm py-2 border-b border-slate-50 dark:border-slate-700 last:border-0">
+              <div key={l} className="flex gap-3 text-sm py-2 border-b border-slate-50 dark:border-[#2B3D1E] last:border-0">
                 <span className="w-36 text-slate-400 flex-shrink-0">{l}</span>
                 <span className="font-medium text-slate-800 dark:text-slate-200">{v}</span>
               </div>

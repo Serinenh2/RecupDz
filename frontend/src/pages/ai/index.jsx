@@ -20,7 +20,7 @@ function formatMarkdown(text) {
     .replace(/^### (.+)$/gm, '<h3 class="font-bold text-xs mt-2 mb-0.5 text-slate-900 dark:text-white">$1</h3>')
     .replace(/^## (.+)$/gm, '<h2 class="font-bold text-sm mt-3 mb-1 text-slate-900 dark:text-white">$1</h2>')
     .replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-slate-900 dark:text-white">$1</strong>')
-    .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[10px] font-mono">$1</code>')
+    .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 bg-slate-100 dark:bg-[#2B3D1E] rounded text-[10px] font-mono">$1</code>')
     .replace(/^- (.+)$/gm, '<li class="ml-3 text-xs text-slate-700 dark:text-slate-300 list-disc">$1</li>')
     .replace(/^✅ (.+)$/gm, '<p class="text-emerald-600 dark:text-emerald-400 text-xs font-semibold">✅ $1</p>')
     .replace(/^⚠️ (.+)$/gm, '<p class="text-amber-600 dark:text-amber-400 text-xs font-semibold">⚠️ $1</p>')
@@ -36,14 +36,14 @@ function MessageBubble({ msg }) {
         <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${
           isUser
             ? 'bg-primary-600 text-white'
-            : 'bg-gradient-to-br from-violet-500 to-purple-600 text-white'
+            : 'bg-gradient-to-br from-primary-500 to-primary-800 text-white'
         }`}>
           {isUser ? <MessageSquare size={10} /> : <Bot size={10} />}
         </div>
         <div className={`rounded-xl px-3 py-2 ${
           isUser
             ? 'bg-primary-600 text-white rounded-tr-sm'
-            : 'bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] text-slate-800 dark:text-slate-200 rounded-tl-sm shadow-sm'
+            : 'bg-white dark:bg-[#16240D] border border-[#E2E8F0] dark:border-[#2B3D1E] text-slate-800 dark:text-slate-200 rounded-tl-sm shadow-sm'
         }`}>
           {isUser ? (
             <p className="text-xs leading-relaxed">{msg.message}</p>
@@ -80,7 +80,7 @@ function Suggestions({ onSelect }) {
       <div className="flex flex-wrap gap-1 justify-center">
         {glossaryQuick.map((s, i) => (
           <button key={i} onClick={() => onSelect(s)}
-            className="px-2 py-1 rounded-full text-[10px] font-medium bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800 hover:bg-violet-100 transition-all">
+            className="px-2 py-1 rounded-full text-[10px] font-medium bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800 hover:bg-primary-100 transition-all">
             <BookOpen size={8} className="inline mr-0.5" />{s}
           </button>
         ))}
@@ -208,7 +208,7 @@ export default function AIAssistantPage() {
         className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${
           open
             ? 'bg-slate-700 hover:bg-slate-600'
-            : 'bg-gradient-to-br from-violet-600 to-purple-700 hover:from-violet-500 hover:to-purple-600'
+            : 'bg-gradient-to-br from-primary-600 to-primary-900 hover:from-primary-500 hover:to-primary-800'
         }`}
       >
         {open
@@ -222,16 +222,16 @@ export default function AIAssistantPage() {
 
       {/* Chat window */}
       {open && (
-        <div className="fixed bottom-24 right-6 z-50 w-[380px] h-[540px] bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl shadow-2xl border border-[#E2E8F0] dark:border-[#334155] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed bottom-24 right-6 z-50 w-[380px] h-[540px] bg-[#F8FAFC] dark:bg-[#0D1B0A] rounded-2xl shadow-2xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
 
           {/* Header */}
-          <div className="bg-gradient-to-r from-violet-600 to-purple-700 px-4 py-3 flex items-center gap-3 flex-shrink-0">
+          <div className="bg-gradient-to-r from-primary-600 to-primary-900 px-4 py-3 flex items-center gap-3 flex-shrink-0">
             <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
               <Bot size={18} className="text-white" />
             </div>
             <div className="flex-1">
               <h3 className="text-sm font-bold text-white">Assistant IA</h3>
-              <p className="text-[10px] text-white/70">RECUP-DZ — Réglementation déchets</p>
+              <p className="text-[10px] text-white/70">Recup <span className="font-arabiya">نفاية</span> — Réglementation déchets</p>
             </div>
             <div className="flex gap-1">
               <button onClick={handleNewConv}
@@ -248,13 +248,13 @@ export default function AIAssistantPage() {
 
           {/* Conversation history mini-bar */}
           {conversations.length > 0 && (
-            <div className="px-2 py-1.5 border-b border-[#E2E8F0] dark:border-[#334155] bg-white dark:bg-[#1E293B] flex gap-1 overflow-x-auto flex-shrink-0">
+            <div className="px-2 py-1.5 border-b border-[#E2E8F0] dark:border-[#2B3D1E] bg-white dark:bg-[#16240D] flex gap-1 overflow-x-auto flex-shrink-0">
               {conversations.slice(0, 5).map(c => (
                 <button key={c.id} onClick={() => handleSelectConv(c.id)}
                   className={`px-2 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
                     activeConvId === c.id
                       ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      : 'bg-slate-100 dark:bg-[#16240D] text-slate-500 hover:bg-slate-200 dark:hover:bg-[#2B3D1E]'
                   }`}>
                   {c.titre?.slice(0, 20) || 'Chat'}
                 </button>
@@ -270,7 +270,7 @@ export default function AIAssistantPage() {
               </div>
             ) : messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full px-4">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mb-3 shadow-lg">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-800 flex items-center justify-center mb-3 shadow-lg">
                   <Bot size={22} className="text-white" />
                 </div>
                 <p className="text-sm font-bold text-slate-700 dark:text-white mb-1 text-center">Bonjour !</p>
@@ -279,7 +279,7 @@ export default function AIAssistantPage() {
                 </p>
                 <div className="flex flex-wrap gap-1 justify-center mb-3">
                   {['BSD', 'Agrément', 'Déchet dangereux', 'Recyclage', 'Loi 01-19'].map(t => (
-                    <span key={t} className="px-2 py-0.5 rounded-full text-[9px] font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
+                    <span key={t} className="px-2 py-0.5 rounded-full text-[9px] font-semibold bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-300 border border-primary-200 dark:border-primary-800">
                       {t}
                     </span>
                   ))}
@@ -292,12 +292,12 @@ export default function AIAssistantPage() {
                 {sending && (
                   <div className="flex justify-start mb-2">
                     <div className="flex gap-2">
-                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white flex-shrink-0">
+                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-primary-500 to-primary-800 flex items-center justify-center text-white flex-shrink-0">
                         <Bot size={10} />
                       </div>
-                      <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] rounded-xl rounded-tl-sm px-3 py-2 shadow-sm">
+                      <div className="bg-white dark:bg-[#16240D] border border-[#E2E8F0] dark:border-[#2B3D1E] rounded-xl rounded-tl-sm px-3 py-2 shadow-sm">
                         <div className="flex items-center gap-1.5">
-                          <Loader2 size={12} className="text-violet-500 animate-spin" />
+                          <Loader2 size={12} className="text-primary-500 animate-spin" />
                           <span className="text-[11px] text-slate-500">Analyse...</span>
                         </div>
                       </div>
@@ -310,7 +310,7 @@ export default function AIAssistantPage() {
           </div>
 
           {/* Input area */}
-          <div className="p-2.5 border-t border-[#E2E8F0] dark:border-[#334155] bg-white dark:bg-[#1E293B] flex-shrink-0">
+          <div className="p-2.5 border-t border-[#E2E8F0] dark:border-[#2B3D1E] bg-white dark:bg-[#16240D] flex-shrink-0">
             <div className="flex items-end gap-1.5">
               <textarea
                 ref={inputRef}
@@ -318,14 +318,14 @@ export default function AIAssistantPage() {
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Votre question..."
-                className="flex-1 resize-none min-h-[36px] max-h-[80px] text-xs px-3 py-2 rounded-xl border border-[#E2E8F0] dark:border-[#334155] bg-[#F8FAFC] dark:bg-[#0F172A] text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-400 transition-all"
+                className="flex-1 resize-none min-h-[36px] max-h-[80px] text-xs px-3 py-2 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] bg-[#F8FAFC] dark:bg-[#0D1B0A] text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-400 transition-all"
                 rows={1}
                 disabled={sending}
               />
               <button
                 onClick={() => handleSend()}
                 disabled={!input.trim() || sending}
-                className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-purple-600 flex items-center justify-center text-white flex-shrink-0 disabled:opacity-40 hover:from-violet-500 hover:to-purple-500 transition-all"
+                className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center text-white flex-shrink-0 disabled:opacity-40 hover:from-primary-500 hover:to-primary-700 transition-all"
               >
                 {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
               </button>
