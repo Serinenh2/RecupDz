@@ -13,6 +13,7 @@ urlpatterns = [
     path('api/nomenclature/', include('apps.nomenclature.urls')),
     path('api/traceability/', include('apps.traceability.urls')),
     path('api/bsd/', include('apps.bsd.urls')),
+    path('api/bl/', include('apps.bl.urls')),
     path('api/declarations/', include('apps.declarations.urls')),
     path('api/inspections/', include('apps.inspections.urls')),
     path('api/operateurs/',  include('apps.operateurs.urls')),

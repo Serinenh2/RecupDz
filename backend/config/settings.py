@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'apps.nomenclature',
     'apps.traceability',
     'apps.bsd',
+    'apps.bl',
     'apps.declarations',
     'apps.inspections',
     'apps.operateurs',
