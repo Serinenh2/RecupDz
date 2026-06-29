@@ -36,7 +36,7 @@ class DeclarationViewSet(viewsets.ModelViewSet):
         else:
             serializer.save(created_by=self.request.user)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['get'])
     def generer_pdf(self, request, pk=None):
         """Genere le PDF DSD pour une declaration existante"""
         decl = self.get_object()
