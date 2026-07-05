@@ -42,7 +42,7 @@ const STATUT_CFG = {
   RECEPTION:  { label:'Réceptionné',   badge:'badge-blue',   icon:Package      },
   TRAITEMENT: { label:'Traitement',    badge:'badge-orange', icon:Zap          },
   TERMINEE:   { label:'Clôturé',       badge:'badge-green',  icon:CheckCircle2 },
-  ANNULE:     { label:'Annulé',        badge:'badge-red',    icon:XCircle      },
+  ANNULEE:    { label:'Annulé',        badge:'badge-red',    icon:XCircle      },
 }
 
 function Spinner() {
@@ -259,6 +259,36 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
 
   useEffect(() => { if (operation) reset(operation) }, [operation])
 
+  // Prix d'achat total = prix unitaire × quantité récupérée (calcul automatique).
+  const quantiteWatch = watch('quantite')
+  const prixUnitaireWatch = watch('prix_unitaire_ttc')
+  useEffect(() => {
+    const q = parseFloat(quantiteWatch)
+    const pu = parseFloat(prixUnitaireWatch)
+    if (!isNaN(q) && !isNaN(pu)) setValue('prix_achat_ttc', (q * pu).toFixed(2))
+    else if (!prixUnitaireWatch) setValue('prix_achat_ttc', '')
+  }, [quantiteWatch, prixUnitaireWatch])
+
+  // Prix de revient global = prix d'achat total + frais de transport + autres frais.
+  // Prix de revient unitaire = prix de revient global / quantité récupérée.
+  const prixAchatWatch      = watch('prix_achat_ttc')
+  const fraisTransportWatch = watch('frais_transport_ttc')
+  const autresFraisWatch    = watch('autres_frais_ttc')
+  useEffect(() => {
+    const achat    = parseFloat(prixAchatWatch) || 0
+    const transport= parseFloat(fraisTransportWatch) || 0
+    const autres   = parseFloat(autresFraisWatch) || 0
+    const q        = parseFloat(quantiteWatch)
+    if (!prixAchatWatch && !fraisTransportWatch && !autresFraisWatch) {
+      setValue('prix_revient_global_ttc', '')
+      setValue('prix_revient_unitaire_ttc', '')
+      return
+    }
+    const global_ = achat + transport + autres
+    setValue('prix_revient_global_ttc', global_.toFixed(2))
+    setValue('prix_revient_unitaire_ttc', (!isNaN(q) && q > 0) ? (global_ / q).toFixed(2) : '')
+  }, [prixAchatWatch, fraisTransportWatch, autresFraisWatch, quantiteWatch])
+
   const onSubmit = async (data) => {
     setSaving(true)
     if (isRecup && currentUser?.recuperateur_id) data.recuperateur = currentUser.recuperateur_id
@@ -284,6 +314,12 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
     if (!data.date_livraison)   delete data.date_livraison
     if (!data.date_commande)    delete data.date_commande
     if (!data.quantite_enfouie && !data.quantite_enfouie !== 0) delete data.quantite_enfouie
+    if (!data.prix_unitaire_ttc && data.prix_unitaire_ttc !== 0) delete data.prix_unitaire_ttc
+    if (!data.prix_achat_ttc && data.prix_achat_ttc !== 0) delete data.prix_achat_ttc
+    if (!data.frais_transport_ttc && data.frais_transport_ttc !== 0) delete data.frais_transport_ttc
+    if (!data.autres_frais_ttc && data.autres_frais_ttc !== 0) delete data.autres_frais_ttc
+    if (!data.prix_revient_global_ttc && data.prix_revient_global_ttc !== 0) delete data.prix_revient_global_ttc
+    if (!data.prix_revient_unitaire_ttc && data.prix_revient_unitaire_ttc !== 0) delete data.prix_revient_unitaire_ttc
     try {
       if (isEdit) { await opAPI.update(operation.id, data); toast.success('Dossier mis à jour') }
       else        { await opAPI.create(data);                toast.success('Dossier de traçabilité créé') }
@@ -615,6 +651,12 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
             </div>
             <F label="Caractéristiques de danger"><input {...register('caracteristiques_danger')} className="input" placeholder="H3 Inflammable, H6 Toxique..."/></F>
             <F label="Date de récupération" req><DateInput value={watch('date_recuperation')||''} onChange={v=>setValue('date_recuperation',v)}/></F>
+            <div className="grid grid-cols-2 gap-3">
+              <F label="Prix unitaire (TTC, DZD)" col=""><input {...register('prix_unitaire_ttc')} type="number" step="0.01" className="input" placeholder="0.00"/></F>
+              <F label="Prix d'achat total (TTC, DZD)" col="">
+                <input {...register('prix_achat_ttc')} type="number" step="0.01" className="input bg-slate-50 dark:bg-[#16240D]" placeholder="0.00" readOnly/>
+              </F>
+            </div>
           </div>
           <div className="flex justify-end"><button type="button" onClick={()=>setEtape(2)} className="btn-primary">Étape suivante <ChevronRight size={15}/></button></div>
         </div>
@@ -673,6 +715,8 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
                   <option value="RETARD">Retard important</option>
                 </select>
               </F>
+              <F label="Frais de transport (TTC, DZD)" col=""><input {...register('frais_transport_ttc')} type="number" step="0.01" className="input" placeholder="0.00"/></F>
+              <F label="Autres frais (TTC, DZD)" col=""><input {...register('autres_frais_ttc')} type="number" step="0.01" className="input" placeholder="0.00"/></F>
             </div>
           </div>
           <div className="flex justify-between">
@@ -728,6 +772,14 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
         <div className="space-y-4">
           <div className="card p-4 space-y-3">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1"><CheckCircle2 size={11}/> 6. Statut et clôture du dossier</p>
+            <div className="grid grid-cols-2 gap-3">
+              <F label="Prix de revient global (TTC, DZD)" col="">
+                <input {...register('prix_revient_global_ttc')} type="number" step="0.01" className="input bg-slate-50 dark:bg-[#16240D]" placeholder="0.00" readOnly/>
+              </F>
+              <F label="Prix de revient unitaire (TTC, DZD)" col="">
+                <input {...register('prix_revient_unitaire_ttc')} type="number" step="0.01" className="input bg-slate-50 dark:bg-[#16240D]" placeholder="0.00" readOnly/>
+              </F>
+            </div>
             <F label="Statut du dossier">
               <select {...register('statut')} className="input">
                 <option value="EN_COURS">En cours</option>
@@ -736,7 +788,7 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
                 <option value="RECEPTION">Réceptionné</option>
                 <option value="TRAITEMENT">En traitement</option>
                 <option value="TERMINEE">Terminée / Clôturée</option>
-                <option value="ANNULE">Annulé</option>
+                <option value="ANNULEE">Annulé</option>
               </select>
             </F>
             <div className="card p-3 bg-primary-50 border-primary-200">
@@ -895,7 +947,7 @@ export default function TracabilitePage() {
           {search&&<button onClick={()=>setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2"><X size={13} className="text-slate-400"/></button>}
         </div>
         <div className="flex gap-1 bg-slate-100 dark:bg-[#16240D] rounded-xl p-1">
-          {[{k:'',l:'Tous'},{k:'EN_COURS',l:'En cours'},{k:'TERMINEE',l:'Terminés'},{k:'ANNULE',l:'Annulés'}].map(t=>(
+          {[{k:'',l:'Tous'},{k:'EN_COURS',l:'En cours'},{k:'TERMINEE',l:'Terminés'},{k:'ANNULEE',l:'Annulés'}].map(t=>(
             <button key={t.k} onClick={()=>setStatut(t.k)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${statut===t.k?'bg-white dark:bg-[#2B3D1E] text-slate-900 shadow-sm':'text-slate-500'}`}>{t.l}</button>
           ))}
         </div>
@@ -938,8 +990,15 @@ export default function TracabilitePage() {
               ['Code déchet',viewing.code_dechet],['Désignation',viewing.designation_dechet],
               ['Classe',viewing.classe_dechet],['Quantité totale',`${viewing.quantite} ${viewing.unite_display||viewing.unite}`],
               ['Couleur',viewing.couleur_display],['Niveau de propreté',viewing.niveau_proprete_display],
-              ['Date récupération',viewing.date_recuperation],['Transporteur',viewing.transporteur_nom],
+              ['Date récupération',viewing.date_recuperation],
+              ['Prix unitaire (TTC, DZD)',viewing.prix_unitaire_ttc && `${Number(viewing.prix_unitaire_ttc).toLocaleString('fr-FR')} DZD`],
+              ['Prix d\'achat total (TTC, DZD)',viewing.prix_achat_ttc && `${Number(viewing.prix_achat_ttc).toLocaleString('fr-FR')} DZD`],
+              ['Transporteur',viewing.transporteur_nom],
               ['Chauffeur',viewing.chauffeur],['Immatriculation',viewing.immatriculation],
+              ['Frais de transport (TTC, DZD)',viewing.frais_transport_ttc && `${Number(viewing.frais_transport_ttc).toLocaleString('fr-FR')} DZD`],
+              ['Autres frais (TTC, DZD)',viewing.autres_frais_ttc && `${Number(viewing.autres_frais_ttc).toLocaleString('fr-FR')} DZD`],
+              ['Prix de revient global (TTC, DZD)',viewing.prix_revient_global_ttc && `${Number(viewing.prix_revient_global_ttc).toLocaleString('fr-FR')} DZD`],
+              ['Prix de revient unitaire (TTC, DZD)',viewing.prix_revient_unitaire_ttc && `${Number(viewing.prix_revient_unitaire_ttc).toLocaleString('fr-FR')} DZD`],
               ['N° BSD',viewing.bsd_numero],['Observations',viewing.observations],
             ].filter(([,v])=>v).map(([l,v])=>(
               <div key={l} className="flex gap-3 text-sm py-2 border-b border-slate-50 dark:border-[#2B3D1E] last:border-0">

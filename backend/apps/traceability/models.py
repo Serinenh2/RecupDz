@@ -1,11 +1,28 @@
 from django.db import models
 from django.conf import settings
 
+class OperationCounter(models.Model):
+    """Compteur séquentiel par année pour le numéro d'opération (Traceability.numero)."""
+    year       = models.PositiveIntegerField(unique=True)
+    last_value = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Compteur d'opération"
+        verbose_name_plural = "Compteurs d'opération"
+
+    def __str__(self):
+        return f"{self.year} → {self.last_value}"
+
+
 class Traceability(models.Model):
     STATUT_CHOICES = [
-        ('EN_COURS',  'En cours'),
-        ('TERMINEE',  'Terminée'),
-        ('ANNULEE',   'Annulée'),
+        ('EN_COURS',   'En cours'),
+        ('ENLEVEMENT', "En cours d'enlèvement"),
+        ('TRANSPORT',  'En transport'),
+        ('RECEPTION',  'Réceptionné'),
+        ('TRAITEMENT', 'En traitement'),
+        ('TERMINEE',   'Terminée'),
+        ('ANNULEE',    'Annulée'),
     ]
     UNITE_CHOICES = [
         ('KG',    'Kilogramme (kg)'),
@@ -82,9 +99,25 @@ class Traceability(models.Model):
     )
     chauffeur         = models.CharField(max_length=200, blank=True)
     immatriculation   = models.CharField(max_length=100, blank=True)
+    frais_transport_ttc = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        verbose_name='Frais de transport TTC (DZD)'
+    )
+    autres_frais_ttc  = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        verbose_name='Autres frais TTC (DZD)'
+    )
 
     # ── Date de récupération ──────────────────────────────────────
     date_recuperation = models.DateField(verbose_name='Date de récupération')
+    prix_unitaire_ttc = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        verbose_name='Prix unitaire TTC (DZD)'
+    )
+    prix_achat_ttc    = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        verbose_name="Prix d'achat total TTC (DZD)"
+    )
 
     # ── Destination ───────────────────────────────────────────────
     destination_type  = models.CharField(max_length=20, choices=DESTINATION_CHOICES, default='VALORISATION')
@@ -117,6 +150,15 @@ class Traceability(models.Model):
     repartitions      = models.JSONField(default=list, blank=True)
 
     # ── Statut & suivi ────────────────────────────────────────────
+    # Prix de revient global = prix d'achat total + frais de transport + autres frais
+    prix_revient_global_ttc   = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        verbose_name='Prix de revient global TTC (DZD)'
+    )
+    prix_revient_unitaire_ttc = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        verbose_name='Prix de revient unitaire TTC (DZD)'
+    )
     statut            = models.CharField(max_length=15, choices=STATUT_CHOICES, default='EN_COURS')
     observations      = models.TextField(blank=True)
     created_by        = models.ForeignKey(
@@ -136,9 +178,14 @@ class Traceability(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero:
-            import uuid
             from datetime import date
-            self.numero = f"TR-{date.today().strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}"
+            from django.db import transaction
+            year = date.today().year
+            with transaction.atomic():
+                counter, _ = OperationCounter.objects.select_for_update().get_or_create(year=year)
+                counter.last_value += 1
+                counter.save(update_fields=['last_value'])
+                self.numero = f"OP-{year}-{counter.last_value:04d}"
         super().save(*args, **kwargs)
 
     @property
