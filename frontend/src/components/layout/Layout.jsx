@@ -14,10 +14,10 @@ const NAV_BASE = [
   { to: '/dashboard',      icon: LayoutDashboard, label: 'Tableau de bord',     permission: null },
   { to: '/operateurs',     icon: Building2,        label: 'Opérateurs',          permission: 'operateurs.view_operateur' },
   { to: '/tracabilite',    icon: Package,          label: 'Traçabilité',         permission: 'traceability.view_traceability' },
-  { to: '/nomenclature',   icon: BookOpen,         label: 'Nomenclature',        permission: null },
-  { to: '/glossaire',      icon: GraduationCap,    label: 'Glossaire',           permission: null },
   { to: '/documents',      icon: FileText,         label: 'Documents',           permission: 'archive.view_document' },
   { to: '/stats',          icon: BarChart3,        label: 'Statistiques',        permission: null },
+  { to: '/nomenclature',   icon: BookOpen,         label: 'Nomenclature',        permission: null },
+  { to: '/glossaire',      icon: GraduationCap,    label: 'Glossaire',           permission: null },
   { to: '/archive',        icon: FolderOpen,       label: 'Archive',             permission: 'archive.view_document' },
   { to: '/alertes',        icon: Bell,             label: 'Alertes',             permission: null },
 ]
