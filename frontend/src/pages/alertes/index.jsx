@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import api from '../../api'
 import { NOMENCLATURE } from '../nomenclature/nomenclatureData'
+import { useAuthStore } from '../../store'
 import toast from 'react-hot-toast'
 
 // ── API ───────────────────────────────────────────────────────────────────────
@@ -117,8 +118,9 @@ function AlertCard({ alert }) {
 }
 
 // ── Vérificateur de droit ─────────────────────────────────────────────────────
-function VerificateurDroit({ recuperateurs }) {
-  const [recupId,  setRecupId]  = useState('')
+function VerificateurDroit({ recuperateurs, currentUser }) {
+  const isRecup = currentUser?.role === 'RECUPERATEUR'
+  const [recupId,  setRecupId]  = useState(isRecup ? (currentUser?.recuperateur_id || '') : '')
   const [code,     setCode]     = useState('')
   const [result,   setResult]   = useState(null)
   const [checking, setChecking] = useState(false)
@@ -168,18 +170,24 @@ function VerificateurDroit({ recuperateurs }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Récupérateur */}
+        {/* Récupérateur — auto-sélectionné pour un profil récupérateur, sélectionnable sinon */}
         <div>
           <label className="label">Récupérateur</label>
-          <select value={recupId} onChange={e => { setRecupId(e.target.value); setResult(null) }}
-            className="input">
-            <option value="">-- Sélectionner --</option>
-            {recuperateurs.map(r => (
-              <option key={r.id} value={r.id}>
-                {r.nom_raison_sociale} — {r.type_display || r.type_recuperateur}
-              </option>
-            ))}
-          </select>
+          {isRecup ? (
+            <div className="input flex items-center bg-slate-50 dark:bg-[#16240D] text-slate-600 dark:text-slate-300">
+              {currentUser?.recuperateur_nom || '—'}
+            </div>
+          ) : (
+            <select value={recupId} onChange={e => { setRecupId(e.target.value); setResult(null) }}
+              className="input">
+              <option value="">-- Sélectionner --</option>
+              {recuperateurs.map(r => (
+                <option key={r.id} value={r.id}>
+                  {r.nom_raison_sociale} — {r.type_display || r.type_recuperateur}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Code déchet */}
@@ -309,6 +317,7 @@ function VerificateurDroit({ recuperateurs }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function AlertesPage() {
+  const { user: currentUser } = useAuthStore()
   const [alerts,        setAlerts]        = useState([])
   const [recuperateurs, setRecuperateurs] = useState([])
   const [loading,       setLoading]       = useState(true)
@@ -487,7 +496,7 @@ export default function AlertesPage() {
               </div>
             </div>
           </div>
-          <VerificateurDroit recuperateurs={recuperateurs} />
+          <VerificateurDroit recuperateurs={recuperateurs} currentUser={currentUser} />
         </div>
       )}
 
