@@ -212,11 +212,17 @@ Comment puis-je vous aider aujourd'hui ?"""
         }
 
     def _reponse_contextuelle(self, message, msg_lower, conversation, langue='fr'):
-        keywords = {
-            'nomenclature': 'nomenclature',
-            'code': 'nomenclature', 'classification': 'nomenclature'
-        }
-        if any(mot in msg_lower for mot in keywords) or 'huile' in msg_lower or 'batterie' in msg_lower or 'métal' in msg_lower or 'زيت' in msg_lower or 'بطارية' in msg_lower or 'معدن' in msg_lower:
+        nomenclature_keywords = [
+            'nomenclature', 'code', 'classification', 'catégorie', 'classe',
+            'huile', 'batterie', 'baterie', 'pile', 'accumulateur',
+            'métal', 'metal', 'cuivre', 'aluminium', 'fer', 'acier', 'plomb', 'zinc',
+            'plastique', 'papier', 'carton', 'verre', 'bois', 'textile',
+            'pneu', 'emballage', 'solvant', 'acide', 'peinture', 'déchet', 'dechet',
+            'chimique', 'inflammable', 'toxique', 'dangereux',
+            'زيت', 'بطارية', 'معدن', 'نحاس', 'حديد', 'فولاذ', 'بلاستيك', 'ورق',
+            'زجاج', 'خشب', 'نسيج', 'إطارات', 'تغليف', 'مذيبات', 'دهانات', 'نفايات',
+        ]
+        if any(mot in msg_lower for mot in nomenclature_keywords):
             return self._rechercher_nomenclature(message, langue)
 
         agrement_keywords = ['agrément', 'agréments', 'validité', 'expire', 'expiré', 'اعتماد', 'صلاحيته']
