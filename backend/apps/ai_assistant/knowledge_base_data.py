@@ -478,6 +478,39 @@ SANCTIONS:
     },
     {
         'categorie': 'referentiel',
+        'titre': 'Types de conditionnement des déchets',
+        'contenu': '''Types de conditionnement utilisés pour le stockage et le transport des déchets en Algérie.
+
+CONDITIONNEMENTS STANDARDS:
+- En vrac: Déchets non conditionnés, chargés directement (gravier, sable, débris de béton)
+- Sac: Sacs en plastique ou en papier pour déchets légers (plastiques, papiers)
+- Big Bag: Grands sacs flexibles (1 m³) pour déchets en vrac légers
+- Carton: Cartons pour déchets légers et secs (papiers, cartons)
+- Fût: Fûts métalliques ou plastiques pour liquides et boues (huiles, solvants)
+- Bidon: Bidons plastiques pour liquides (huiles usagées, eaux contaminées)
+- Palette: Palettes pour le transport de fûts et cartons empilés
+- Conteneur: Conteneurs métalliques pour grands volumes (DEEE, ferraille)
+
+CONDITIONNEMENTS PAR TYPE DE DÉCHET:
+- Huiles usagées: Fûts ou bidons
+- Plastiques: Sac ou Big Bag
+- Métaux: Conteneur ou palette
+- Papier/carton: Carton ou sac
+- Verre: Sac ou conteneur
+- Textiles: Sac
+- Batteries: Palette ou conteneur
+- Pneus: En vrac ou conteneur
+
+NORMES DE CONDITIONNEMENT:
+- Les déchets dangereux (SD) doivent être conditionnés dans des emballages homologués
+- Étiquetage obligatoire avec code nomenclature et pictogramme de danger
+- Fermeture hermétique pour les déchets toxiques ou inflammables
+- Non mélange des déchets compatibles''',
+        'reference_reglementaire': 'Guide pratique - RECUP-DZ',
+        'tags': ['conditionnement', 'emballage', 'transport', 'stockage', 'sac', 'fut', 'bidon', 'palette', 'conteneur'],
+    },
+    {
+        'categorie': 'referentiel',
         'titre': 'Référentiel des codes déchets courants',
         'contenu': '''Référentiel des codes déchets les plus couramment rencontrés en Algérie.
 

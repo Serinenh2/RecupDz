@@ -15,6 +15,7 @@ class Nomenclature(models.Model):
     classe        = models.CharField(max_length=5, choices=CLASSE_CHOICES)
     dangerosite_fr= models.TextField(blank=True)
     dangerosite_ar= models.TextField(blank=True)
+    annexe        = models.CharField(max_length=10, blank=True)  # II ou III
     # Réglementaire
     bsd_obligatoire     = models.BooleanField(default=False)
     agrement_requis     = models.BooleanField(default=False)

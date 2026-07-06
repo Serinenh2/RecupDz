@@ -250,8 +250,9 @@ Comment puis-je vous aider aujourd'hui ?"""
                 reponse = "## نتائج البحث في التصنيف :\n\n"
                 for r in results:
                     danger = " ⚠️ خطير" if r.dangerosite_ar else ""
+                    annexe = f" | الملحق: {r.annexe}" if r.annexe else ""
                     reponse += f"- **{r.code}** — {r.designation_ar or r.designation_fr}{danger}\n"
-                    reponse += f"  الفئة : {r.classe} | العائلة : {r.famille}\n"
+                    reponse += f"  الفئة : {r.classe} | العائلة : {r.famille}{annexe}\n"
                     if r.bsd_obligatoire:
                         reponse += f"  📋 بوليصة متابعة مطلوبة\n"
                     if r.agrement_requis:
@@ -262,8 +263,9 @@ Comment puis-je vous aider aujourd'hui ?"""
                 reponse = "## Résultats de recherche dans la nomenclature :\n\n"
                 for r in results:
                     danger = " ⚠️ DANGEREUX" if r.dangerosite_fr else ""
+                    annexe = f" | Annexe {r.annexe}" if r.annexe else ""
                     reponse += f"- **{r.code}** — {r.designation_fr}{danger}\n"
-                    reponse += f"  Catégorie : {r.classe} | Famille : {r.famille}\n"
+                    reponse += f"  Catégorie : {r.classe} | Famille : {r.famille}{annexe}\n"
                     if r.bsd_obligatoire:
                         reponse += f"  📋 BSD obligatoire\n"
                     if r.agrement_requis:
