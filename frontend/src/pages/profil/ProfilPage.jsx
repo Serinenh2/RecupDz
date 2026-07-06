@@ -521,7 +521,10 @@ export default function ProfilPage() {
   const onSaveRec = async (data) => {
     setSavingRec(true)
     try {
-      await api.patch('/accounts/mon-recuperateur/', data)
+      // logo n'est jamais modifié depuis ce formulaire (upload dédié via uploadLogo) —
+      // renvoyer l'URL texte reçue du GET casserait la validation ImageField du backend.
+      const { logo, ...payload } = data
+      await api.patch('/accounts/mon-recuperateur/', payload)
       toast.success('Fiche récupérateur mise à jour')
       const r = await api.get('/accounts/mon-recuperateur/')
       setRecup(r.data)
@@ -728,11 +731,17 @@ export default function ProfilPage() {
                 <F label="Téléphone">
                   <input {...recForm.register('telephone')} className="input" placeholder="+213..."/>
                 </F>
+                <F label="Fax">
+                  <input {...recForm.register('fax')} className="input" placeholder="+213..."/>
+                </F>
                 <F label="Email">
                   <input {...recForm.register('email')} type="email" className="input"/>
                 </F>
                 <F label="Site web">
                   <input {...recForm.register('site_web')} className="input"/>
+                </F>
+                <F label="Compte bancaire (RIB)">
+                  <input {...recForm.register('compte_bancaire')} className="input" placeholder="Banque, agence, RIB..."/>
                 </F>
               </div>
             </div>

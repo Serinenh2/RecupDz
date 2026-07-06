@@ -3,7 +3,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import {
   FileText, Plus, Search, X, Save, Edit, Trash2,
   Download, Shield, AlertTriangle, CheckCircle2,
-  Clock, XCircle, Clipboard, BarChart3, Calendar, Truck, ShoppingCart
+  Clock, XCircle, Clipboard, BarChart3, Calendar, Truck, ShoppingCart, FileSignature, Receipt
 } from 'lucide-react'
 import api from '../../api'
 import { useAuthStore } from '../../store'
@@ -65,8 +65,10 @@ const destinatairesAPI = {
 const TABS = [
   { key:'bl',       label:'BL',       icon:Truck,         desc:"Bon de Livraison — émis par le récupérateur vers l'éliminateur ou le valorisateur" },
   { key:'bc',       label:'BC',       icon:ShoppingCart,  desc:"Bon de Commande — document commercial avec prix unitaires, TVA et Total TTC" },
+  { key:'proforma', label:'Proforma', icon:FileSignature, desc:'Proforma — devis préalable, même contenu que le Bon de Commande' },
   { key:'bsd',      label:'BSD',      icon:FileText,      desc:'Bordereaux de Suivi des Déchets — documents de traçabilité obligatoires' },
   { key:'dsd',      label:'DSD',      icon:AlertTriangle, desc:'Déclarations des Déchets Spéciaux Dangereux — formulaire annuel officiel' },
+  { key:'facture',  label:'Facture',  icon:Receipt,       desc:'Facture — document de facturation, même contenu que le Bon de Commande' },
   { key:'pv',       label:'PV',       icon:Clipboard,     desc:'Procès-Verbaux de contrôle environnemental' },
   { key:'rapports', label:'Rapports', icon:BarChart3,     desc:'Rapports environnementaux périodiques' },
 ]
@@ -278,7 +280,8 @@ function BLForm({ bl, currentUser, onSave, onClose }) {
       statut: 'BROUILLON',
       destinataire_type: 'ELIMINATEUR',
       date_livraison: new Date().toISOString().split('T')[0],
-      lignes: [{ description:'', quantite:'', unite:'KG', stockage:'' }],
+      mode_livraison: 'ENLEVEMENT',
+      lignes: [{ ref_article:'', description:'', quantite:'', unite:'KG', stockage:'' }],
     }
   })
   const { fields, append, remove } = useFieldArray({ control, name: 'lignes' })
@@ -296,6 +299,7 @@ function BLForm({ bl, currentUser, onSave, onClose }) {
 
   const onSubmit = async (data) => {
     setSaving(true)
+    if (!data.montant_reference && data.montant_reference !== 0) delete data.montant_reference
     try {
       if (isEdit) { await blAPI.update(bl.id, data); toast.success('BL mis à jour') }
       else        { await blAPI.create(data);          toast.success('BL créé') }
@@ -309,6 +313,17 @@ function BLForm({ bl, currentUser, onSave, onClose }) {
     recuperateur:           bl?.recuperateur || currentUser?.recuperateur_id,
     destinataire_type:      watch('destinataire_type'),
     destinataire:           watch('destinataire'),
+    ref_client:             watch('ref_client'),
+    client_rc:              watch('client_rc'),
+    client_nif:             watch('client_nif'),
+    client_numero_article:  watch('client_numero_article'),
+    client_nis:             watch('client_nis'),
+    client_telephone:       watch('client_telephone'),
+    client_fax:             watch('client_fax'),
+    client_email:           watch('client_email'),
+    pieces_liees:           watch('pieces_liees'),
+    mode_livraison:         watch('mode_livraison'),
+    montant_reference:      watch('montant_reference'),
     date_livraison:         watch('date_livraison'),
     lignes:                 watch('lignes'),
     chauffeur_nom:          watch('chauffeur_nom'),
@@ -377,6 +392,28 @@ function BLForm({ bl, currentUser, onSave, onClose }) {
         </F>
       </div>
 
+      <div className="card p-4 space-y-3">
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Client (facturation)</p>
+        <div className="grid grid-cols-2 gap-3">
+          <F label="Réf. client"><input {...register('ref_client')} className="input" placeholder="Code court (ex: FOSSIL)..."/></F>
+          <F label="N° RC client"><input {...register('client_rc')} className="input"/></F>
+          <F label="NIF client"><input {...register('client_nif')} className="input"/></F>
+          <F label="N° Article client"><input {...register('client_numero_article')} className="input"/></F>
+          <F label="N° I.S. client"><input {...register('client_nis')} className="input"/></F>
+          <F label="Tél. client"><input {...register('client_telephone')} className="input"/></F>
+          <F label="Fax client"><input {...register('client_fax')} className="input"/></F>
+          <F label="Email client"><input {...register('client_email')} type="email" className="input"/></F>
+          <F label="Pièces liées"><input {...register('pieces_liees')} className="input" placeholder="Réf. bon de commande, soumission..."/></F>
+          <F label="Mode de livraison">
+            <select {...register('mode_livraison')} className="input">
+              <option value="ENLEVEMENT">Enlèvement</option>
+              <option value="LIVRAISON">Livraison</option>
+            </select>
+          </F>
+          <F label="Montant de référence (DZD)"><input {...register('montant_reference')} type="number" step="0.01" className="input" placeholder="0.00"/></F>
+        </div>
+      </div>
+
       {watch('destinataire_type') === 'CET' && (
         <div className="card p-3 bg-amber-50 border border-amber-300 flex items-start gap-2 rounded-xl">
           <AlertTriangle size={15} className="text-amber-600 flex-shrink-0 mt-0.5"/>
@@ -394,52 +431,60 @@ function BLForm({ bl, currentUser, onSave, onClose }) {
       <div className="card p-4 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Description (Nature des déchets)</p>
-          <button type="button" onClick={()=>append({ description:'', quantite:'', unite:'KG', stockage:'' })}
+          <button type="button" onClick={()=>append({ ref_article:'', description:'', quantite:'', unite:'KG', stockage:'' })}
             className="text-xs font-semibold text-primary-600 hover:underline">+ Ajouter une ligne</button>
         </div>
         {fields.map((f, i) => (
-          <div key={f.id} className="grid grid-cols-12 gap-2 items-end">
-            <div className="col-span-5">
-              {i===0 && <label className="label text-[10px]">Description (Nature des déchets)</label>}
-              {watch('destinataire_type') === 'CET' ? (
-                <select {...register(`lignes.${i}.description`)} className="input">
-                  <option value="">— Sélectionner la désignation —</option>
-                  {DECHETS_MENAGERS.map(d => <option key={d} value={d}>{d}</option>)}
+          <div key={f.id} className="space-y-2 pb-3 border-b border-[#E2E8F0] last:border-0">
+            <div className="grid grid-cols-12 gap-2 items-end">
+              <div className="col-span-3">
+                {i===0 && <label className="label text-[10px]">Réf. article</label>}
+                <input {...register(`lignes.${i}.ref_article`)} className="input" placeholder="Réf..."/>
+              </div>
+              <div className="col-span-9">
+                {i===0 && <label className="label text-[10px]">Description (Nature des déchets)</label>}
+                {watch('destinataire_type') === 'CET' ? (
+                  <select {...register(`lignes.${i}.description`)} className="input">
+                    <option value="">— Sélectionner la désignation —</option>
+                    {DECHETS_MENAGERS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                ) : (
+                  <>
+                    <DescriptionDechetPicker
+                      value={watch(`lignes.${i}.description`) || ''}
+                      onChange={text => setValue(`lignes.${i}.description`, text)}
+                    />
+                    <input type="hidden" {...register(`lignes.${i}.description`)} />
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-12 gap-2 items-end">
+              <div className="col-span-3">
+                {i===0 && <label className="label text-[10px]">Quantité</label>}
+                <input {...register(`lignes.${i}.quantite`)} className="input" type="number"/>
+              </div>
+              <div className="col-span-3">
+                {i===0 && <label className="label text-[10px]">Unité</label>}
+                <select {...register(`lignes.${i}.unite`)} className="input">
+                  <option value="KG">KG</option>
+                  <option value="TONNE">Tonne</option>
+                  <option value="M3">m³</option>
+                  <option value="LITRE">Litre</option>
+                  <option value="UNITE">Unité</option>
                 </select>
-              ) : (
-                <>
-                  <DescriptionDechetPicker
-                    value={watch(`lignes.${i}.description`) || ''}
-                    onChange={text => setValue(`lignes.${i}.description`, text)}
-                  />
-                  <input type="hidden" {...register(`lignes.${i}.description`)} />
-                </>
-              )}
-            </div>
-            <div className="col-span-2">
-              {i===0 && <label className="label text-[10px]">Quantité</label>}
-              <input {...register(`lignes.${i}.quantite`)} className="input" type="number"/>
-            </div>
-            <div className="col-span-2">
-              {i===0 && <label className="label text-[10px]">Unité</label>}
-              <select {...register(`lignes.${i}.unite`)} className="input">
-                <option value="KG">KG</option>
-                <option value="TONNE">Tonne</option>
-                <option value="M3">m³</option>
-                <option value="LITRE">Litre</option>
-                <option value="UNITE">Unité</option>
-              </select>
-            </div>
-            <div className="col-span-2">
-              {i===0 && <label className="label text-[10px]">Stockage</label>}
-              <input {...register(`lignes.${i}.stockage`)} className="input" placeholder="Ibc, Fût..."/>
-            </div>
-            <div className="col-span-1">
-              {fields.length>1 && (
-                <button type="button" onClick={()=>remove(i)} className="btn-ghost p-1.5 text-red-400 hover:text-red-600">
-                  <Trash2 size={14}/>
-                </button>
-              )}
+              </div>
+              <div className="col-span-4">
+                {i===0 && <label className="label text-[10px]">Stockage</label>}
+                <input {...register(`lignes.${i}.stockage`)} className="input" placeholder="Ibc, Fût..."/>
+              </div>
+              <div className="col-span-2 flex justify-end">
+                {fields.length>1 && (
+                  <button type="button" onClick={()=>remove(i)} className="btn-ghost p-1.5 text-red-400 hover:text-red-600">
+                    <Trash2 size={14}/>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -523,14 +568,17 @@ function BLCard({ doc, onEdit, onDelete, onPdf, onWord }) {
 }
 
 // ── BC Form (Bon de Commande) ─────────────────────────────────────────────────
-function BCForm({ bc, currentUser, onSave, onClose }) {
+function BCForm({ bc, currentUser, onSave, onClose, typeDocument = 'BC' }) {
   const isEdit = !!bc?.id
+  const isFacture = typeDocument === 'FACTURE'
+  const docLabel = typeDocument === 'PROFORMA' ? 'Proforma' : typeDocument === 'FACTURE' ? 'Facture' : 'BC'
   const { register, handleSubmit, watch, setValue, control, reset } = useForm({
     defaultValues: bc || {
       statut: 'BROUILLON',
+      type_document: typeDocument,
       date_commande: new Date().toISOString().split('T')[0],
       tva_pct: 19,
-      lignes: [{ description:'', quantite:'', unite:'KG', prix_unitaire:'' }],
+      lignes: [{ ref_article:'', description:'', quantite:'', unite:'KG', prix_unitaire:'', remise_pct:0, tva_pct:'' }],
     }
   })
   const { fields, append, remove } = useFieldArray({ control, name: 'lignes' })
@@ -542,8 +590,17 @@ function BCForm({ bc, currentUser, onSave, onClose }) {
   const calcTotaux = () => {
     const lignes  = watch('lignes') || []
     const tva_pct = parseFloat(watch('tva_pct') || 19)
-    const ht = lignes.reduce((acc, l) => acc + (parseFloat(l.quantite||0) * parseFloat(l.prix_unitaire||0)), 0)
-    return { ht, tva: ht * tva_pct / 100, ttc: ht + ht * tva_pct / 100 }
+    let ht = 0, tva = 0
+    lignes.forEach(l => {
+      const qte    = parseFloat(l.quantite || 0)
+      const pu     = parseFloat(l.prix_unitaire || 0)
+      const remise = parseFloat(l.remise_pct || 0)
+      const ligneTva = (l.tva_pct !== undefined && l.tva_pct !== '') ? parseFloat(l.tva_pct) : tva_pct
+      const ligneHt  = qte * pu * (1 - remise / 100)
+      ht  += ligneHt
+      tva += ligneHt * ligneTva / 100
+    })
+    return { ht, tva, ttc: ht + tva }
   }
 
   const { ht, tva, ttc } = calcTotaux()
@@ -551,23 +608,37 @@ function BCForm({ bc, currentUser, onSave, onClose }) {
 
   const onSubmit = async (data) => {
     setSaving(true)
+    if (!isEdit) data.type_document = typeDocument
     try {
-      if (isEdit) { await bcAPI.update(bc.id, data); toast.success('BC mis à jour') }
-      else        { await bcAPI.create(data);          toast.success('BC créé') }
+      if (isEdit) { await bcAPI.update(bc.id, data); toast.success(`${docLabel} mis${isFacture?'e':''} à jour`) }
+      else        { await bcAPI.create(data);          toast.success(`${docLabel} créé${isFacture?'e':''}`) }
       onSave()
     } catch { toast.error('Erreur') }
     finally { setSaving(false) }
   }
 
   const buildBcData = () => ({
-    numero:        bc?.numero || '',
-    recuperateur:  bc?.recuperateur || currentUser?.recuperateur_id,
-    client_nom:    watch('client_nom'),
-    client_adresse:watch('client_adresse'),
-    date_commande: watch('date_commande'),
-    tva_pct:       watch('tva_pct'),
-    lignes:        watch('lignes'),
-    statut:        watch('statut'),
+    numero:               bc?.numero || '',
+    type_document:        bc?.type_document || typeDocument,
+    recuperateur:         bc?.recuperateur || currentUser?.recuperateur_id,
+    ref_client:           watch('ref_client'),
+    client_nom:           watch('client_nom'),
+    client_adresse:       watch('client_adresse'),
+    client_rc:            watch('client_rc'),
+    client_nif:           watch('client_nif'),
+    client_numero_article:watch('client_numero_article'),
+    client_nis:           watch('client_nis'),
+    client_telephone:     watch('client_telephone'),
+    client_fax:           watch('client_fax'),
+    client_email:         watch('client_email'),
+    date_commande:        watch('date_commande'),
+    date_echeance:        watch('date_echeance'),
+    pieces_liees:         watch('pieces_liees'),
+    mode_paiement:        watch('mode_paiement'),
+    reference_paiement:   watch('reference_paiement'),
+    tva_pct:              watch('tva_pct'),
+    lignes:               watch('lignes'),
+    statut:               watch('statut'),
   })
 
   const downloadPdf = async () => {
@@ -576,10 +647,10 @@ function BCForm({ bc, currentUser, onSave, onClose }) {
       const res = await bcAPI.pdf(buildBcData())
       const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/pdf'}))
       const a   = document.createElement('a')
-      a.href = url; a.setAttribute('download', `${bc?.numero||'BC'}.pdf`)
+      a.href = url; a.setAttribute('download', `${bc?.numero||(docLabel)}.pdf`)
       document.body.appendChild(a); a.click(); a.remove()
       window.URL.revokeObjectURL(url)
-      toast.success('BC téléchargé !')
+      toast.success(`${docLabel} téléchargé${isFacture?'e':''} !`)
     } catch { toast.error('Erreur génération PDF') }
     finally { setGenerating(false) }
   }
@@ -590,10 +661,10 @@ function BCForm({ bc, currentUser, onSave, onClose }) {
       const res = await bcAPI.word(buildBcData())
       const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}))
       const a   = document.createElement('a')
-      a.href = url; a.setAttribute('download', `${bc?.numero||'BC'}.docx`)
+      a.href = url; a.setAttribute('download', `${bc?.numero||(docLabel)}.docx`)
       document.body.appendChild(a); a.click(); a.remove()
       window.URL.revokeObjectURL(url)
-      toast.success('BC téléchargé (Word) !')
+      toast.success(`${docLabel} téléchargé${isFacture?'e':''} (Word) !`)
     } catch { toast.error('Erreur génération Word') }
     finally { setGenerating(false) }
   }
@@ -616,71 +687,140 @@ function BCForm({ bc, currentUser, onSave, onClose }) {
       <div className="card p-4 space-y-3">
         <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Client</p>
         <div className="grid grid-cols-2 gap-3">
+          <F label="Réf. client">
+            <input {...register('ref_client')} className="input" placeholder="Code court (ex: FOSSIL)..."/>
+          </F>
           <F label="Nom de client" req>
             <input {...register('client_nom', {required:true})} className="input" placeholder="Raison sociale..."/>
           </F>
           <F label="Adresse client">
-            <input {...register('client_adresse')} className="input" placeholder="Adresse..."/>
+            <textarea {...register('client_adresse')} className="input" rows={2} placeholder="Adresse..."/>
+          </F>
+          <F label="N° RC client">
+            <input {...register('client_rc')} className="input"/>
+          </F>
+          <F label="NIF client">
+            <input {...register('client_nif')} className="input"/>
+          </F>
+          <F label="N° Article client">
+            <input {...register('client_numero_article')} className="input"/>
+          </F>
+          <F label="N° I.S. client">
+            <input {...register('client_nis')} className="input"/>
+          </F>
+          <F label="Tél. client">
+            <input {...register('client_telephone')} className="input"/>
+          </F>
+          <F label="Fax client">
+            <input {...register('client_fax')} className="input"/>
+          </F>
+          <F label="Email client">
+            <input {...register('client_email')} type="email" className="input"/>
           </F>
         </div>
       </div>
 
-      <F label="Date de commande" req>
-        <DateInput value={watch('date_commande')||''} onChange={v=>setValue('date_commande',v)}/>
-      </F>
+      <div className="grid grid-cols-3 gap-3">
+        <F label="Date de commande" req>
+          <DateInput value={watch('date_commande')||''} onChange={v=>setValue('date_commande',v)}/>
+        </F>
+        <F label="Échéance">
+          <DateInput value={watch('date_echeance')||''} onChange={v=>setValue('date_echeance',v)}/>
+        </F>
+        <F label="Pièces liées">
+          <input {...register('pieces_liees')} className="input" placeholder="Réf. devis, proforma..."/>
+        </F>
+      </div>
+
+      {isFacture && (
+        <div className="grid grid-cols-2 gap-3">
+          <F label="Mode de paiement">
+            <select {...register('mode_paiement')} className="input">
+              <option value="">--</option>
+              <option value="Espèces">Espèces</option>
+              <option value="Chèque">Chèque</option>
+              <option value="Virement">Virement</option>
+              <option value="Traite">Traite</option>
+            </select>
+          </F>
+          <F label="Référence de paiement">
+            <input {...register('reference_paiement')} className="input" placeholder="N° chèque, virement..."/>
+          </F>
+        </div>
+      )}
 
       {/* Lignes */}
       <div className="card p-4 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Description (Nature des déchets)</p>
           <button type="button"
-            onClick={()=>append({ description:'', quantite:'', unite:'KG', prix_unitaire:'' })}
+            onClick={()=>append({ ref_article:'', description:'', quantite:'', unite:'KG', prix_unitaire:'', remise_pct:0, tva_pct:'' })}
             className="text-xs font-semibold text-primary-600 hover:underline">+ Ajouter une ligne</button>
         </div>
 
-        {fields.map((f, i) => (
-          <div key={f.id} className="grid grid-cols-12 gap-2 items-end">
-            <div className="col-span-4">
-              {i===0 && <label className="label text-[10px]">Description</label>}
-              <select {...register(`lignes.${i}.description`)} className="input">
-                <option value="">— Sélectionner —</option>
-                {DECHETS_MENAGERS.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-            <div className="col-span-2">
-              {i===0 && <label className="label text-[10px]">Quantité</label>}
-              <input {...register(`lignes.${i}.quantite`)} className="input" type="number" step="any"
-                onChange={()=>setTimeout(()=>calcTotaux(),0)}/>
-            </div>
-            <div className="col-span-2">
-              {i===0 && <label className="label text-[10px]">Unité</label>}
-              <select {...register(`lignes.${i}.unite`)} className="input">
-                <option value="KG">KG</option>
-                <option value="TONNE">Tonne</option>
-                <option value="M3">m³</option>
-                <option value="LITRE">Litre</option>
-                <option value="UNITE">Unité</option>
-              </select>
-            </div>
-            <div className="col-span-2">
-              {i===0 && <label className="label text-[10px]">Prix unit. (DZ)</label>}
-              <input {...register(`lignes.${i}.prix_unitaire`)} className="input" type="number" step="any" placeholder="0.00"/>
-            </div>
-            <div className="col-span-1">
-              {i===0 && <label className="label text-[10px]">Total HT</label>}
-              <div className="input bg-slate-50 text-slate-500 text-xs flex items-center">
-                {fmt((parseFloat(watch(`lignes.${i}.quantite`)||0) * parseFloat(watch(`lignes.${i}.prix_unitaire`)||0)))} DZ
+        {fields.map((f, i) => {
+          const qte    = parseFloat(watch(`lignes.${i}.quantite`)||0)
+          const pu     = parseFloat(watch(`lignes.${i}.prix_unitaire`)||0)
+          const remise = parseFloat(watch(`lignes.${i}.remise_pct`)||0)
+          const ligneHt = qte * pu * (1 - remise / 100)
+          return (
+          <div key={f.id} className="space-y-2 pb-3 border-b border-[#E2E8F0] last:border-0">
+            <div className="grid grid-cols-12 gap-2 items-end">
+              <div className="col-span-2">
+                {i===0 && <label className="label text-[10px]">Réf. article</label>}
+                <input {...register(`lignes.${i}.ref_article`)} className="input" placeholder="Réf..."/>
+              </div>
+              <div className="col-span-4">
+                {i===0 && <label className="label text-[10px]">Description</label>}
+                <select {...register(`lignes.${i}.description`)} className="input">
+                  <option value="">— Sélectionner —</option>
+                  {DECHETS_MENAGERS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
+                {i===0 && <label className="label text-[10px]">Quantité</label>}
+                <input {...register(`lignes.${i}.quantite`)} className="input" type="number" step="any"/>
+              </div>
+              <div className="col-span-2">
+                {i===0 && <label className="label text-[10px]">Unité</label>}
+                <select {...register(`lignes.${i}.unite`)} className="input">
+                  <option value="KG">KG</option>
+                  <option value="TONNE">Tonne</option>
+                  <option value="M3">m³</option>
+                  <option value="LITRE">Litre</option>
+                  <option value="UNITE">Unité</option>
+                </select>
+              </div>
+              <div className="col-span-2">
+                {i===0 && <label className="label text-[10px]">Prix unit. (DZ)</label>}
+                <input {...register(`lignes.${i}.prix_unitaire`)} className="input" type="number" step="any" placeholder="0.00"/>
               </div>
             </div>
-            <div className="col-span-1">
-              {fields.length > 1 && (
-                <button type="button" onClick={()=>remove(i)} className="btn-ghost p-1.5 text-red-400 hover:text-red-600">
-                  <Trash2 size={14}/>
-                </button>
-              )}
+            <div className="grid grid-cols-12 gap-2 items-end">
+              <div className="col-span-2">
+                {i===0 && <label className="label text-[10px]">Remise %</label>}
+                <input {...register(`lignes.${i}.remise_pct`)} className="input" type="number" step="0.01" placeholder="0.00"/>
+              </div>
+              <div className="col-span-2">
+                {i===0 && <label className="label text-[10px]">Tva %</label>}
+                <input {...register(`lignes.${i}.tva_pct`)} className="input" type="number" step="0.01" placeholder={watch('tva_pct')||'19'}/>
+              </div>
+              <div className="col-span-6">
+                {i===0 && <label className="label text-[10px]">Total HT</label>}
+                <div className="input bg-slate-50 text-slate-500 text-xs flex items-center">
+                  {fmt(ligneHt)} DZ
+                </div>
+              </div>
+              <div className="col-span-2 flex justify-end">
+                {fields.length > 1 && (
+                  <button type="button" onClick={()=>remove(i)} className="btn-ghost p-1.5 text-red-400 hover:text-red-600">
+                    <Trash2 size={14}/>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        ))}
+        )})}
 
         {/* Récapitulatif */}
         <div className="mt-2 pt-3 border-t border-[#E2E8F0] flex flex-col items-end gap-1 text-sm">
@@ -711,7 +851,7 @@ function BCForm({ bc, currentUser, onSave, onClose }) {
 
       <div className="flex gap-3 pt-2 border-t border-[#E2E8F0]">
         <button type="submit" disabled={saving||generating} className="btn-primary">
-          <Save size={15}/> {saving?'Enregistrement...':isEdit?'Mettre à jour':'Créer le BC'}
+          <Save size={15}/> {saving?'Enregistrement...':isEdit?'Mettre à jour':`Créer ${isFacture?'la':'le'} ${docLabel}`}
         </button>
         <button type="button" onClick={downloadPdf} disabled={saving||generating} className="btn-secondary flex items-center gap-2">
           {generating
@@ -1723,7 +1863,9 @@ export default function DocumentsPage() {
       if (isRecup && user?.recuperateur_id) p.recuperateur = user.recuperateur_id
       let res
       if (tab==='bl')                        res = await blAPI.getAll(p)
-      else if (tab==='bc')                   res = await bcAPI.getAll(p)
+      else if (tab==='bc')                   res = await bcAPI.getAll({ ...p, type_document:'BC' })
+      else if (tab==='proforma')             res = await bcAPI.getAll({ ...p, type_document:'PROFORMA' })
+      else if (tab==='facture')              res = await bcAPI.getAll({ ...p, type_document:'FACTURE' })
       else if (tab==='bsd')                  res = await bsdAPI.getAll(p)
       else if (tab==='dsd')                  res = await dsdAPI.getAll(p)
       else if (tab==='pv'||tab==='rapports') res = await pvAPI.getAll(p)
@@ -1738,7 +1880,7 @@ export default function DocumentsPage() {
     if (!window.confirm('Supprimer ?')) return
     try {
       if (type==='bl')       await blAPI.delete(id)
-      else if (type==='bc')  await bcAPI.delete(id)
+      else if (type==='bc' || type==='proforma' || type==='facture') await bcAPI.delete(id)
       else if (type==='bsd') await bsdAPI.delete(id)
       else if (type==='dsd') await dsdAPI.delete(id)
       else                   await pvAPI.delete(id)
@@ -1875,6 +2017,8 @@ export default function DocumentsPage() {
   const getBtnLabel = () => {
     if (tab==='bl')  return 'Nouveau BL'
     if (tab==='bc')  return 'Nouveau BC'
+    if (tab==='proforma') return 'Nouveau Proforma'
+    if (tab==='facture') return 'Nouvelle Facture'
     if (tab==='bsd') return 'Nouveau BSD'
     if (tab==='dsd') return 'Nouvelle DSD'
     if (tab==='pv')  return 'Nouveau PV'
@@ -1941,7 +2085,7 @@ export default function DocumentsPage() {
       ) : (
         <div className="space-y-2">
           {tab==='bl'      && items.map(doc=><BLCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleBlPdf} onWord={handleBlWord}/>)}
-          {tab==='bc'      && items.map(doc=><BCCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleBcPdf} onWord={handleBcWord}/>)}
+          {(tab==='bc'||tab==='proforma'||tab==='facture') && items.map(doc=><BCCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleBcPdf} onWord={handleBcWord}/>)}
           {tab==='bsd'     && items.map(doc=><BSDCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleBsdPdf} onWord={handleBsdWord}/>)}
           {tab==='dsd'     && items.map(doc=><DSDCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleDsdPdf} onWord={handleDsdWord}/>)}
           {(tab==='pv'||tab==='rapports') && items.map(doc=><PVCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handlePvPdf} onWord={handlePvWord}/>)}
@@ -1952,13 +2096,14 @@ export default function DocumentsPage() {
         open={showForm}
         onClose={()=>{setShowForm(false);setEditing(null)}}
         title={editing ? `Modifier ${tab.toUpperCase()}` : getBtnLabel()}
-        size={tab==='dsd' || tab==='bc' ? 'max-w-3xl' : 'max-w-2xl'}>
+        size={tab==='dsd' || tab==='bc' || tab==='proforma' || tab==='facture' ? 'max-w-3xl' : 'max-w-2xl'}>
         {tab==='bl' && (
           <BLForm bl={editing} currentUser={user}
             onSave={handleSave} onClose={()=>{setShowForm(false);setEditing(null)}}/>
         )}
-        {tab==='bc' && (
+        {(tab==='bc'||tab==='proforma'||tab==='facture') && (
           <BCForm bc={editing} currentUser={user}
+            typeDocument={tab==='proforma' ? 'PROFORMA' : tab==='facture' ? 'FACTURE' : 'BC'}
             onSave={handleSave} onClose={()=>{setShowForm(false);setEditing(null)}}/>
         )}
         {tab==='bsd' && (

@@ -39,7 +39,7 @@ class PermissionSerializer(serializers.ModelSerializer):
         fields = ['id', 'codename', 'name', 'app_label', 'model_name']
 
 
-@api_view(['GET'])
+@api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def me(request):
     if request.method == 'PATCH':

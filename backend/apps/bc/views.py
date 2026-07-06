@@ -20,7 +20,7 @@ class BCFilter(django_filters.FilterSet):
 
     class Meta:
         model  = BonCommande
-        fields = ['recuperateur', 'statut', 'date_commande']
+        fields = ['recuperateur', 'statut', 'date_commande', 'type_document']
 
 
 class BCViewSet(viewsets.ModelViewSet):

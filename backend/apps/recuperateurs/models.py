@@ -53,8 +53,10 @@ class Recuperateur(models.Model):
     latitude           = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     longitude          = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     telephone          = models.CharField(max_length=30, blank=True)
+    fax                = models.CharField(max_length=30, blank=True)
     email              = models.EmailField(blank=True)
     site_web           = models.URLField(blank=True)
+    compte_bancaire    = models.CharField(max_length=100, blank=True, verbose_name='Compte bancaire (RIB)')
 
     statut             = models.CharField(max_length=15, choices=STATUT_CHOICES, default='EN_ATTENTE')
     date_creation      = models.DateField(null=True, blank=True)

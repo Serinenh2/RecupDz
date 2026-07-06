@@ -19,6 +19,10 @@ class BonLivraison(models.Model):
         ('VALIDE',    'Validé'),
         ('ARCHIVE',   'Archivé'),
     ]
+    MODE_LIVRAISON_CHOICES = [
+        ('ENLEVEMENT', 'Enlèvement'),
+        ('LIVRAISON',  'Livraison'),
+    ]
 
     numero               = models.CharField(max_length=30, unique=True, blank=True)
     recuperateur         = models.ForeignKey('recuperateurs.Recuperateur', on_delete=models.PROTECT,
@@ -26,6 +30,20 @@ class BonLivraison(models.Model):
     destinataire_type    = models.CharField(max_length=20, choices=DESTINATAIRE_CHOICES)
     destinataire         = models.ForeignKey('operateurs.Operateur', on_delete=models.PROTECT,
                                               related_name='bons_livraison_recus')
+
+    ref_client             = models.CharField(max_length=100, blank=True, verbose_name='Réf. client')
+    client_rc               = models.CharField(max_length=100, blank=True, verbose_name='N° RC client')
+    client_nif               = models.CharField(max_length=100, blank=True, verbose_name='NIF client')
+    client_numero_article    = models.CharField(max_length=100, blank=True, verbose_name='N° Article client')
+    client_nis               = models.CharField(max_length=100, blank=True, verbose_name='N° I.S. client')
+    client_telephone         = models.CharField(max_length=50, blank=True, verbose_name='Tél. client')
+    client_fax               = models.CharField(max_length=50, blank=True, verbose_name='Fax client')
+    client_email             = models.EmailField(blank=True, verbose_name='Email client')
+    pieces_liees             = models.CharField(max_length=200, blank=True, verbose_name='Pièces liées')
+    mode_livraison           = models.CharField(max_length=15, choices=MODE_LIVRAISON_CHOICES,
+                                                 default='ENLEVEMENT', verbose_name='Mode de livraison')
+    montant_reference        = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True,
+                                                     verbose_name='Montant de référence (DZD)')
 
     date_livraison        = models.DateField()
 
