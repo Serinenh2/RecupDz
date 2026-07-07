@@ -17,8 +17,9 @@ export default function LoginPage() {
     try {
       await login(data.username, data.password)
       navigate('/dashboard')
-    } catch {
-      toast.error('Identifiants incorrects')
+    } catch (err) {
+      if (err.response) toast.error('Identifiants incorrects')
+      else toast.error('Impossible de contacter le serveur — vérifiez que le backend est démarré')
     } finally {
       setLoading(false)
     }
