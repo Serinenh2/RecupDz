@@ -80,7 +80,7 @@ export default function LoginPage() {
 
         <div className="relative z-10 inline-flex items-center gap-2 mb-4 self-start">
           <span className="w-1.5 h-1.5 rounded-full bg-[#97C459]" />
-          <span className="text-[11px] font-medium text-[#97C459] tracking-wide">DEPUIS 2022 AU SERVICE DE L'ENVIRONNEMENT</span>
+          <span className="text-[11px] font-medium text-[#97C459] tracking-wide">UNE SOLUTION NUMÉRIQUE AU SERVICE DE LA GESTION DES DÉCHETS</span>
         </div>
 
         <h1 className="relative z-10 text-[32px] lg:text-[36px] font-medium leading-[1.25] text-[#EAF3DE] mb-5 tracking-tight">
@@ -89,8 +89,8 @@ export default function LoginPage() {
         </h1>
 
         <p className="relative z-10 text-sm leading-relaxed text-[#C0DD97] max-w-xs">
-          Accompagner les récupérateurs agréés dans le suivi conforme et la
-          valorisation responsable de chaque déchet collecté.
+          Faciliter le suivi, renforcer la traçabilité et accompagner les acteurs agréés 
+          dans une gestion responsable des déchets.
         </p>
 
         <div className="relative z-10 flex gap-8 mt-auto">
