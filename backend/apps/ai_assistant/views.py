@@ -212,13 +212,18 @@ Comment puis-je vous aider aujourd'hui ?"""
         }
 
     def _reponse_contextuelle(self, message, msg_lower, conversation, langue='fr'):
+        import re
+        # Detect code patterns like 15.01.01, 1.3.1, 16.06.01
+        if re.search(r'\d{1,2}\.\d{1,2}\.\d{1,2}', message):
+            return self._rechercher_nomenclature(message, langue)
+
         nomenclature_keywords = [
             'nomenclature', 'code', 'classification', 'catégorie', 'classe',
             'huile', 'batterie', 'baterie', 'pile', 'accumulateur',
             'métal', 'metal', 'cuivre', 'aluminium', 'fer', 'acier', 'plomb', 'zinc',
             'plastique', 'papier', 'carton', 'verre', 'bois', 'textile',
             'pneu', 'emballage', 'solvant', 'acide', 'peinture', 'déchet', 'dechet',
-            'chimique', 'inflammable', 'toxique', 'dangereux',
+            'chimique', 'inflammable', 'inflamable', 'toxique', 'dangereux',
             'زيت', 'بطارية', 'معدن', 'نحاس', 'حديد', 'فولاذ', 'بلاستيك', 'ورق',
             'زجاج', 'خشب', 'نسيج', 'إطارات', 'تغليف', 'مذيبات', 'دهانات', 'نفايات',
         ]
@@ -245,11 +250,37 @@ Comment puis-je vous aider aujourd'hui ?"""
 
     def _rechercher_nomenclature(self, message, langue='fr'):
         from apps.nomenclature.models import Nomenclature
+        import re
+        msg_clean = message.strip().replace(':', '').replace('?', '').replace('!', '').strip()
+
+        # Detect code pattern and normalize
+        code_match = re.search(r'(\d{1,2}\.\d{1,2}\.\d{1,2})', msg_clean)
+        if code_match:
+            raw = code_match.group(1)
+            parts = raw.split('.')
+            normalized = f"{int(parts[0]):02d}.{int(parts[1]):02d}.{int(parts[2]):02d}"
+            exact = Nomenclature.objects.filter(code=normalized).first()
+            if not exact:
+                exact = Nomenclature.objects.filter(code=raw).first()
+            if exact:
+                return self._nomenclature_detail(exact, langue)
+
+        # Common typo corrections
+        typo_map = {
+            'baterie': 'batterie', 'bateris': 'batterie',
+            'electrique': 'électrique', 'electronique': 'électronique',
+            'inflamable': 'inflammable', 'cancerogene': 'cancérogène',
+            'corosif': 'corrosif',
+        }
+        corrected = msg_clean.lower()
+        for wrong, right in typo_map.items():
+            corrected = corrected.replace(wrong, right)
+
         results = Nomenclature.objects.filter(
-            Q(designation_fr__icontains=message) |
-            Q(designation_ar__icontains=message) |
-            Q(code__icontains=message) |
-            Q(famille__icontains=message)
+            Q(designation_fr__icontains=corrected) |
+            Q(designation_ar__icontains=corrected) |
+            Q(code__icontains=corrected) |
+            Q(famille__icontains=corrected)
         )[:10]
         if results:
             if langue == 'ar':
@@ -282,6 +313,56 @@ Comment puis-je vous aider aujourd'hui ?"""
         if langue == 'ar':
             return {'message': "لم يتم العثور على نتائج في التصنيف. جرب بحثاً بكلمة أخرى (مثال: 'زيت', 'بطارية', 'معدن')."}
         return {'message': "Aucun résultat trouvé dans la nomenclature. Essayez avec un autre terme (ex: 'huile', 'batterie', 'métal')."}
+
+    def _nomenclature_detail(self, n, langue='fr'):
+        classe_labels = {
+            'MA': ('Ménagers et Assimilés', 'نفايات منزلية'),
+            'I': ('Inertes', 'نفايات خاملة'),
+            'S': ('Spéciaux', 'نفايات خاصة'),
+            'SD': ('Spéciaux Dangereux', 'نفايات خاصة خطرة'),
+        }
+        fr_label, ar_label = classe_labels.get(n.classe, (n.classe, n.classe))
+
+        dangers = []
+        if n.explosible: dangers.append(('Explosible', 'متفجر'))
+        if n.inflammable: dangers.append(('Inflammable', 'قابل للاشتعال'))
+        if n.toxique: dangers.append(('Toxique', 'سام'))
+        if n.cancerogene: dangers.append(('Cancérogène', 'مسرطن'))
+        if n.corrosive: dangers.append(('Corrosif', 'آكل'))
+        if n.infectieuse: dangers.append(('Infectieux', 'ممرض'))
+        if n.dangereuse_environnement: dangers.append(('Dangereux environnement', 'خطير للبيئة'))
+
+        if langue == 'ar':
+            reponse = f"## التصنيف — `{n.code}`\n\n"
+            reponse += f"### {n.designation_ar or n.designation_fr}\n\n"
+            reponse += f"**الرمز** : `{n.code}`\n"
+            reponse += f"**التصنيف** : {n.classe} — {ar_label}\n"
+            reponse += f"**العائلة** : {n.famille} — {n.sous_famille}\n"
+            if n.annexe:
+                reponse += f"**الملحق** : {n.annexe}\n"
+            if dangers:
+                reponse += f"**أنواع الخطورة** : {', '.join(ar for _, ar in dangers)}\n"
+            reponse += "\n"
+            reponse += f"**📋 بوليصة متابعة** : {'مطلوب' if n.bsd_obligatoire else 'غير مطلوب'}\n"
+            reponse += f"**📝 اعتماد** : {'مطلوب' if n.agrement_requis else 'غير مطلوب'}\n"
+            reponse += "\n_المصدر: المرجع الوطني للنفايات، المرسوم التنفيذي رقم 06-104_"
+        else:
+            reponse = f"## Nomenclature — `{n.code}`\n\n"
+            reponse += f"### {n.designation_fr}\n\n"
+            reponse += f"**Code** : `{n.code}`\n"
+            reponse += f"**Classe** : {n.classe} — {fr_label}\n"
+            reponse += f"**Famille** : {n.famille} — {n.sous_famille}\n"
+            if n.annexe:
+                reponse += f"**Annexe** : {n.annexe}\n"
+            if n.dangerosite_fr:
+                reponse += f"**Dangerosité** : {n.dangerosite_fr}\n"
+            if dangers:
+                reponse += f"**Types de danger** : {', '.join(fr for fr, _ in dangers)}\n"
+            reponse += "\n"
+            reponse += f"**📋 BSD obligatoire** : {'Oui' if n.bsd_obligatoire else 'Non'}\n"
+            reponse += f"**📝 Agrément requis** : {'Oui' if n.agrement_requis else 'Non'}\n"
+            reponse += "\n_Source : Référentiel national des déchets, Décret exécutif n°06-104_"
+        return {'message': reponse}
 
     def _verifier_agrements(self, langue='fr'):
         aujourd_hui = timezone.now().date()
