@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { Calendar, CalendarRange, CalendarDays, CalendarClock, Package, Download, Loader2, AlertTriangle, Home, Layers, Boxes } from 'lucide-react'
 import api from '../../api'
 import DateInput from '../../components/common/DateInput'
+import { formatDateFR } from '../../utils/formatDate'
 
 const PERIODES = [
   { key: 'QUOTIDIENNE', label: 'Quotidienne',          icon: CalendarClock },
@@ -231,7 +232,7 @@ function RubriqueCET({ bls, loading }) {
                     {l.quantite ? `${Number(l.quantite).toLocaleString('fr-FR')} ${l.unite || 'KG'}` : '—'}
                   </td>
                   <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{l.bl_num}</td>
-                  <td className="px-4 py-2.5 text-slate-600 dark:text-slate-300">{l.date}</td>
+                  <td className="px-4 py-2.5 text-slate-600 dark:text-slate-300">{formatDateFR(l.date)}</td>
                 </tr>
               ))}
             </tbody>
@@ -307,7 +308,7 @@ function RubriqueStock({ rows, loading }) {
                   <tr key={`${t.designation}-${o.numero}`} className="border-b border-slate-50 dark:border-[#16240D] last:border-0 hover:bg-slate-50 dark:hover:bg-[#16240D]/50">
                     <td className="px-4 py-2 pl-8 font-mono text-xs text-slate-500">{o.numero}</td>
                     <td className="px-4 py-2 text-xs text-slate-500">
-                      {o.recupere.toLocaleString('fr-FR')} récupéré − {o.sortie.toLocaleString('fr-FR')} sorti ({o.date})
+                      {o.recupere.toLocaleString('fr-FR')} récupéré − {o.sortie.toLocaleString('fr-FR')} sorti ({formatDateFR(o.date)})
                     </td>
                     <td className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
                       {o.stock.toLocaleString('fr-FR', { maximumFractionDigits: 3 })} {o.unite}
@@ -413,7 +414,7 @@ function Rubrique({ titre, icon: Icon, accent, rows, loading, fichierCsv, vue })
                     {r.quantite} {r.unite_display || r.unite}
                   </td>
                   <td className="px-4 py-2.5 text-slate-600 dark:text-slate-300">{r.generateur_nom || '—'}</td>
-                  <td className="px-4 py-2.5 text-slate-600 dark:text-slate-300">{r.date_recuperation}</td>
+                  <td className="px-4 py-2.5 text-slate-600 dark:text-slate-300">{formatDateFR(r.date_recuperation)}</td>
                 </tr>
               ))}
             </tbody>

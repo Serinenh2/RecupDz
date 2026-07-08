@@ -24,7 +24,8 @@ class BonLivraison(models.Model):
         ('LIVRAISON',  'Livraison'),
     ]
 
-    numero               = models.CharField(max_length=30, unique=True, blank=True)
+    numero               = models.CharField(max_length=30, unique=True, verbose_name='N° document',
+                                             help_text="Saisi par l'utilisateur, ex: BL20260003")
     recuperateur         = models.ForeignKey('recuperateurs.Recuperateur', on_delete=models.PROTECT,
                                               related_name='bons_livraison')
     destinataire_type    = models.CharField(max_length=20, choices=DESTINATAIRE_CHOICES)
@@ -62,13 +63,6 @@ class BonLivraison(models.Model):
     class Meta:
         ordering     = ['-created_at']
         verbose_name = 'Bon de Livraison'
-
-    def save(self, *args, **kwargs):
-        if not self.numero:
-            import uuid
-            from datetime import date
-            self.numero = f"PBL{date.today().strftime('%y')}{str(uuid.uuid4())[:6].upper()}"
-        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.numero

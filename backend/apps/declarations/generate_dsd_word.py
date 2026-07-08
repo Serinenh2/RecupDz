@@ -23,6 +23,16 @@ def _champ(doc, label, valeur):
     p.add_run(str(valeur) if valeur else '—')
 
 
+def _fmt_date(iso):
+    if not iso:
+        return ''
+    parts = str(iso).split('-')
+    if len(parts) != 3:
+        return str(iso)
+    y, m, d = parts
+    return f"{d}/{m}/{y}"
+
+
 def generate_dsd_docx(data: dict) -> bytes:
     doc = Document()
     doc.add_heading('DÉCLARATION DES DÉCHETS SPÉCIAUX DANGEREUX (DSD)', level=1).alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -32,7 +42,7 @@ def generate_dsd_docx(data: dict) -> bytes:
     doc.add_paragraph()
     _section(doc, 'Identification du générateur')
     _champ(doc, 'Année', data.get('annee'))
-    _champ(doc, 'Date de transmission', data.get('date_transmission'))
+    _champ(doc, 'Date de transmission', _fmt_date(data.get('date_transmission')))
     _champ(doc, 'Statut juridique', data.get('statut_juridique'))
     _champ(doc, 'Dénomination', data.get('denomination'))
     _champ(doc, 'Siège social', data.get('siege_social'))

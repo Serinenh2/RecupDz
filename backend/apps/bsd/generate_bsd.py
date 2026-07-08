@@ -41,6 +41,15 @@ def generate_bsd_pdf(data: dict) -> bytes:
         val = data.get(key, default)
         return str(val) if val not in (None, '') else default
 
+    def fmt_date(iso):
+        if not iso:
+            return ''
+        parts = str(iso).split('-')
+        if len(parts) != 3:
+            return str(iso)
+        y, m, d = parts
+        return f"{d}/{m}/{y}"
+
     def champ(label, valeur, largeur_label=4.2*cm):
         t = Table([[Paragraph(label, LBL), Paragraph(f"<b>{valeur}</b>" if valeur else '', LBL)]],
                    colWidths=[largeur_label, COL - largeur_label])
@@ -148,7 +157,7 @@ def generate_bsd_pdf(data: dict) -> bytes:
 
     annee = v('date_emission')[:4] if v('date_emission') else ''
     story.append(double_champ('N° Bordereau :', f"{v('numero')} /BSD/HSE/ /{annee}" if v('numero') else '',
-        'Délivré le :', v('date_emission'), lw1=2.8*cm, lw2=2.3*cm))
+        'Délivré le :', fmt_date(v('date_emission')), lw1=2.8*cm, lw2=2.3*cm))
     story.append(Spacer(1, 5))
     story.append(Paragraph("Objet de la Prestation :", LBL))
     story.append(Paragraph('Collecte et transport des déchets',
@@ -178,7 +187,7 @@ def generate_bsd_pdf(data: dict) -> bytes:
     ]))
     story.append(champ('Autres Précision :', v('autres_precision')))
     story.append(boites_quantite(v('quantite'), v('unite')))
-    story.append(date_signature("Date d'enlèvement :", v('date_emission')))
+    story.append(date_signature("Date d'enlèvement :", fmt_date(v('date_emission'))))
     story.append(Spacer(1, 6))
 
     # ── 2. Collecteur — Transporteur ───────────────────────────────────────────
@@ -193,7 +202,7 @@ def generate_bsd_pdf(data: dict) -> bytes:
     story.append(champ('Moyen de transport :', v('transporteur_vehicule')))
     story.append(champ('Matricule :', v('immatriculation')))
     story.append(boites_quantite(v('quantite'), v('unite')))
-    story.append(date_signature("Date d'enlèvement :", v('date_emission')))
+    story.append(date_signature("Date d'enlèvement :", fmt_date(v('date_emission'))))
     story.append(Spacer(1, 6))
 
     # ── 3. Destination — Centre de traitement ──────────────────────────────────
@@ -202,7 +211,7 @@ def generate_bsd_pdf(data: dict) -> bytes:
     story.append(Spacer(1, 3))
     story.append(champ('Installation :', v('recepteur_nom')))
     story.append(boites_quantite(v('quantite'), v('unite')))
-    story.append(date_signature("Date D'arrivé :", v('date_reception')))
+    story.append(date_signature("Date D'arrivé :", fmt_date(v('date_reception'))))
 
     doc.build(story)
     buffer.seek(0)

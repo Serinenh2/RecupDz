@@ -26,6 +26,16 @@ def _texte_date(date_str):
         return DOTS, DOTS
 
 
+def _fmt_date(iso):
+    if not iso:
+        return ''
+    parts = str(iso).split('-')
+    if len(parts) != 3:
+        return str(iso)
+    y, m, d = parts
+    return f"{d}/{m}/{y}"
+
+
 def _espace(doc, taille=4):
     """Espacement fin entre sections — moins encombrant qu'un paragraphe vide normal."""
     p = doc.add_paragraph()
@@ -79,7 +89,7 @@ def generate_pv_docx(data: dict) -> bytes:
     titre = doc.add_paragraph()
     titre.paragraph_format.space_after = Pt(8)
     titre.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = titre.add_run(f"Procès-verbal d'incinération n° {pv_numero} du {data.get('date_inspection') or DOTS}")
+    r = titre.add_run(f"Procès-verbal d'incinération n° {pv_numero} du {_fmt_date(data.get('date_inspection')) or DOTS}")
     r.bold = True
     r.font.size = Pt(13)
 
@@ -117,7 +127,7 @@ def generate_pv_docx(data: dict) -> bytes:
            suite=f" récupérée par {data.get('recuperateur_nom') or DOTS}")
     _champ(doc, 'Sise :', data.get('recuperateur_adresse'))
     _champ(doc, 'Agrément n°', data.get('recuperateur_agrement'),
-           suite=f" du {data.get('recuperateur_agrement_date') or DOTS}")
+           suite=f" du {_fmt_date(data.get('recuperateur_agrement_date')) or DOTS}")
 
     _espace(doc, 6)
     _champ(doc, 'Les déchets proviennent de :', data.get('generateur_nom'))

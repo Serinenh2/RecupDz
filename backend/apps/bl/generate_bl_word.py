@@ -7,7 +7,7 @@ from docx import Document
 from docx.shared import Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-from .generate_bl import _recuperateur_info, _destinataire_info
+from .generate_bl import _recuperateur_info, _destinataire_info, _fmt_date
 
 
 def generate_bl_docx(data: dict) -> bytes:
@@ -37,7 +37,7 @@ def generate_bl_docx(data: dict) -> bytes:
     doc.add_paragraph(f"NA {rec['na']}\tNIS {rec['nis']}")
 
     doc.add_paragraph()
-    lieu_date = doc.add_paragraph(f"{rec['commune']} le : {data.get('date_livraison','')}")
+    lieu_date = doc.add_paragraph(f"{rec['commune']} le : {_fmt_date(data.get('date_livraison',''))}")
     lieu_date.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
     doc.add_paragraph()

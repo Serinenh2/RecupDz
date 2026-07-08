@@ -11,6 +11,7 @@ import api from '../../api'
 import { WILAYAS, getCommunesByWilaya } from '../../utils/algeria_geo'
 import { NOMENCLATURE } from '../nomenclature/nomenclatureData'
 import DateInput from '../../components/common/DateInput'
+import { formatDateFR } from '../../utils/formatDate'
 import toast from 'react-hot-toast'
 
 // ── API ───────────────────────────────────────────────────────────────────────
@@ -36,6 +37,19 @@ export const TYPE_CFG = {
 
 // Types needing agrément
 const TYPES_AGREMENT = ['GENERATEUR', 'TRANSPORTEUR', 'ELIMINATEUR']
+
+// Defined once at module scope (not inside the form component) so its identity
+// stays stable across re-renders — otherwise React remounts the wrapped <input>
+// on every keystroke (this form re-renders on every watch()'d change), which
+// makes text fields lose focus after each character typed.
+function F({ label, req, children, full }) {
+  return (
+    <div className={full ? 'col-span-2' : ''}>
+      <label className="label">{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
+      {children}
+    </div>
+  )
+}
 
 function Spinner() {
   return (
@@ -145,7 +159,6 @@ function OperateurForm({ operateur, onSave, onClose }) {
 
   const needsAgrement = TYPES_AGREMENT.includes(type)
   const isTransporteur= type === 'TRANSPORTEUR'
-  const needsCoords   = !['DIR_WILAYA','MINISTERE'].includes(type)
 
   useEffect(() => {
     if (wilaya) setCommunes(getCommunesByWilaya(wilaya))
@@ -172,8 +185,6 @@ function OperateurForm({ operateur, onSave, onClose }) {
   setSaving(true)
 
   // Nettoyer les champs vides
-  if (!data.latitude)            delete data.latitude
-  if (!data.longitude)           delete data.longitude
   if (!data.date_agrement)       delete data.date_agrement
   if (!data.date_debut_agrement) delete data.date_debut_agrement
   if (!data.date_fin_agrement)   delete data.date_fin_agrement
@@ -198,13 +209,6 @@ function OperateurForm({ operateur, onSave, onClose }) {
   }
   finally { setSaving(false) }
 }
-
-  const F = ({ label, req, children, full }) => (
-    <div className={full ? 'col-span-2' : ''}>
-      <label className="label">{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
-      {children}
-    </div>
-  )
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -348,16 +352,6 @@ function OperateurForm({ operateur, onSave, onClose }) {
             <input {...register('email')} type="email" className="input" placeholder="contact@..." />
           </F>
         </div>
-        {needsCoords && (
-          <div className="grid grid-cols-2 gap-3">
-            <F label="Latitude GPS">
-              <input {...register('latitude')} type="number" step="0.0000001" className="input" placeholder="36.7538" />
-            </F>
-            <F label="Longitude GPS">
-              <input {...register('longitude')} type="number" step="0.0000001" className="input" placeholder="3.0588" />
-            </F>
-          </div>
-        )}
       </div>
 
       {/* Statut + Notes */}
@@ -419,7 +413,7 @@ function OperateurCard({ op, onEdit, onDelete, onView }) {
                 </span>
               )}
               {op.date_fin_agrement && (
-                <span className="text-[10px] text-slate-400">jusqu'au {op.date_fin_agrement}</span>
+                <span className="text-[10px] text-slate-400">jusqu'au {formatDateFR(op.date_fin_agrement)}</span>
               )}
             </div>
           )}
@@ -434,7 +428,7 @@ function OperateurCard({ op, onEdit, onDelete, onView }) {
                 </span>
               )}
               {op.convention_date_fin && (
-                <span className="text-[10px] text-slate-400">jusqu'au {op.convention_date_fin}</span>
+                <span className="text-[10px] text-slate-400">jusqu'au {formatDateFR(op.convention_date_fin)}</span>
               )}
             </div>
           )}
@@ -505,9 +499,9 @@ function DetailPanel({ op, onClose, onEdit }) {
                 </span>
               </div>
               <Row label="N° Agrément"   value={op.num_agrement} />
-              <Row label="Date"          value={op.date_agrement} />
-              <Row label="Du"            value={op.date_debut_agrement} />
-              <Row label="Au"            value={op.date_fin_agrement} />
+              <Row label="Date"          value={formatDateFR(op.date_agrement)} />
+              <Row label="Du"            value={formatDateFR(op.date_debut_agrement)} />
+              <Row label="Au"            value={formatDateFR(op.date_fin_agrement)} />
               {op.codes_dechets_autorises && (
                 <div className="mt-3">
                   <p className="text-xs text-slate-400 mb-1.5">Codes autorisés :</p>
@@ -542,9 +536,9 @@ function DetailPanel({ op, onClose, onEdit }) {
                 </span>
               </div>
               <Row label="N° Convention"  value={op.convention_numero} />
-              <Row label="Date"           value={op.convention_date} />
+              <Row label="Date"           value={formatDateFR(op.convention_date)} />
               <Row label="Durée"          value={op.convention_duree ? `${op.convention_duree} an${op.convention_duree > 1 ? 's' : ''}` : null} />
-              <Row label="Échéance"       value={op.convention_date_fin} />
+              <Row label="Échéance"       value={formatDateFR(op.convention_date_fin)} />
             </div>
           )}
 
@@ -566,7 +560,6 @@ function DetailPanel({ op, onClose, onEdit }) {
             <Row label="Adresse"   value={op.adresse} />
             <Row label="Téléphone" value={op.telephone} />
             <Row label="Email"     value={op.email} />
-            {op.latitude && <Row label="GPS" value={`${op.latitude}, ${op.longitude}`} />}
           </div>
 
           {op.notes && (

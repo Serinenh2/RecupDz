@@ -19,7 +19,8 @@ class BonCommande(models.Model):
     ]
 
     type_document  = models.CharField(max_length=10, choices=TYPE_DOCUMENT_CHOICES, default='BC')
-    numero         = models.CharField(max_length=30, unique=True, blank=True)
+    numero         = models.CharField(max_length=30, unique=True, verbose_name='N° document',
+                                       help_text="Saisi par l'utilisateur, ex: CM20260003 / PR20260003 / FA20260003")
     recuperateur   = models.ForeignKey('recuperateurs.Recuperateur', on_delete=models.PROTECT,
                                         related_name='bons_commande')
     ref_client     = models.CharField(max_length=100, blank=True, verbose_name='Réf. client')
@@ -51,14 +52,6 @@ class BonCommande(models.Model):
     class Meta:
         ordering     = ['-created_at']
         verbose_name = 'Bon de Commande'
-
-    def save(self, *args, **kwargs):
-        if not self.numero:
-            import uuid
-            from datetime import date
-            prefix = {'PROFORMA': 'PPR', 'FACTURE': 'FA'}.get(self.type_document, 'PBC')
-            self.numero = f"{prefix}{date.today().strftime('%y')}{str(uuid.uuid4())[:6].upper()}"
-        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.numero

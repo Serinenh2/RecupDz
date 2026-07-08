@@ -12,6 +12,7 @@ import { WILAYAS, getCommunesByWilaya } from '../../utils/algeria_geo'
 import { NOMENCLATURE } from '../nomenclature/nomenclatureData'
 import { NOMENCLATURE_GOLD } from '../nomenclature/nomenclatureGold'
 import DateInput from '../../components/common/DateInput'
+import { formatDateFR } from '../../utils/formatDate'
 import SpecialisationReadOnly from './SpecialisationReadOnly'
 
 // Merged lookup — NOMENCLATURE_GOLD has real designations + dangerosite + annexe
@@ -24,6 +25,19 @@ const NOM_MAP = (() => {
 import toast from 'react-hot-toast'
 
 const findCode = (code) => NOM_MAP[code] || null
+
+// Defined once at module scope (not inside each form component) so its identity
+// stays stable across re-renders — otherwise React remounts the wrapped <input>
+// on every keystroke (these forms re-render on every watch()'d change), which
+// makes text fields lose focus after each character typed.
+function F({ label, req, children, col }) {
+  return (
+    <div className={col || ''}>
+      <label className="label">{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
+      {children}
+    </div>
+  )
+}
 
 const ETENDUE_CFG = {
   NATIONALE: { label: 'Nationale',     icon: '🇩🇿' },
@@ -185,9 +199,9 @@ function AgrementDisplay({ agrement, onEdit }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'N° Agrément',  value: agrement.numero_agrement  },
-          { label: 'Délivré le',   value: agrement.date_delivrance   },
-          { label: 'Valide du',    value: agrement.date_debut        },
-          { label: 'Au',           value: agrement.date_fin          },
+          { label: 'Délivré le',   value: formatDateFR(agrement.date_delivrance) },
+          { label: 'Valide du',    value: formatDateFR(agrement.date_debut)      },
+          { label: 'Au',           value: formatDateFR(agrement.date_fin)        },
         ].filter(i => i.value).map(({ label, value }) => (
           <div key={label} className="card p-3 bg-slate-50/50">
             <p className="text-[10px] text-slate-400 uppercase tracking-wide">{label}</p>
@@ -333,13 +347,6 @@ function AgrementForm({ agrement, recuperateurId, onSave, onCancel }) {
     } catch { toast.error('Erreur lors de la sauvegarde') }
     finally { setSaving(false) }
   }
-
-  const F = ({ label, req, children, col }) => (
-    <div className={col||''}>
-      <label className="label">{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
-      {children}
-    </div>
-  )
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -563,10 +570,6 @@ export default function ProfilPage() {
     SUPERADMIN:'Super Admin', ADMIN:'Administrateur',
     INSPECTEUR:'Inspecteur', RECUPERATEUR:'Récupérateur', READONLY:'Lecture seule',
   }
-  const F = ({ label, children }) => (
-    <div><label className="label">{label}</label>{children}</div>
-  )
-
   return (
     <div className="max-w-3xl space-y-5">
       <div>

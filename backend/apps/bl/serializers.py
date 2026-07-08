@@ -1,5 +1,8 @@
+import re
 from rest_framework import serializers
 from .models import BonLivraison
+
+NUMERO_PREFIX = 'BL'
 
 
 class BLSerializer(serializers.ModelSerializer):
@@ -12,6 +15,7 @@ class BLSerializer(serializers.ModelSerializer):
     class Meta:
         model = BonLivraison
         fields = '__all__'
+        read_only_fields = ['recuperateur']
 
     def validate(self, data):
         dest_type    = data.get('destinataire_type') or getattr(self.instance, 'destinataire_type', None)
@@ -23,5 +27,15 @@ class BLSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "L'opérateur sélectionné n'est pas un Centre d'Enfouissement Technique (CET)."
                 )
+
+        numero = data.get('numero')
+        if numero is not None:
+            numero = numero.strip().upper()
+            if not re.match(rf'^{NUMERO_PREFIX}\d{{4}}\d+$', numero):
+                raise serializers.ValidationError({
+                    'numero': f"Le numéro doit être au format {NUMERO_PREFIX}AAAANNNN "
+                              f"(ex: {NUMERO_PREFIX}20260003 — AAAA = année, NNNN = n° de bon)."
+                })
+            data['numero'] = numero
 
         return data

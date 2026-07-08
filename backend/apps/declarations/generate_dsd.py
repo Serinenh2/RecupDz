@@ -40,6 +40,15 @@ def generate_dsd_pdf(data: dict) -> bytes:
         val = data.get(key, default)
         return str(val) if val not in (None, '') else default
 
+    def fmt_date(iso):
+        if not iso:
+            return ''
+        parts = str(iso).split('-')
+        if len(parts) != 3:
+            return str(iso)
+        y, m, d = parts
+        return f"{d}/{m}/{y}"
+
     def sec_hdr(txt):
         story = [Spacer(1, 12), Paragraph(txt.upper(), SEC),
                   HRFlowable(width='100%', thickness=1.2, color=BLACK), Spacer(1, 6)]
@@ -82,7 +91,7 @@ def generate_dsd_pdf(data: dict) -> bytes:
     s.append(Paragraph('DÉCLARATION DES DÉCHETS SPÉCIAUX DANGEREUX', T2))
     s.append(Paragraph("Décret exécutif n°05-315 du 10 septembre 2005 — Journal Officiel n°62", REF))
     s.append(Spacer(1, 10))
-    s.append(double_champ('Année :', v('annee'), 'Date de transmission :', v('date_transmission'),
+    s.append(double_champ('Année :', v('annee'), 'Date de transmission :', fmt_date(v('date_transmission')),
         lw1=2.2*cm, lw2=4.5*cm))
 
     s.extend(sec_hdr('Identification du générateur et/ou du détenteur'))
@@ -206,7 +215,7 @@ def generate_dsd_pdf(data: dict) -> bytes:
 
     sig = Table([[
         Paragraph('Fait à :', LB), Paragraph('.' * 35, VL),
-        Paragraph('Date :', LB), Paragraph(f"<b>{v('date_transmission')}</b>" if v('date_transmission') else '', VL),
+        Paragraph('Date :', LB), Paragraph(f"<b>{fmt_date(v('date_transmission'))}</b>" if v('date_transmission') else '', VL),
     ]], colWidths=[2*cm, COL/2-2*cm, 2*cm, COL/2-2*cm])
     sig.setStyle(TableStyle([
         ('TOPPADDING', (0,0),(-1,-1), 3), ('BOTTOMPADDING', (0,0),(-1,-1), 3),

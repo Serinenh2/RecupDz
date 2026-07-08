@@ -7,6 +7,7 @@ import {
 import api from '../../api'
 import { NOMENCLATURE } from '../nomenclature/nomenclatureData'
 import { useAuthStore } from '../../store'
+import { formatDateFR } from '../../utils/formatDate'
 import toast from 'react-hot-toast'
 
 // ── API ───────────────────────────────────────────────────────────────────────
@@ -90,7 +91,7 @@ function AlertCard({ alert }) {
             )}
             {alert.date && (
               <span className="flex items-center gap-1">
-                📅 {alert.date}
+                📅 {formatDateFR(alert.date)}
               </span>
             )}
             {alert.code_dechet && (

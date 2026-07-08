@@ -9,6 +9,7 @@ import api from '../../api'
 import { useAuthStore } from '../../store'
 import { NOMENCLATURE } from '../nomenclature/nomenclatureData'
 import DateInput from '../../components/common/DateInput'
+import { formatDateFR } from '../../utils/formatDate'
 import toast from 'react-hot-toast'
 
 const bsdAPI = {
@@ -61,6 +62,7 @@ const eliminateurAPI = { getAll: () => api.get('/operateurs/?type_operateur=ELIM
 const destinatairesAPI = {
   getAll: (type) => api.get('/operateurs/', { params: { type_operateur: type, page_size: 200 } }),
 }
+const clientsAPI = { getAll: () => api.get('/operateurs/', { params: { page_size: 500 } }) }
 
 const TABS = [
   { key:'bl',       label:'BL',       icon:Truck,         desc:"Bon de Livraison — émis par le récupérateur vers l'éliminateur ou le valorisateur" },
@@ -137,6 +139,27 @@ function Modal({ open, onClose, title, children, size='max-w-2xl' }) {
   )
 }
 
+// ── Shared form field wrappers ─────────────────────────────────────────────────
+// Defined once at module scope (not inside each form component) so their identity
+// stays stable across re-renders — otherwise React remounts the wrapped <input>
+// on every keystroke (any form here re-renders on every watch()'d change), which
+// makes text fields lose focus after each character typed.
+function F({ label, req, children, col }) {
+  return (
+    <div className={col || ''}>
+      <label className="label">{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
+      {children}
+    </div>
+  )
+}
+function Sec({ children }) {
+  return (
+    <div className="bg-slate-100 dark:bg-[#2B3D1E] px-4 py-2 rounded-lg">
+      <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{children}</p>
+    </div>
+  )
+}
+
 // ── Code Déchet Picker (shared by BSD and DSD) ────────────────────────────────
 function CodeDechetPicker({ value, onChange }) {
   const [search, setSearch] = useState(value || '')
@@ -193,21 +216,28 @@ function CodeDechetPicker({ value, onChange }) {
 function DescriptionDechetPicker({ value, onChange }) {
   const [search, setSearch] = useState(value || '')
   const [open,   setOpen]   = useState(false)
+  const [dirty,  setDirty]  = useState(false)
 
-  useEffect(() => { setSearch(value || '') }, [value])
+  useEffect(() => { setSearch(value || ''); setDirty(false) }, [value])
+
+  // Tant que l'utilisateur n'a pas retapé, on ignore la valeur pré-remplie pour le
+  // filtrage (elle peut venir d'une ancienne saisie libre qui ne correspond à aucune
+  // rubrique de la nomenclature) et on affiche la liste complète à l'ouverture.
+  const filterText = dirty ? search : ''
 
   const filtered = useMemo(() =>
     NOMENCLATURE
       .filter(n =>
-        !search ||
-        n.code.includes(search.split(' ')[0]) ||
-        n.nom_fr.toLowerCase().includes(search.toLowerCase())
+        !filterText ||
+        n.code.includes(filterText.split(' ')[0]) ||
+        n.nom_fr.toLowerCase().includes(filterText.toLowerCase())
       )
       .slice(0, 40)
-  , [search])
+  , [filterText])
 
   const select = (n) => {
     setSearch(n.nom_fr)
+    setDirty(false)
     setOpen(false)
     onChange(n.nom_fr)
   }
@@ -216,7 +246,7 @@ function DescriptionDechetPicker({ value, onChange }) {
     <div className="relative">
       <input
         value={search}
-        onChange={e => { setSearch(e.target.value); setOpen(true) }}
+        onChange={e => { setSearch(e.target.value); setDirty(true); setOpen(true) }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder="Plastique PET..."
@@ -240,7 +270,7 @@ function DescriptionDechetPicker({ value, onChange }) {
 }
 
 // ── Dossier de traçabilité Picker (import depuis un dossier S/SD existant) ────
-function DossierPicker({ dossiers = [], onSelect }) {
+function DossierPicker({ dossiers = [], onSelect, label = 'Importer depuis un dossier de traçabilité (déchets spéciaux / dangereux)' }) {
   const [selected, setSelected] = useState('')
 
   const handleChange = (e) => {
@@ -248,6 +278,7 @@ function DossierPicker({ dossiers = [], onSelect }) {
     setSelected(id)
     const d = dossiers.find(x => String(x.id) === id)
     if (d) onSelect(d)
+    setSelected('')
   }
 
   if (dossiers.length === 0) return null
@@ -255,7 +286,7 @@ function DossierPicker({ dossiers = [], onSelect }) {
   return (
     <div className="card p-3 bg-primary-50/50 border-primary-200 space-y-2">
       <label className="label flex items-center gap-1.5">
-        <Shield size={12} className="text-primary-500"/> Importer depuis un dossier de traçabilité (déchets spéciaux / dangereux)
+        <Shield size={12} className="text-primary-500"/> {label}
       </label>
       <select value={selected} onChange={handleChange} className="input">
         <option value="">-- Sélectionner un dossier pour pré-remplir le formulaire --</option>
@@ -273,10 +304,11 @@ function DossierPicker({ dossiers = [], onSelect }) {
 }
 
 // ── BL Form (Bon de Livraison) ─────────────────────────────────────────────────
-function BLForm({ bl, currentUser, onSave, onClose }) {
+function BLForm({ bl, currentUser, dossiers = [], onSave, onClose }) {
   const isEdit = !!bl?.id
   const { register, handleSubmit, watch, setValue, control, reset } = useForm({
     defaultValues: bl || {
+      numero: '',
       statut: 'BROUILLON',
       destinataire_type: 'ELIMINATEUR',
       date_livraison: new Date().toISOString().split('T')[0],
@@ -304,12 +336,38 @@ function BLForm({ bl, currentUser, onSave, onClose }) {
       if (isEdit) { await blAPI.update(bl.id, data); toast.success('BL mis à jour') }
       else        { await blAPI.create(data);          toast.success('BL créé') }
       onSave()
-    } catch { toast.error('Erreur') }
+    } catch (err) {
+      toast.error(err?.response?.data?.numero?.[0] || 'Erreur')
+    }
     finally { setSaving(false) }
   }
 
+  const importClientFromDestinataire = (destinataireId) => {
+    const op = destinataires.find(d => String(d.id) === String(destinataireId))
+    if (!op) return
+    setValue('client_rc',        op.registre_commerce || '')
+    setValue('client_nif',       op.nif || '')
+    setValue('client_nis',       op.nis || '')
+    setValue('client_telephone', op.telephone || '')
+    setValue('client_email',     op.email || '')
+  }
+
+  const importLigneFromDossier = (d) => {
+    const lignesActuelles = watch('lignes') || []
+    const lastIdx  = lignesActuelles.length - 1
+    const lastVide = lastIdx >= 0 && !lignesActuelles[lastIdx].description && !lignesActuelles[lastIdx].quantite
+    if (lastVide) {
+      setValue(`lignes.${lastIdx}.description`, d.designation_dechet || '')
+      setValue(`lignes.${lastIdx}.quantite`,     d.quantite || '')
+      setValue(`lignes.${lastIdx}.unite`,        d.unite || 'KG')
+    } else {
+      append({ ref_article:'', description: d.designation_dechet || '', quantite: d.quantite || '', unite: d.unite || 'KG', stockage:'' })
+    }
+    toast.success(`Désignation du dossier ${d.numero} importée`)
+  }
+
   const buildBlData = () => ({
-    numero:                 bl?.numero || '',
+    numero:                 watch('numero') || '',
     recuperateur:           bl?.recuperateur || currentUser?.recuperateur_id,
     destinataire_type:      watch('destinataire_type'),
     destinataire:           watch('destinataire'),
@@ -361,19 +419,20 @@ function BLForm({ bl, currentUser, onSave, onClose }) {
     finally { setGenerating(false) }
   }
 
-  const F = ({ label, req, children }) => (
-    <div>
-      <label className="label">{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
-      {children}
-    </div>
-  )
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <DossierPicker dossiers={dossiers} onSelect={importLigneFromDossier}
+        label="Importer la désignation précise depuis un dossier de traçabilité"/>
+
       <div className="card p-3 bg-primary-50 border-primary-200 flex items-center gap-2">
         <Shield size={14} className="text-primary-600 flex-shrink-0"/>
         <p className="text-sm font-semibold text-primary-800">Émetteur : {currentUser?.recuperateur_nom}</p>
       </div>
+
+      <F label="N° Bon de Livraison" req>
+        <input {...register('numero',{required:true})} className="input font-mono" placeholder="BL20260003"/>
+        <p className="text-[10px] text-slate-400 mt-1">Format : BL + année + n° de bon (ex: BL20260003 = 3ème bon de 2026)</p>
+      </F>
 
       <div className="grid grid-cols-2 gap-3">
         <F label="Destinataire — type" req>
@@ -385,7 +444,8 @@ function BLForm({ bl, currentUser, onSave, onClose }) {
           </select>
         </F>
         <F label={watch('destinataire_type')==='CET' ? 'CET — nom (commune)' : 'Destinataire — raison sociale'} req>
-          <select {...register('destinataire',{required:true})} className="input">
+          <select {...register('destinataire',{required:true})} className="input"
+            onChange={e=>{ setValue('destinataire', e.target.value); importClientFromDestinataire(e.target.value) }}>
             <option value="">-- Sélectionner --</option>
             {destinataires.map(d => <option key={d.id} value={d.id}>{d.raison_sociale}</option>)}
           </select>
@@ -394,6 +454,7 @@ function BLForm({ bl, currentUser, onSave, onClose }) {
 
       <div className="card p-4 space-y-3">
         <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Client (facturation)</p>
+        <p className="text-[10px] text-slate-400 -mt-2">Les champs ci-dessous sont pré-remplis automatiquement depuis la fiche du destinataire sélectionné — modifiables si besoin.</p>
         <div className="grid grid-cols-2 gap-3">
           <F label="Réf. client"><input {...register('ref_client')} className="input" placeholder="Code court (ex: FOSSIL)..."/></F>
           <F label="N° RC client"><input {...register('client_rc')} className="input"/></F>
@@ -545,7 +606,7 @@ function BLCard({ doc, onEdit, onDelete, onPdf, onWord }) {
           </p>
           <div className="flex flex-wrap gap-x-4 text-xs text-slate-400 mt-1">
             <span>{(doc.lignes||[]).length} ligne(s)</span>
-            <span className="flex items-center gap-1"><Calendar size={10}/>{doc.date_livraison}</span>
+            <span className="flex items-center gap-1"><Calendar size={10}/>{formatDateFR(doc.date_livraison)}</span>
           </div>
         </div>
         <div className="flex gap-1 flex-shrink-0">
@@ -568,12 +629,14 @@ function BLCard({ doc, onEdit, onDelete, onPdf, onWord }) {
 }
 
 // ── BC Form (Bon de Commande) ─────────────────────────────────────────────────
-function BCForm({ bc, currentUser, onSave, onClose, typeDocument = 'BC' }) {
+function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument = 'BC' }) {
   const isEdit = !!bc?.id
   const isFacture = typeDocument === 'FACTURE'
   const docLabel = typeDocument === 'PROFORMA' ? 'Proforma' : typeDocument === 'FACTURE' ? 'Facture' : 'BC'
+  const numeroPrefix = typeDocument === 'PROFORMA' ? 'PR' : typeDocument === 'FACTURE' ? 'FA' : 'CM'
   const { register, handleSubmit, watch, setValue, control, reset } = useForm({
     defaultValues: bc || {
+      numero: '',
       statut: 'BROUILLON',
       type_document: typeDocument,
       date_commande: new Date().toISOString().split('T')[0],
@@ -584,8 +647,38 @@ function BCForm({ bc, currentUser, onSave, onClose, typeDocument = 'BC' }) {
   const { fields, append, remove } = useFieldArray({ control, name: 'lignes' })
   const [saving,     setSaving]     = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [clients,    setClients]    = useState([])
+  const [selectedClient, setSelectedClient] = useState('')
 
   useEffect(() => { if (bc) reset(bc) }, [bc])
+  useEffect(() => { clientsAPI.getAll().then(r => setClients(r.data.results || r.data)).catch(()=>{}) }, [])
+
+  const importClientFromOperateur = (operateurId) => {
+    setSelectedClient(operateurId)
+    const op = clients.find(c => String(c.id) === String(operateurId))
+    if (!op) return
+    setValue('client_nom',           op.raison_sociale || '')
+    setValue('client_adresse',       op.adresse || '')
+    setValue('client_rc',            op.registre_commerce || '')
+    setValue('client_nif',           op.nif || '')
+    setValue('client_nis',           op.nis || '')
+    setValue('client_telephone',     op.telephone || '')
+    setValue('client_email',         op.email || '')
+  }
+
+  const importLigneFromDossier = (d) => {
+    const lignesActuelles = watch('lignes') || []
+    const lastIdx  = lignesActuelles.length - 1
+    const lastVide = lastIdx >= 0 && !lignesActuelles[lastIdx].description && !lignesActuelles[lastIdx].quantite
+    if (lastVide) {
+      setValue(`lignes.${lastIdx}.description`, d.designation_dechet || '')
+      setValue(`lignes.${lastIdx}.quantite`,     d.quantite || '')
+      setValue(`lignes.${lastIdx}.unite`,        d.unite || 'KG')
+    } else {
+      append({ ref_article:'', description: d.designation_dechet || '', quantite: d.quantite || '', unite: d.unite || 'KG', prix_unitaire:'', remise_pct:0, tva_pct:'' })
+    }
+    toast.success(`Désignation du dossier ${d.numero} importée`)
+  }
 
   const calcTotaux = () => {
     const lignes  = watch('lignes') || []
@@ -613,12 +706,14 @@ function BCForm({ bc, currentUser, onSave, onClose, typeDocument = 'BC' }) {
       if (isEdit) { await bcAPI.update(bc.id, data); toast.success(`${docLabel} mis${isFacture?'e':''} à jour`) }
       else        { await bcAPI.create(data);          toast.success(`${docLabel} créé${isFacture?'e':''}`) }
       onSave()
-    } catch { toast.error('Erreur') }
+    } catch (err) {
+      toast.error(err?.response?.data?.numero?.[0] || 'Erreur')
+    }
     finally { setSaving(false) }
   }
 
   const buildBcData = () => ({
-    numero:               bc?.numero || '',
+    numero:               watch('numero') || '',
     type_document:        bc?.type_document || typeDocument,
     recuperateur:         bc?.recuperateur || currentUser?.recuperateur_id,
     ref_client:           watch('ref_client'),
@@ -647,7 +742,7 @@ function BCForm({ bc, currentUser, onSave, onClose, typeDocument = 'BC' }) {
       const res = await bcAPI.pdf(buildBcData())
       const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/pdf'}))
       const a   = document.createElement('a')
-      a.href = url; a.setAttribute('download', `${bc?.numero||(docLabel)}.pdf`)
+      a.href = url; a.setAttribute('download', `${watch('numero')||bc?.numero||docLabel}.pdf`)
       document.body.appendChild(a); a.click(); a.remove()
       window.URL.revokeObjectURL(url)
       toast.success(`${docLabel} téléchargé${isFacture?'e':''} !`)
@@ -661,7 +756,7 @@ function BCForm({ bc, currentUser, onSave, onClose, typeDocument = 'BC' }) {
       const res = await bcAPI.word(buildBcData())
       const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}))
       const a   = document.createElement('a')
-      a.href = url; a.setAttribute('download', `${bc?.numero||(docLabel)}.docx`)
+      a.href = url; a.setAttribute('download', `${watch('numero')||bc?.numero||docLabel}.docx`)
       document.body.appendChild(a); a.click(); a.remove()
       window.URL.revokeObjectURL(url)
       toast.success(`${docLabel} téléchargé${isFacture?'e':''} (Word) !`)
@@ -669,23 +764,31 @@ function BCForm({ bc, currentUser, onSave, onClose, typeDocument = 'BC' }) {
     finally { setGenerating(false) }
   }
 
-  const F = ({ label, req, children }) => (
-    <div>
-      <label className="label">{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
-      {children}
-    </div>
-  )
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <DossierPicker dossiers={dossiers} onSelect={importLigneFromDossier}
+        label="Importer la désignation précise depuis un dossier de traçabilité"/>
+
       <div className="card p-3 bg-primary-50 border-primary-200 flex items-center gap-2">
         <Shield size={14} className="text-primary-600 flex-shrink-0"/>
         <p className="text-sm font-semibold text-primary-800">Émetteur : {currentUser?.recuperateur_nom}</p>
       </div>
 
+      <F label={`N° ${docLabel}`} req>
+        <input {...register('numero',{required:true})} className="input font-mono" placeholder={`${numeroPrefix}20260003`}/>
+        <p className="text-[10px] text-slate-400 mt-1">Format : {numeroPrefix} + année + n° de bon (ex: {numeroPrefix}20260003 = 3ème {docLabel.toLowerCase()} de 2026)</p>
+      </F>
+
       {/* Client */}
       <div className="card p-4 space-y-3">
         <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Client</p>
+        <F label="Client existant (optionnel)">
+          <select value={selectedClient} onChange={e=>importClientFromOperateur(e.target.value)} className="input">
+            <option value="">-- Sélectionner pour pré-remplir --</option>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.raison_sociale}</option>)}
+          </select>
+          <p className="text-[10px] text-slate-400 mt-1">Les champs client sont pré-remplis automatiquement depuis la fiche Opérateur sélectionnée — modifiables si besoin.</p>
+        </F>
         <div className="grid grid-cols-2 gap-3">
           <F label="Réf. client">
             <input {...register('ref_client')} className="input" placeholder="Code court (ex: FOSSIL)..."/>
@@ -771,11 +874,12 @@ function BCForm({ bc, currentUser, onSave, onClose, typeDocument = 'BC' }) {
                 <input {...register(`lignes.${i}.ref_article`)} className="input" placeholder="Réf..."/>
               </div>
               <div className="col-span-4">
-                {i===0 && <label className="label text-[10px]">Description</label>}
-                <select {...register(`lignes.${i}.description`)} className="input">
-                  <option value="">— Sélectionner —</option>
-                  {DECHETS_MENAGERS.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
+                {i===0 && <label className="label text-[10px]">Description (Nature des déchets)</label>}
+                <DescriptionDechetPicker
+                  value={watch(`lignes.${i}.description`) || ''}
+                  onChange={text => setValue(`lignes.${i}.description`, text)}
+                />
+                <input type="hidden" {...register(`lignes.${i}.description`)} />
               </div>
               <div className="col-span-2">
                 {i===0 && <label className="label text-[10px]">Quantité</label>}
@@ -887,7 +991,7 @@ function BCCard({ doc, onEdit, onDelete, onPdf, onWord }) {
           <p className="text-sm text-slate-700 dark:text-slate-300 mt-0.5">{doc.client_nom || '—'}</p>
           <div className="flex flex-wrap gap-x-4 text-xs text-slate-400 mt-1">
             <span>{(doc.lignes||[]).length} ligne(s)</span>
-            <span className="flex items-center gap-1"><Calendar size={10}/>{doc.date_commande}</span>
+            <span className="flex items-center gap-1"><Calendar size={10}/>{formatDateFR(doc.date_commande)}</span>
             {total > 0 && <span className="font-semibold text-emerald-600">TTC ≈ {(total * (1 + parseFloat(doc.tva_pct||19)/100)).toLocaleString('fr-FR',{minimumFractionDigits:2})} DZ</span>}
           </div>
         </div>
@@ -1004,13 +1108,6 @@ function BSDForm({ bsd, recuperateurs, dossiers, currentUser, onSave, onClose })
     } catch { toast.error('Erreur génération Word') }
     finally { setGenerating(false) }
   }
-
-  const F = ({ label, req, children }) => (
-    <div>
-      <label className="label">{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
-      {children}
-    </div>
-  )
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -1299,18 +1396,6 @@ function DSDForm({ dsd, recuperateurs, dossiers, currentUser, onSave, onClose })
     finally { setGenerating(false) }
   }
 
-  const F = ({ label, req, children, col }) => (
-    <div className={col||''}>
-      <label className="label">{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
-      {children}
-    </div>
-  )
-  const Sec = ({ children }) => (
-    <div className="bg-slate-100 dark:bg-[#2B3D1E] px-4 py-2 rounded-lg">
-      <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{children}</p>
-    </div>
-  )
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       {!isEdit && <DossierPicker dossiers={dossiers} onSelect={importerDossier}/>}
@@ -1589,10 +1674,6 @@ function PVForm({ pv, recuperateurs, dossiers, eliminateurs, currentUser, onSave
     finally { setGenerating(false) }
   }
 
-  const F = ({label,req,children}) => (
-    <div><label className="label">{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>{children}</div>
-  )
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       {!isEdit && <DossierPicker dossiers={dossiers} onSelect={importerDossier}/>}
@@ -1725,7 +1806,7 @@ function BSDCard({ doc, onEdit, onDelete, onPdf, onWord }) {
           <div className="flex flex-wrap gap-x-4 text-xs text-slate-400 mt-1">
             <span className="font-bold text-slate-600">{doc.quantite} {doc.unite}</span>
             {doc.generateur_nom && <span>Gen: {doc.generateur_nom}</span>}
-            <span className="flex items-center gap-1"><Calendar size={10}/>{doc.date_emission}</span>
+            <span className="flex items-center gap-1"><Calendar size={10}/>{formatDateFR(doc.date_emission)}</span>
           </div>
         </div>
         <div className="flex gap-1 flex-shrink-0">
@@ -1808,7 +1889,7 @@ function PVCard({ doc, onEdit, onDelete, onPdf, onWord }) {
             {res && <span className={`badge ${res.badge} text-[10px]`}>{doc.resultat}</span>}
           </div>
           <div className="text-xs text-slate-400 mt-1 flex items-center gap-1">
-            <Calendar size={10}/>{doc.date_inspection}
+            <Calendar size={10}/>{formatDateFR(doc.date_inspection)}
           </div>
           {doc.observations && (
             <p className="text-xs text-slate-500 mt-1 line-clamp-2">{doc.observations}</p>
@@ -1840,6 +1921,7 @@ export default function DocumentsPage() {
   const [search,   setSearch]   = useState('')
   const [recuperateurs, setRecuperateurs] = useState([])
   const [dossiers,      setDossiers]      = useState([])
+  const [allDossiers,   setAllDossiers]   = useState([])
   const [eliminateurs,  setEliminateurs]  = useState([])
 
   const isRecup = user?.role === 'RECUPERATEUR'
@@ -1851,6 +1933,7 @@ export default function DocumentsPage() {
     if (isRecup && user?.recuperateur_id) p.recuperateur = user.recuperateur_id
     tracaAPI.getAll(p).then(r => {
       const data = r.data.results || r.data
+      setAllDossiers(data)
       setDossiers(data.filter(d => ['S','SD'].includes(d.classe_dechet)))
     }).catch(()=>{})
   }, [])
@@ -2098,11 +2181,11 @@ export default function DocumentsPage() {
         title={editing ? `Modifier ${tab.toUpperCase()}` : getBtnLabel()}
         size={tab==='dsd' || tab==='bc' || tab==='proforma' || tab==='facture' ? 'max-w-3xl' : 'max-w-2xl'}>
         {tab==='bl' && (
-          <BLForm bl={editing} currentUser={user}
+          <BLForm bl={editing} currentUser={user} dossiers={allDossiers}
             onSave={handleSave} onClose={()=>{setShowForm(false);setEditing(null)}}/>
         )}
         {(tab==='bc'||tab==='proforma'||tab==='facture') && (
-          <BCForm bc={editing} currentUser={user}
+          <BCForm bc={editing} currentUser={user} dossiers={allDossiers}
             typeDocument={tab==='proforma' ? 'PROFORMA' : tab==='facture' ? 'FACTURE' : 'BC'}
             onSave={handleSave} onClose={()=>{setShowForm(false);setEditing(null)}}/>
         )}

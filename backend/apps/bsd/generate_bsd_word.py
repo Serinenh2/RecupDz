@@ -27,6 +27,16 @@ def _champ(doc, label, valeur):
     p.add_run(str(valeur) if valeur else '—')
 
 
+def _fmt_date(iso):
+    if not iso:
+        return ''
+    parts = str(iso).split('-')
+    if len(parts) != 3:
+        return str(iso)
+    y, m, d = parts
+    return f"{d}/{m}/{y}"
+
+
 def generate_bsd_docx(data: dict) -> bytes:
     doc = Document()
     doc.add_heading('BORDEREAU DE SUIVI DES DÉCHETS (BSD)', level=1).alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -35,7 +45,7 @@ def generate_bsd_docx(data: dict) -> bytes:
 
     doc.add_paragraph()
     _champ(doc, 'N° BSD', data.get('numero'))
-    _champ(doc, 'Date d\'émission', data.get('date_emission'))
+    _champ(doc, 'Date d\'émission', _fmt_date(data.get('date_emission')))
     _champ(doc, 'Statut', data.get('statut_display') or data.get('statut'))
 
     doc.add_paragraph()
@@ -63,7 +73,7 @@ def generate_bsd_docx(data: dict) -> bytes:
     _section(doc, '5 — Destination finale')
     _champ(doc, 'Destinataire / Récepteur', data.get('recepteur_nom') or data.get('destination_nom'))
     _champ(doc, 'Type de traitement', data.get('type_traitement'))
-    _champ(doc, 'Date de réception', data.get('date_reception'))
+    _champ(doc, 'Date de réception', _fmt_date(data.get('date_reception')))
 
     if data.get('observations'):
         doc.add_paragraph()

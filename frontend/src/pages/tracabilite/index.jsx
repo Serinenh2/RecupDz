@@ -10,6 +10,7 @@ import {
 import api from '../../api'
 import { useAuthStore } from '../../store'
 import DateInput from '../../components/common/DateInput'
+import { formatDateFR } from '../../utils/formatDate'
 import toast from 'react-hot-toast'
 
 const opAPI = {
@@ -47,6 +48,19 @@ const STATUT_CFG = {
 
 function Spinner() {
   return <div className="flex justify-center py-16"><div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"/></div>
+}
+
+// Defined once at module scope (not inside the form component) so its identity
+// stays stable across re-renders — otherwise React remounts the wrapped <input>
+// on every keystroke (this form re-renders on every watch()'d change), which
+// makes text fields lose focus after each character typed.
+function F({ label, req, children, col }) {
+  return (
+    <div className={col || ''}>
+      <label className="label">{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
+      {children}
+    </div>
+  )
 }
 
 function Modal({ open, onClose, title, children, size='max-w-3xl' }) {
@@ -163,6 +177,355 @@ function RepartitionBuilder({ quantiteTotale, unite, lists, value, onChange }) {
   )
 }
 
+// ── Déchets multiples ──────────────────────────────────────────────────────
+// Un récupérateur peut collecter plusieurs types de déchets en une seule
+// opération (même générateur, transporteur, BL/BC). Chaque ligne ci-dessous
+// devient, à la soumission, un dossier de traçabilité distinct qui partage
+// les informations communes (générateur, transport, statut...).
+function emptyDechet() {
+  return {
+    _key: `d${Date.now()}${Math.random().toString(36).slice(2)}`,
+    typeDechet: '', sousCategorie: '', codeDechet: '', classe: '', designationChoisie: '',
+    designation_dechet: '', designation_ar: '', id_recup_dz: '',
+    etat_physique: '', quantite: '', unite: 'KG', conditionnement: '', lieu_stockage: '',
+    caracteristiques_danger: '', couleur: '', niveau_proprete: '',
+    prix_unitaire_ttc: '', prix_achat_ttc: '',
+    bsd_numero: '', date_reception: '', quantite_acceptee: '', quantite_refusee: '', motif_refus: '',
+    repartitions: [],
+  }
+}
+
+function initLigneRepartitions(op) {
+  if (op?.repartitions?.length > 0) return op.repartitions
+  if (op?.destination_type && op.destination_type !== 'MULTIPLE') {
+    const line = { type: op.destination_type, quantite: op.quantite || '', operateur: '', operateur_nom: '' }
+    if (op.destination_type === 'VALORISATION' && op.valorisateur) { line.operateur = op.valorisateur; line.operateur_nom = op.valorisateur_nom || '' }
+    if (op.destination_type === 'ELIMINATION'  && op.eliminateur)  { line.operateur = op.eliminateur;  line.operateur_nom = op.eliminateur_nom  || '' }
+    if (op.destination_type === 'CET'          && op.cet)          { line.operateur = op.cet;          line.operateur_nom = op.cet_nom          || '' }
+    if (op.destination_type === 'STOCKAGE') { line.operateur_nom = op.lieu_stockage_final || '' }
+    return [line]
+  }
+  return []
+}
+
+function dechetFromOperation(op) {
+  const base = emptyDechet()
+  if (!op) return base
+  return {
+    ...base,
+    typeDechet: op.classe_dechet === 'MA' ? 'MA' : ['S','SD'].includes(op.classe_dechet) ? 'SD' : '',
+    codeDechet: op.code_dechet || '',
+    classe: op.classe_dechet || '',
+    designation_dechet: op.designation_dechet || '',
+    designation_ar: op.designation_ar || '',
+    id_recup_dz: op.id_recup_dz || '',
+    etat_physique: op.etat_physique || '',
+    quantite: op.quantite ?? '',
+    unite: op.unite || 'KG',
+    conditionnement: op.conditionnement || '',
+    lieu_stockage: op.lieu_stockage || '',
+    caracteristiques_danger: op.caracteristiques_danger || '',
+    couleur: op.couleur || '',
+    niveau_proprete: op.niveau_proprete || '',
+    prix_unitaire_ttc: op.prix_unitaire_ttc ?? '',
+    prix_achat_ttc: op.prix_achat_ttc ?? '',
+    bsd_numero: op.bsd_numero || '',
+    date_reception: op.date_reception || '',
+    quantite_acceptee: op.quantite_acceptee ?? '',
+    quantite_refusee: op.quantite_refusee ?? '',
+    motif_refus: op.motif_refus || '',
+    repartitions: initLigneRepartitions(op),
+  }
+}
+
+function DechetLigneForm({ index, value, onChange, onRemove, canRemove, currentUser, isRecup, recupId, onAlertesChange }) {
+  const [sousCategories, setSousCategories] = useState([])
+  const [loadingCascade, setLoadingCascade] = useState(false)
+  const [designations, setDesignations] = useState([])
+  const [loadingDesignations, setLoadingDesignations] = useState(false)
+
+  const update = (patch) => onChange(index, { ...value, ...patch })
+
+  useEffect(() => {
+    if (!value.typeDechet) { setSousCategories([]); return }
+    setLoadingCascade(true)
+    api.get('/recuperateurs/mes-types-dechets/', { params: { type: value.typeDechet } })
+      .then(r => setSousCategories(r.data.sous_categories || []))
+      .catch(() => setSousCategories([]))
+      .finally(() => setLoadingCascade(false))
+  }, [value.typeDechet])
+
+  useEffect(() => {
+    if (!value.codeDechet) { setDesignations([]); return }
+    setLoadingDesignations(true)
+    api.get('/nomenclature/designations/', { params: { code: value.codeDechet } })
+      .then(r => setDesignations(r.data || []))
+      .catch(() => setDesignations([]))
+      .finally(() => setLoadingDesignations(false))
+  }, [value.codeDechet])
+
+  useEffect(() => {
+    if (!recupId || !value.codeDechet || !value.classe) { onAlertesChange(value._key, []); return }
+    api.post('/operateurs/verifier_compatibilite/', {
+      recuperateur_id: recupId, operateur_id: 0,
+      code_dechet: value.codeDechet, classe_dechet: value.classe
+    }).then(r => onAlertesChange(value._key, r.data.compatible ? [] : (r.data.alertes || [])))
+      .catch(() => {})
+  }, [recupId, value.codeDechet, value.classe])
+
+  // Prix d'achat = prix unitaire × quantité (calcul automatique par déchet).
+  useEffect(() => {
+    const q  = parseFloat(value.quantite)
+    const pu = parseFloat(value.prix_unitaire_ttc)
+    if (!isNaN(q) && !isNaN(pu)) {
+      const achat = (q * pu).toFixed(2)
+      if (achat !== value.prix_achat_ttc) update({ prix_achat_ttc: achat })
+    } else if (!value.prix_unitaire_ttc && value.prix_achat_ttc !== '') {
+      update({ prix_achat_ttc: '' })
+    }
+  }, [value.quantite, value.prix_unitaire_ttc])
+
+  const sousCategorieObj = sousCategories.find(sc => String(sc.id) === value.sousCategorie)
+  const codesDisponibles = useMemo(() => {
+    if (!sousCategorieObj) return []
+    const seen = new Map()
+    sousCategorieObj.details.forEach(d => {
+      d.codes.forEach(c => { if (!seen.has(c.code)) seen.set(c.code, c) })
+    })
+    return Array.from(seen.values()).sort((a, b) => a.code.localeCompare(b.code))
+  }, [sousCategorieObj])
+
+  const needsAgrmt = ['S','SD'].includes(value.classe)
+
+  return (
+    <div className="card p-3 border border-[#E2E8F0] dark:border-[#2B3D1E] space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold text-slate-400">Déchet #{index + 1}</span>
+        {canRemove && (
+          <button type="button" onClick={() => onRemove(index)} className="btn-ghost p-1.5 text-red-400 hover:text-red-600">
+            <X size={13}/>
+          </button>
+        )}
+      </div>
+
+      <F label="Type de déchets" req>
+        <select value={value.typeDechet} className="input"
+          onChange={e => update({ typeDechet: e.target.value, sousCategorie: '', codeDechet: '', classe: '', designationChoisie: '', designation_dechet: '' })}>
+          <option value="">-- Sélectionner un type --</option>
+          <option value="MA">Déchets ménagers et assimilés</option>
+          <option value="SD">Déchets spéciaux et spéciaux dangereux</option>
+        </select>
+      </F>
+
+      {value.typeDechet === 'MA' && (
+        <>
+          <F label="Catégorie de déchet" req>
+            {loadingCascade ? (
+              <p className="text-xs text-slate-400 py-2">Chargement...</p>
+            ) : sousCategories.length === 0 ? (
+              <p className="text-xs text-amber-600 py-2">
+                Aucune catégorie ne vous a été assignée pour ce type. Contactez l'administrateur.
+              </p>
+            ) : (
+              <select value={value.sousCategorie} className="input"
+                onChange={e => update({ sousCategorie: e.target.value, codeDechet: '', classe: '', designationChoisie: '', designation_dechet: '' })}>
+                <option value="">-- Sélectionner une catégorie --</option>
+                {sousCategories.map(sc => <option key={sc.id} value={sc.id}>{sc.nom}</option>)}
+              </select>
+            )}
+          </F>
+
+          {value.sousCategorie && (
+            <F label="Code réglementaire du déchet" req>
+              <select value={value.codeDechet} className="input"
+                onChange={e => {
+                  const code = e.target.value
+                  const c = codesDisponibles.find(x => x.code === code)
+                  if (c) update({ codeDechet: c.code, classe: c.classe, designationChoisie: '', designation_dechet: c.designation_fr })
+                  else    update({ codeDechet: '', classe: '', designationChoisie: '', designation_dechet: '' })
+                }}>
+                <option value="">-- Sélectionner un code déchet --</option>
+                {codesDisponibles.map(c => <option key={c.code} value={c.code}>{c.code} — {c.designation_fr}</option>)}
+              </select>
+            </F>
+          )}
+
+          {value.codeDechet && (
+            <F label="Désignation précise">
+              {loadingDesignations ? (
+                <p className="text-xs text-slate-400 py-2">Chargement...</p>
+              ) : designations.length === 0 ? (
+                <p className="text-xs text-slate-400 py-2">Aucune désignation précise disponible pour ce code.</p>
+              ) : (
+                <select value={value.designationChoisie} className="input"
+                  onChange={e => {
+                    const id = e.target.value
+                    const d = designations.find(x => String(x.id) === id)
+                    if (d) update({ designationChoisie: id, designation_dechet: d.designation, id_recup_dz: d.id_recup_dz })
+                    else    update({ designationChoisie: '', id_recup_dz: '' })
+                  }}>
+                  <option value="">-- Sélectionner une désignation --</option>
+                  {designations.map(d => <option key={d.id} value={d.id}>{d.designation}</option>)}
+                </select>
+              )}
+            </F>
+          )}
+
+          {value.codeDechet === '15.01.02' && (
+            <div className="grid grid-cols-2 gap-3">
+              <F label="Couleur" col="">
+                <select value={value.couleur} className="input" onChange={e => update({ couleur: e.target.value })}>
+                  <option value="">-- Sélectionner --</option>
+                  <option value="TRANSPARENT">Transparent</option>
+                  <option value="BLANC">Blanc</option>
+                  <option value="NOIR">Noir</option>
+                  <option value="BLEU">Bleu</option>
+                  <option value="VERT">Vert</option>
+                  <option value="ROUGE">Rouge</option>
+                  <option value="JAUNE">Jaune</option>
+                  <option value="GRIS">Gris</option>
+                  <option value="MARRON">Marron</option>
+                  <option value="MULTICOLORE">Multicolore</option>
+                </select>
+              </F>
+              <F label="Niveau de propreté" col="">
+                <select value={value.niveau_proprete} className="input" onChange={e => update({ niveau_proprete: e.target.value })}>
+                  <option value="">-- Sélectionner --</option>
+                  <option value="TRES_PROPRE">Très propre</option>
+                  <option value="PROPRE">Propre</option>
+                  <option value="MOYENNEMENT_PROPRE">Moyennement propre</option>
+                  <option value="SALE">Sale</option>
+                  <option value="TRES_SALE">Très sale</option>
+                </select>
+              </F>
+            </div>
+          )}
+        </>
+      )}
+
+      {value.typeDechet === 'SD' && (
+        <div className="rounded-xl border-2 border-red-300 bg-red-50/60 dark:bg-red-900/10 p-4 space-y-3">
+          <p className="text-xs font-bold text-red-700 uppercase tracking-wide flex items-center gap-1.5">
+            <AlertTriangle size={13}/> Déchets spéciaux et spéciaux dangereux — Codes autorisés par l'agrément
+          </p>
+          <p className="text-xs text-red-600/80">
+            Seuls les codes couverts par l'agrément de {currentUser?.recuperateur_nom || 'votre entreprise'} sont affichés ci-dessous.
+          </p>
+
+          <F label="Catégorie de déchet (selon agrément)" req>
+            {loadingCascade ? (
+              <p className="text-xs text-slate-400 py-2">Chargement...</p>
+            ) : sousCategories.length === 0 ? (
+              <p className="text-xs text-amber-600 py-2">
+                Aucune catégorie de déchets spéciaux ne vous a été assignée. Contactez l'administrateur.
+              </p>
+            ) : (
+              <select value={value.sousCategorie} className="input"
+                onChange={e => update({ sousCategorie: e.target.value, codeDechet: '', classe: '', designationChoisie: '', designation_dechet: '' })}>
+                <option value="">-- Sélectionner une catégorie --</option>
+                {sousCategories.map(sc => <option key={sc.id} value={sc.id}>{sc.nom}</option>)}
+              </select>
+            )}
+          </F>
+
+          {value.sousCategorie && (
+            <F label="Code réglementaire autorisé" req>
+              <select value={value.codeDechet} className="input"
+                onChange={e => {
+                  const code = e.target.value
+                  const c = codesDisponibles.find(x => x.code === code)
+                  if (c) update({ codeDechet: c.code, classe: c.classe, designationChoisie: '', designation_dechet: c.designation_fr })
+                  else    update({ codeDechet: '', classe: '', designationChoisie: '', designation_dechet: '' })
+                }}>
+                <option value="">-- Sélectionner un code déchet --</option>
+                {codesDisponibles.map(c => <option key={c.code} value={c.code}>{c.code} — {c.designation_fr} ({c.classe})</option>)}
+              </select>
+            </F>
+          )}
+        </div>
+      )}
+
+      {value.classe && (
+        <div className="flex items-center gap-2">
+          <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${value.classe==='SD'?'bg-red-50 text-red-700 border-red-200':value.classe==='S'?'bg-amber-50 text-amber-700 border-amber-200':'bg-slate-50 text-slate-600 border-slate-200'}`}>Classe {value.classe}</span>
+          {needsAgrmt && <span className="text-xs text-red-600 font-bold flex items-center gap-1"><AlertCircle size={12}/>Déchet spécial — agrément obligatoire</span>}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <F label="Désignation AR" col=""><input value={value.designation_ar} onChange={e => update({ designation_ar: e.target.value })} className="input" placeholder="تسمية النفاية..."/></F>
+        <F label="État physique" col="">
+          <select value={value.etat_physique} className="input" onChange={e => update({ etat_physique: e.target.value })}>
+            <option value="">--</option>
+            <option value="SOLIDE">Solide</option>
+            <option value="LIQUIDE">Liquide</option>
+            <option value="BOUEUX">Boueux / Pâteux</option>
+            <option value="GAZEUX">Gazeux</option>
+          </select>
+        </F>
+        <F label="Quantité estimée" req col=""><input value={value.quantite} onChange={e => update({ quantite: e.target.value })} type="number" step="0.001" className="input" placeholder="0.000"/></F>
+        <F label="Unité" req col="">
+          <select value={value.unite} className="input" onChange={e => update({ unite: e.target.value })}>
+            <option value="KG">Kilogramme (kg)</option>
+            <option value="TONNE">Tonne (t)</option>
+            <option value="M3">Mètre cube (m3)</option>
+            <option value="LITRE">Litre (L)</option>
+            <option value="UNITE">Unité</option>
+          </select>
+        </F>
+        <F label="Conditionnement" col="">
+          <select value={value.conditionnement} className="input" onChange={e => update({ conditionnement: e.target.value })}>
+            <option value="">--</option>
+            {['Fût','Sac','Benne','Citerne','Big bag','Conteneur','Autre'].map(c => <option key={c}>{c}</option>)}
+          </select>
+        </F>
+        <F label="Lieu de stockage" col=""><input value={value.lieu_stockage} onChange={e => update({ lieu_stockage: e.target.value })} className="input" placeholder="Dépôt, aire..."/></F>
+      </div>
+      <F label="Caractéristiques de danger"><input value={value.caracteristiques_danger} onChange={e => update({ caracteristiques_danger: e.target.value })} className="input" placeholder="H3 Inflammable, H6 Toxique..."/></F>
+      <div className="grid grid-cols-2 gap-3">
+        <F label="Prix unitaire (TTC, DZD)" col=""><input value={value.prix_unitaire_ttc} onChange={e => update({ prix_unitaire_ttc: e.target.value })} type="number" step="0.01" className="input" placeholder="0.00"/></F>
+        <F label="Prix d'achat total (TTC, DZD)" col="">
+          <input value={value.prix_achat_ttc} type="number" step="0.01" className="input bg-slate-50 dark:bg-[#16240D]" placeholder="0.00" readOnly/>
+        </F>
+      </div>
+    </div>
+  )
+}
+
+function DestinationLigneForm({ index, dechet, onChange, lists }) {
+  const update = (patch) => onChange(index, { ...dechet, ...patch })
+  return (
+    <div className="card p-4 space-y-3 border border-[#E2E8F0] dark:border-[#2B3D1E]">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+          <Package size={11}/> Déchet #{index + 1}
+          {dechet.codeDechet && <span className="font-mono normal-case text-slate-400">— {dechet.codeDechet}</span>}
+        </p>
+        <span className="text-xs text-slate-400">
+          Récupéré : <strong>{dechet.quantite || 0} {dechet.unite || 'KG'}</strong>
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <F label="N° BSD" col=""><input value={dechet.bsd_numero} onChange={e => update({ bsd_numero: e.target.value })} className="input" placeholder="BSD-2026-..."/></F>
+        <F label="Date d'arrivée" col=""><DateInput value={dechet.date_reception || ''} onChange={v => update({ date_reception: v })}/></F>
+        <F label="Quantité acceptée" col=""><input value={dechet.quantite_acceptee} onChange={e => update({ quantite_acceptee: e.target.value })} type="number" step="0.001" className="input"/></F>
+        <F label="Quantité refusée" col=""><input value={dechet.quantite_refusee} onChange={e => update({ quantite_refusee: e.target.value })} type="number" step="0.001" className="input"/></F>
+        <F label="Motif de refus" col="col-span-2"><input value={dechet.motif_refus} onChange={e => update({ motif_refus: e.target.value })} className="input" placeholder="Motif (si applicable)..."/></F>
+      </div>
+      <p className="text-xs text-slate-400">
+        Distribuez la quantité récupérée pour ce déchet sur une ou plusieurs destinations.
+      </p>
+      <RepartitionBuilder
+        quantiteTotale={dechet.quantite}
+        unite={dechet.unite || 'KG'}
+        lists={lists}
+        value={dechet.repartitions}
+        onChange={reps => update({ repartitions: reps })}
+      />
+    </div>
+  )
+}
+
 function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
   const isEdit = !!operation?.id
   const { register, handleSubmit, watch, setValue, reset } = useForm({
@@ -174,166 +537,128 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
     }
   })
   const [saving,        setSaving]        = useState(false)
-  const [codeDechet,    setCodeDechet]    = useState(operation?.code_dechet || '')
-  const [classe,        setClasse]        = useState(operation?.classe_dechet || '')
-  const [typeDechet,    setTypeDechet]    = useState(
-    operation?.classe_dechet === 'MA' ? 'MA' :
-    ['S','SD'].includes(operation?.classe_dechet) ? 'SD' : ''
-  )
-  const [sousCategorie, setSousCategorie] = useState('')
-  const [sousCategories,setSousCategories]= useState([])
-  const [loadingCascade,setLoadingCascade]= useState(false)
-  const [designations,     setDesignations]     = useState([])
-  const [designationChoisie, setDesignationChoisie] = useState('')
-  const [loadingDesignations, setLoadingDesignations] = useState(false)
-  const [alertes,       setAlertes]       = useState([])
   const [etape,         setEtape]         = useState(1)
+  const [dechets, setDechets] = useState(() => operation ? [dechetFromOperation(operation)] : [emptyDechet()])
+  const [alertesMap, setAlertesMap] = useState({})
 
-  const initRepartitions = (op) => {
-    if (op?.repartitions?.length > 0) return op.repartitions
-    if (op?.destination_type && op.destination_type !== 'MULTIPLE') {
-      const line = { type: op.destination_type, quantite: op.quantite || '', operateur: '', operateur_nom: '' }
-      if (op.destination_type === 'VALORISATION' && op.valorisateur) { line.operateur = op.valorisateur; line.operateur_nom = op.valorisateur_nom || '' }
-      if (op.destination_type === 'ELIMINATION'  && op.eliminateur)  { line.operateur = op.eliminateur;  line.operateur_nom = op.eliminateur_nom  || '' }
-      if (op.destination_type === 'CET'          && op.cet)          { line.operateur = op.cet;          line.operateur_nom = op.cet_nom          || '' }
-      if (op.destination_type === 'STOCKAGE') { line.operateur_nom = op.lieu_stockage_final || '' }
-      return [line]
-    }
-    return []
-  }
-  const [repartitions, setRepartitions] = useState(() => initRepartitions(operation))
-
-  // 4ème niveau de la cascade : une fois un code réglementaire choisi, charge
-  // les désignations précises disponibles pour ce code (ex: code 15.01.02
-  // "Emballages plastiques" -> "Bouteille d'eau PET", "Flacon PEHD"...).
-  useEffect(() => {
-    if (!codeDechet) { setDesignations([]); setDesignationChoisie(''); return }
-    setLoadingDesignations(true)
-    api.get('/nomenclature/designations/', { params: { code: codeDechet } })
-      .then(r => setDesignations(r.data || []))
-      .catch(() => setDesignations([]))
-      .finally(() => setLoadingDesignations(false))
-  }, [codeDechet])
-
-  // Charge, pour le récupérateur connecté, la liste des sous-catégories +
-  // détails + codes nomenclature qui lui ont été assignés (Django Admin)
-  // pour le type choisi (MA ou SD). Chaque récupérateur peut avoir un mapping
-  // différent — voir endpoint /api/recuperateurs/mes-types-dechets/.
-  useEffect(() => {
-    if (!typeDechet) { setSousCategories([]); return }
-    setLoadingCascade(true)
-    api.get('/recuperateurs/mes-types-dechets/', { params: { type: typeDechet } })
-      .then(r => setSousCategories(r.data.sous_categories || []))
-      .catch(() => setSousCategories([]))
-      .finally(() => setLoadingCascade(false))
-  }, [typeDechet])
-
-  const sousCategorieObj = sousCategories.find(sc => String(sc.id) === sousCategorie)
-  // Codes nomenclature UNIQUES de la sous-catégorie choisie (un seul par code,
-  // même si plusieurs détails — PET, PEHD, PP, Films... — y sont rattachés ;
-  // ces détails apparaîtront ensuite dans le 4ème dropdown "Désignation précise").
-  const codesDisponibles = useMemo(() => {
-    if (!sousCategorieObj) return []
-    const seen = new Map()
-    sousCategorieObj.details.forEach(d => {
-      d.codes.forEach(c => {
-        if (!seen.has(c.code)) seen.set(c.code, c)
-      })
-    })
-    return Array.from(seen.values()).sort((a, b) => a.code.localeCompare(b.code))
-  }, [sousCategorieObj])
+  const updateDechet = (i, next) => setDechets(prev => prev.map((d, idx) => idx === i ? next : d))
+  const addDechet    = () => setDechets(prev => [...prev, emptyDechet()])
+  const removeDechet = (i) => setDechets(prev => {
+    const removed = prev[i]
+    setAlertesMap(am => { const { [removed._key]: _, ...rest } = am; return rest })
+    return prev.filter((_, idx) => idx !== i)
+  })
+  const handleLineAlertes = (key, arr) => setAlertesMap(prev => ({ ...prev, [key]: arr }))
+  const allAlertes = useMemo(() => Object.values(alertesMap).flat(), [alertesMap])
 
   const isRecup    = currentUser?.role === 'RECUPERATEUR'
-  const destination = watch('destination_type')
   const recupId    = isRecup ? currentUser?.recuperateur_id : watch('recuperateur')
-  const needsAgrmt = ['S','SD'].includes(classe)
-
-  useEffect(() => {
-    if (!recupId || !codeDechet || !classe) { setAlertes([]); return }
-    api.post('/operateurs/verifier_compatibilite/', {
-      recuperateur_id: recupId, operateur_id: 0,
-      code_dechet: codeDechet, classe_dechet: classe
-    }).then(r => setAlertes(r.data.compatible ? [] : (r.data.alertes || [])))
-      .catch(() => {})
-  }, [recupId, codeDechet, classe])
+  const needsAgrmt = dechets.some(d => ['S','SD'].includes(d.classe))
 
   useEffect(() => { if (operation) reset(operation) }, [operation])
 
-  // Prix d'achat total = prix unitaire × quantité récupérée (calcul automatique).
-  const quantiteWatch = watch('quantite')
-  const prixUnitaireWatch = watch('prix_unitaire_ttc')
-  useEffect(() => {
-    const q = parseFloat(quantiteWatch)
-    const pu = parseFloat(prixUnitaireWatch)
-    if (!isNaN(q) && !isNaN(pu)) setValue('prix_achat_ttc', (q * pu).toFixed(2))
-    else if (!prixUnitaireWatch) setValue('prix_achat_ttc', '')
-  }, [quantiteWatch, prixUnitaireWatch])
-
-  // Prix de revient global = prix d'achat total + frais de transport + autres frais.
-  // Prix de revient unitaire = prix de revient global / quantité récupérée.
-  const prixAchatWatch      = watch('prix_achat_ttc')
+  // Prix de revient par déchet = prix d'achat de ce déchet + sa quote-part des
+  // frais de transport/autres frais (répartis au prorata de la quantité,
+  // puisque ces frais sont communs à l'ensemble de l'enlèvement).
   const fraisTransportWatch = watch('frais_transport_ttc')
   const autresFraisWatch    = watch('autres_frais_ttc')
-  useEffect(() => {
-    const achat    = parseFloat(prixAchatWatch) || 0
-    const transport= parseFloat(fraisTransportWatch) || 0
-    const autres   = parseFloat(autresFraisWatch) || 0
-    const q        = parseFloat(quantiteWatch)
-    if (!prixAchatWatch && !fraisTransportWatch && !autresFraisWatch) {
-      setValue('prix_revient_global_ttc', '')
-      setValue('prix_revient_unitaire_ttc', '')
-      return
-    }
-    const global_ = achat + transport + autres
-    setValue('prix_revient_global_ttc', global_.toFixed(2))
-    setValue('prix_revient_unitaire_ttc', (!isNaN(q) && q > 0) ? (global_ / q).toFixed(2) : '')
-  }, [prixAchatWatch, fraisTransportWatch, autresFraisWatch, quantiteWatch])
+  const revientData = useMemo(() => {
+    const totalQty  = dechets.reduce((s, d) => s + (parseFloat(d.quantite) || 0), 0)
+    const transport = parseFloat(fraisTransportWatch) || 0
+    const autres    = parseFloat(autresFraisWatch) || 0
+    return dechets.map(d => {
+      const q      = parseFloat(d.quantite) || 0
+      const achat  = parseFloat(d.prix_achat_ttc) || 0
+      const ratio  = totalQty > 0 ? q / totalQty : (dechets.length ? 1 / dechets.length : 0)
+      const global_= achat + transport * ratio + autres * ratio
+      return { ...d, revientGlobal: global_, revientUnitaire: q > 0 ? global_ / q : 0 }
+    })
+  }, [dechets, fraisTransportWatch, autresFraisWatch])
 
   const onSubmit = async (data) => {
-    setSaving(true)
-    if (isRecup && currentUser?.recuperateur_id) data.recuperateur = currentUser.recuperateur_id
-    data.code_dechet   = codeDechet
-    data.classe_dechet = classe
-
-    // Répartitions multi-destinations
-    if (repartitions.length > 0) {
-      data.repartitions    = repartitions
-      data.destination_type = repartitions.length === 1 ? repartitions[0].type : 'MULTIPLE'
-      // Setter les FK pour compatibilité avec les vues existantes
-      const valo = repartitions.find(r => r.type === 'VALORISATION')
-      const elim = repartitions.find(r => r.type === 'ELIMINATION')
-      const cet  = repartitions.find(r => r.type === 'CET')
-      data.valorisateur = valo?.operateur || null
-      data.eliminateur  = elim?.operateur || null
-      data.cet          = cet?.operateur  || null
-      data.quantite_enfouie = cet?.quantite || null
-    } else {
-      data.repartitions = []
+    const invalidIdx = dechets.findIndex(d => !d.typeDechet || !d.codeDechet || !d.quantite || !d.unite)
+    if (invalidIdx !== -1) {
+      toast.error(`Déchet #${invalidIdx + 1} : complétez le type, le code déchet et la quantité`)
+      setEtape(1)
+      return
     }
 
-    if (!data.date_livraison)   delete data.date_livraison
-    if (!data.date_commande)    delete data.date_commande
-    if (!data.quantite_enfouie && !data.quantite_enfouie !== 0) delete data.quantite_enfouie
-    if (!data.prix_unitaire_ttc && data.prix_unitaire_ttc !== 0) delete data.prix_unitaire_ttc
-    if (!data.prix_achat_ttc && data.prix_achat_ttc !== 0) delete data.prix_achat_ttc
-    if (!data.frais_transport_ttc && data.frais_transport_ttc !== 0) delete data.frais_transport_ttc
-    if (!data.autres_frais_ttc && data.autres_frais_ttc !== 0) delete data.autres_frais_ttc
-    if (!data.prix_revient_global_ttc && data.prix_revient_global_ttc !== 0) delete data.prix_revient_global_ttc
-    if (!data.prix_revient_unitaire_ttc && data.prix_revient_unitaire_ttc !== 0) delete data.prix_revient_unitaire_ttc
+    setSaving(true)
+    if (isRecup && currentUser?.recuperateur_id) data.recuperateur = currentUser.recuperateur_id
+    if (!data.date_livraison) delete data.date_livraison
+    if (!data.date_commande)  delete data.date_commande
+
+    const totalQty       = dechets.reduce((s, d) => s + (parseFloat(d.quantite) || 0), 0)
+    const transportTotal = parseFloat(data.frais_transport_ttc) || 0
+    const autresTotal    = parseFloat(data.autres_frais_ttc) || 0
+
+    const buildPayload = (d) => {
+      const q     = parseFloat(d.quantite) || 0
+      const ratio = totalQty > 0 ? q / totalQty : (dechets.length ? 1 / dechets.length : 0)
+      const shareTransport = transportTotal * ratio
+      const shareAutres    = autresTotal * ratio
+      const achat  = parseFloat(d.prix_achat_ttc) || 0
+      const global_= achat + shareTransport + shareAutres
+
+      const valo = d.repartitions.find(r => r.type === 'VALORISATION')
+      const elim = d.repartitions.find(r => r.type === 'ELIMINATION')
+      const cet  = d.repartitions.find(r => r.type === 'CET')
+
+      const payload = {
+        ...data,
+        code_dechet: d.codeDechet,
+        designation_dechet: d.designation_dechet,
+        classe_dechet: d.classe,
+        unite: d.unite,
+        quantite: d.quantite,
+        couleur: d.couleur,
+        niveau_proprete: d.niveau_proprete,
+        designation_ar: d.designation_ar,
+        etat_physique: d.etat_physique,
+        conditionnement: d.conditionnement,
+        lieu_stockage: d.lieu_stockage,
+        caracteristiques_danger: d.caracteristiques_danger,
+        prix_unitaire_ttc: d.prix_unitaire_ttc,
+        prix_achat_ttc: d.prix_achat_ttc,
+        id_recup_dz: d.id_recup_dz,
+        bsd_numero: d.bsd_numero,
+        date_reception: d.date_reception,
+        quantite_acceptee: d.quantite_acceptee,
+        quantite_refusee: d.quantite_refusee,
+        motif_refus: d.motif_refus,
+        repartitions: d.repartitions,
+        destination_type: d.repartitions.length === 1 ? d.repartitions[0].type : (d.repartitions.length > 1 ? 'MULTIPLE' : 'VALORISATION'),
+        valorisateur: valo?.operateur || null,
+        eliminateur: elim?.operateur || null,
+        cet: cet?.operateur || null,
+        quantite_enfouie: cet?.quantite || null,
+        frais_transport_ttc: dechets.length > 1 ? shareTransport.toFixed(2) : data.frais_transport_ttc,
+        autres_frais_ttc: dechets.length > 1 ? shareAutres.toFixed(2) : data.autres_frais_ttc,
+        prix_revient_global_ttc: (achat || shareTransport || shareAutres) ? global_.toFixed(2) : '',
+        prix_revient_unitaire_ttc: (q > 0 && (achat || shareTransport || shareAutres)) ? (global_ / q).toFixed(2) : '',
+      }
+      if (!payload.prix_unitaire_ttc && payload.prix_unitaire_ttc !== 0) delete payload.prix_unitaire_ttc
+      if (!payload.prix_achat_ttc && payload.prix_achat_ttc !== 0) delete payload.prix_achat_ttc
+      if (!payload.frais_transport_ttc && payload.frais_transport_ttc !== 0) delete payload.frais_transport_ttc
+      if (!payload.autres_frais_ttc && payload.autres_frais_ttc !== 0) delete payload.autres_frais_ttc
+      if (!payload.prix_revient_global_ttc && payload.prix_revient_global_ttc !== 0) delete payload.prix_revient_global_ttc
+      if (!payload.prix_revient_unitaire_ttc && payload.prix_revient_unitaire_ttc !== 0) delete payload.prix_revient_unitaire_ttc
+      if (!payload.quantite_enfouie && payload.quantite_enfouie !== 0) delete payload.quantite_enfouie
+      return payload
+    }
+
     try {
-      if (isEdit) { await opAPI.update(operation.id, data); toast.success('Dossier mis à jour') }
-      else        { await opAPI.create(data);                toast.success('Dossier de traçabilité créé') }
+      if (isEdit) {
+        await opAPI.update(operation.id, buildPayload(dechets[0]))
+        toast.success('Dossier mis à jour')
+      } else {
+        for (const d of dechets) { await opAPI.create(buildPayload(d)) }
+        toast.success(dechets.length > 1 ? `${dechets.length} dossiers de traçabilité créés` : 'Dossier de traçabilité créé')
+      }
       onSave()
     } catch (e) { console.error('Erreur traçabilité:', e.response?.data); toast.error('Erreur') }
     finally { setSaving(false) }
   }
-
-  const F = ({ label, req, children, col }) => (
-    <div className={col||''}>
-      <label className="label">{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
-      {children}
-    </div>
-  )
 
   const steps = [
     {n:1, label:'Générateur & Déchet'},
@@ -359,7 +684,7 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
         ))}
       </div>
 
-      {alertes.map((a,i) => (
+      {allAlertes.map((a,i) => (
         <div key={i} className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-300">
           <AlertTriangle size={16} className="text-red-500 flex-shrink-0 mt-0.5"/>
           <p className="text-sm text-red-700">{a.message}</p>
@@ -404,259 +729,24 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
           </div>
 
           <div className="card p-4 space-y-3">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1"><Package size={11}/> Identification du déchet</p>
-            <F label="Type de déchets" req>
-              <select value={typeDechet} className="input"
-                onChange={e => {
-                  setTypeDechet(e.target.value)
-                  // Reset toute la cascade car la liste proposée change
-                  setSousCategorie('')
-                  setCodeDechet('')
-                  setClasse('')
-                  setDesignationChoisie('')
-                  setValue('designation_dechet', '')
-                  setValue('classe_dechet', '')
-                }}>
-                <option value="">-- Sélectionner un type --</option>
-                <option value="MA">Déchets ménagers et assimilés</option>
-                <option value="SD">Déchets spéciaux et spéciaux dangereux</option>
-              </select>
-            </F>
-
-            {typeDechet === 'MA' && (
-              <>
-                <F label="Catégorie de déchet" req>
-                  {loadingCascade ? (
-                    <p className="text-xs text-slate-400 py-2">Chargement...</p>
-                  ) : sousCategories.length === 0 ? (
-                    <p className="text-xs text-amber-600 py-2">
-                      Aucune catégorie ne vous a été assignée pour ce type. Contactez l'administrateur.
-                    </p>
-                  ) : (
-                    <select value={sousCategorie} className="input"
-                      onChange={e => {
-                        setSousCategorie(e.target.value)
-                        setCodeDechet('')
-                        setClasse('')
-                        setDesignationChoisie('')
-                        setValue('designation_dechet', '')
-                        setValue('classe_dechet', '')
-                      }}>
-                      <option value="">-- Sélectionner une catégorie --</option>
-                      {sousCategories.map(sc => (
-                        <option key={sc.id} value={sc.id}>{sc.nom}</option>
-                      ))}
-                    </select>
-                  )}
-                </F>
-
-                {sousCategorie && (
-                  <F label="Code réglementaire du déchet" req>
-                    <select
-                      value={codeDechet}
-                      className="input"
-                      onChange={e => {
-                        const code = e.target.value
-                        const c = codesDisponibles.find(x => x.code === code)
-                        setDesignationChoisie('')
-                        if (c) {
-                          setCodeDechet(c.code)
-                          setClasse(c.classe)
-                          setValue('designation_dechet', c.designation_fr)
-                          setValue('classe_dechet', c.classe)
-                        } else {
-                          setCodeDechet('')
-                          setClasse('')
-                          setValue('designation_dechet', '')
-                          setValue('classe_dechet', '')
-                        }
-                      }}>
-                      <option value="">-- Sélectionner un code déchet --</option>
-                      {codesDisponibles.map(c => (
-                        <option key={c.code} value={c.code}>
-                          {c.code} — {c.designation_fr}
-                        </option>
-                      ))}
-                    </select>
-                    <input type="hidden" {...register('designation_dechet')}/>
-                    <input type="hidden" {...register('classe_dechet')}/>
-                  </F>
-                )}
-
-                {codeDechet && (
-                  <F label="Désignation précise">
-                    {loadingDesignations ? (
-                      <p className="text-xs text-slate-400 py-2">Chargement...</p>
-                    ) : designations.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-2">
-                    Aucune désignation précise disponible pour ce code.
-                  </p>
-                ) : (
-                  <select value={designationChoisie} className="input"
-                    onChange={e => {
-                      const id = e.target.value
-                      setDesignationChoisie(id)
-                      const d = designations.find(x => String(x.id) === id)
-                      if (d) {
-                        setValue('designation_dechet', d.designation)
-                        setValue('id_recup_dz', d.id_recup_dz)
-                      } else {
-                        setValue('id_recup_dz', '')
-                      }
-                    }}>
-                    <option value="">-- Sélectionner une désignation --</option>
-                    {designations.map(d => (
-                      <option key={d.id} value={d.id}>{d.designation}</option>
-                    ))}
-                  </select>
-                )}
-                <input type="hidden" {...register('id_recup_dz')}/>
-              </F>
-            )}
-
-                {codeDechet === '15.01.02' && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <F label="Couleur" col="">
-                      <select {...register('couleur')} className="input">
-                        <option value="">-- Sélectionner --</option>
-                        <option value="TRANSPARENT">Transparent</option>
-                        <option value="BLANC">Blanc</option>
-                        <option value="NOIR">Noir</option>
-                        <option value="BLEU">Bleu</option>
-                        <option value="VERT">Vert</option>
-                        <option value="ROUGE">Rouge</option>
-                        <option value="JAUNE">Jaune</option>
-                        <option value="GRIS">Gris</option>
-                        <option value="MARRON">Marron</option>
-                        <option value="MULTICOLORE">Multicolore</option>
-                      </select>
-                    </F>
-                    <F label="Niveau de propreté" col="">
-                      <select {...register('niveau_proprete')} className="input">
-                        <option value="">-- Sélectionner --</option>
-                        <option value="TRES_PROPRE">Très propre</option>
-                        <option value="PROPRE">Propre</option>
-                        <option value="MOYENNEMENT_PROPRE">Moyennement propre</option>
-                        <option value="SALE">Sale</option>
-                        <option value="TRES_SALE">Très sale</option>
-                      </select>
-                    </F>
-                  </div>
-                )}
-              </>
-            )}
-
-            {typeDechet === 'SD' && (
-              <div className="rounded-xl border-2 border-red-300 bg-red-50/60 dark:bg-red-900/10 p-4 space-y-3">
-                <p className="text-xs font-bold text-red-700 uppercase tracking-wide flex items-center gap-1.5">
-                  <AlertTriangle size={13}/> Déchets spéciaux et spéciaux dangereux — Codes autorisés par l'agrément
-                </p>
-                <p className="text-xs text-red-600/80">
-                  Seuls les codes couverts par l'agrément de {currentUser?.recuperateur_nom || 'votre entreprise'} sont affichés ci-dessous.
-                </p>
-
-                <F label="Catégorie de déchet (selon agrément)" req>
-                  {loadingCascade ? (
-                    <p className="text-xs text-slate-400 py-2">Chargement...</p>
-                  ) : sousCategories.length === 0 ? (
-                    <p className="text-xs text-amber-600 py-2">
-                      Aucune catégorie de déchets spéciaux ne vous a été assignée. Contactez l'administrateur.
-                    </p>
-                  ) : (
-                    <select value={sousCategorie} className="input"
-                      onChange={e => {
-                        setSousCategorie(e.target.value)
-                        setCodeDechet('')
-                        setClasse('')
-                        setDesignationChoisie('')
-                        setValue('designation_dechet', '')
-                        setValue('classe_dechet', '')
-                      }}>
-                      <option value="">-- Sélectionner une catégorie --</option>
-                      {sousCategories.map(sc => (
-                        <option key={sc.id} value={sc.id}>{sc.nom}</option>
-                      ))}
-                    </select>
-                  )}
-                </F>
-
-                {sousCategorie && (
-                  <F label="Code réglementaire autorisé" req>
-                    <select
-                      value={codeDechet}
-                      className="input"
-                      onChange={e => {
-                        const code = e.target.value
-                        const c = codesDisponibles.find(x => x.code === code)
-                        setDesignationChoisie('')
-                        if (c) {
-                          setCodeDechet(c.code)
-                          setClasse(c.classe)
-                          setValue('designation_dechet', c.designation_fr)
-                          setValue('classe_dechet', c.classe)
-                        } else {
-                          setCodeDechet('')
-                          setClasse('')
-                          setValue('designation_dechet', '')
-                          setValue('classe_dechet', '')
-                        }
-                      }}>
-                      <option value="">-- Sélectionner un code déchet --</option>
-                      {codesDisponibles.map(c => (
-                        <option key={c.code} value={c.code}>
-                          {c.code} — {c.designation_fr} ({c.classe})
-                        </option>
-                      ))}
-                    </select>
-                    <input type="hidden" {...register('designation_dechet')}/>
-                    <input type="hidden" {...register('classe_dechet')}/>
-                  </F>
-                )}
-              </div>
-            )}
-            {classe&&(
-              <div className="flex items-center gap-2">
-                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${classe==='SD'?'bg-red-50 text-red-700 border-red-200':classe==='S'?'bg-amber-50 text-amber-700 border-amber-200':'bg-slate-50 text-slate-600 border-slate-200'}`}>Classe {classe}</span>
-                {needsAgrmt&&<span className="text-xs text-red-600 font-bold flex items-center gap-1"><AlertCircle size={12}/>Déchet spécial — agrément obligatoire</span>}
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              <F label="Désignation AR" col=""><input {...register('designation_ar')} className="input" placeholder="تسمية النفاية..."/></F>
-              <F label="État physique" col="">
-                <select {...register('etat_physique')} className="input">
-                  <option value="">--</option>
-                  <option value="SOLIDE">Solide</option>
-                  <option value="LIQUIDE">Liquide</option>
-                  <option value="BOUEUX">Boueux / Pâteux</option>
-                  <option value="GAZEUX">Gazeux</option>
-                </select>
-              </F>
-              <F label="Quantité estimée" req col=""><input {...register('quantite',{required:true})} type="number" step="0.001" className="input" placeholder="0.000"/></F>
-              <F label="Unité" req col="">
-                <select {...register('unite',{required:true})} className="input">
-                  <option value="KG">Kilogramme (kg)</option>
-                  <option value="TONNE">Tonne (t)</option>
-                  <option value="M3">Mètre cube (m3)</option>
-                  <option value="LITRE">Litre (L)</option>
-                  <option value="UNITE">Unité</option>
-                </select>
-              </F>
-              <F label="Conditionnement" col="">
-                <select {...register('conditionnement')} className="input">
-                  <option value="">--</option>
-                  {['Fût','Sac','Benne','Citerne','Big bag','Conteneur','Autre'].map(c=><option key={c}>{c}</option>)}
-                </select>
-              </F>
-              <F label="Lieu de stockage" col=""><input {...register('lieu_stockage')} className="input" placeholder="Dépôt, aire..."/></F>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1"><Package size={11}/> Identification du/des déchet(s)</p>
+              <span className="text-xs text-slate-400">{dechets.length} déchet{dechets.length>1?'s':''}</span>
             </div>
-            <F label="Caractéristiques de danger"><input {...register('caracteristiques_danger')} className="input" placeholder="H3 Inflammable, H6 Toxique..."/></F>
             <F label="Date de récupération" req><DateInput value={watch('date_recuperation')||''} onChange={v=>setValue('date_recuperation',v)}/></F>
-            <div className="grid grid-cols-2 gap-3">
-              <F label="Prix unitaire (TTC, DZD)" col=""><input {...register('prix_unitaire_ttc')} type="number" step="0.01" className="input" placeholder="0.00"/></F>
-              <F label="Prix d'achat total (TTC, DZD)" col="">
-                <input {...register('prix_achat_ttc')} type="number" step="0.01" className="input bg-slate-50 dark:bg-[#16240D]" placeholder="0.00" readOnly/>
-              </F>
-            </div>
+
+            {dechets.map((d, i) => (
+              <DechetLigneForm key={d._key} index={i} value={d} onChange={updateDechet} onRemove={removeDechet}
+                canRemove={dechets.length>1 && !isEdit} currentUser={currentUser} isRecup={isRecup}
+                recupId={recupId} onAlertesChange={handleLineAlertes}/>
+            ))}
+
+            {!isEdit && (
+              <button type="button" onClick={addDechet}
+                className="w-full border-2 border-dashed border-slate-300 rounded-xl p-3 text-xs font-semibold text-slate-500 hover:border-primary-400 hover:text-primary-600 hover:bg-primary-50 transition-all flex items-center justify-center gap-2">
+                <Plus size={14}/> Ajouter un autre déchet (même générateur / transporteur / BL)
+              </button>
+            )}
           </div>
           <div className="flex justify-end"><button type="button" onClick={()=>setEtape(2)} className="btn-primary">Étape suivante <ChevronRight size={15}/></button></div>
         </div>
@@ -729,37 +819,12 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
       {/* ETAPE 3 */}
       {etape===3 && (
         <div className="space-y-4">
-          <div className="card p-4 space-y-3">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1"><Package size={11}/> 4. Réception chez le destinataire</p>
-            <div className="grid grid-cols-2 gap-3">
-              <F label="N° BSD" col=""><input {...register('bsd_numero')} className="input" placeholder="BSD-2026-..."/></F>
-              <F label="Date d'arrivée" col=""><DateInput value={watch('date_reception')||''} onChange={v=>setValue('date_reception',v)}/></F>
-              <F label="Quantité acceptée" col=""><input {...register('quantite_acceptee')} type="number" step="0.001" className="input"/></F>
-              <F label="Quantité refusée" col=""><input {...register('quantite_refusee')} type="number" step="0.001" className="input"/></F>
-              <F label="Motif de refus" col="col-span-2"><input {...register('motif_refus')} className="input" placeholder="Motif (si applicable)..."/></F>
-            </div>
-          </div>
-
-          <div className="card p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
-                <GitBranch size={11}/> 5. Répartition de la quantité récupérée
-              </p>
-              <span className="text-xs text-slate-400">
-                Total récupéré : <strong>{watch('quantite')||0} {watch('unite')||'KG'}</strong>
-              </span>
-            </div>
-            <p className="text-xs text-slate-400">
-              Distribuez la quantité récupérée sur une ou plusieurs destinations. La somme des quantités affectées doit correspondre à la quantité totale récupérée.
-            </p>
-            <RepartitionBuilder
-              quantiteTotale={watch('quantite')}
-              unite={watch('unite')||'KG'}
-              lists={lists}
-              value={repartitions}
-              onChange={setRepartitions}
-            />
-          </div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5 px-1">
+            <GitBranch size={11}/> 4. Réception & répartition — par déchet
+          </p>
+          {dechets.map((d, i) => (
+            <DestinationLigneForm key={d._key} index={i} dechet={d} onChange={updateDechet} lists={lists}/>
+          ))}
           <div className="flex justify-between">
             <button type="button" onClick={()=>setEtape(2)} className="btn-secondary">Retour</button>
             <button type="button" onClick={()=>setEtape(4)} className="btn-primary">Étape suivante <ChevronRight size={15}/></button>
@@ -772,13 +837,22 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
         <div className="space-y-4">
           <div className="card p-4 space-y-3">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1"><CheckCircle2 size={11}/> 6. Statut et clôture du dossier</p>
-            <div className="grid grid-cols-2 gap-3">
-              <F label="Prix de revient global (TTC, DZD)" col="">
-                <input {...register('prix_revient_global_ttc')} type="number" step="0.01" className="input bg-slate-50 dark:bg-[#16240D]" placeholder="0.00" readOnly/>
-              </F>
-              <F label="Prix de revient unitaire (TTC, DZD)" col="">
-                <input {...register('prix_revient_unitaire_ttc')} type="number" step="0.01" className="input bg-slate-50 dark:bg-[#16240D]" placeholder="0.00" readOnly/>
-              </F>
+            <div className="card p-3 bg-slate-50 dark:bg-[#16240D] space-y-1.5">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Prix de revient par déchet (TTC, DZD)</p>
+              {revientData.map((d,i) => (
+                <div key={d._key} className="flex items-center justify-between text-xs py-1 border-b border-slate-100 dark:border-[#2B3D1E] last:border-0">
+                  <span className="text-slate-500">{d.codeDechet || `Déchet #${i+1}`} <span className="text-slate-400">({d.quantite||0} {d.unite})</span></span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200">
+                    {d.revientGlobal.toFixed(2)} DZD <span className="text-slate-400 font-normal">({d.revientUnitaire.toFixed(2)} DZD/{d.unite})</span>
+                  </span>
+                </div>
+              ))}
+              {revientData.length > 1 && (
+                <div className="flex items-center justify-between text-xs pt-1 font-bold text-slate-800 dark:text-white">
+                  <span>Total</span>
+                  <span>{revientData.reduce((s,d)=>s+d.revientGlobal,0).toFixed(2)} DZD</span>
+                </div>
+              )}
             </div>
             <F label="Statut du dossier">
               <select {...register('statut')} className="input">
@@ -801,10 +875,10 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
           </div>
           <div className="flex gap-3 pt-2 border-t border-[#E2E8F0]">
             <button type="button" onClick={()=>setEtape(3)} className="btn-secondary">Retour</button>
-            <button type="submit" disabled={saving||alertes.length>0} className="btn-primary">
-              <Save size={15}/> {saving?'Enregistrement...':isEdit?'Mettre à jour':'Créer le dossier de traçabilité'}
+            <button type="submit" disabled={saving||allAlertes.length>0} className="btn-primary">
+              <Save size={15}/> {saving?'Enregistrement...':isEdit?'Mettre à jour':dechets.length>1?`Créer ${dechets.length} dossiers de traçabilité`:'Créer le dossier de traçabilité'}
             </button>
-            {alertes.length>0&&<span className="text-xs text-red-600 self-center font-semibold flex items-center gap-1"><AlertTriangle size={11}/>Corrigez les alertes</span>}
+            {allAlertes.length>0&&<span className="text-xs text-red-600 self-center font-semibold flex items-center gap-1"><AlertTriangle size={11}/>Corrigez les alertes</span>}
           </div>
         </div>
       )}
@@ -837,7 +911,7 @@ function OperationCard({ op, onEdit, onDelete, onView }) {
             <span className="font-bold text-slate-700 dark:text-slate-200">{op.quantite} {op.unite_display||op.unite}</span>
             {op.generateur_nom&&<span className="flex items-center gap-1"><Factory size={10}/>{op.generateur_nom}</span>}
             {op.transporteur_nom&&<span className="flex items-center gap-1"><Truck size={10}/>{op.transporteur_nom}</span>}
-            <span className="flex items-center gap-1"><Calendar size={10}/>{op.date_recuperation}</span>
+            <span className="flex items-center gap-1"><Calendar size={10}/>{formatDateFR(op.date_recuperation)}</span>
           </div>
           {op.repartitions?.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1.5">
@@ -990,7 +1064,7 @@ export default function TracabilitePage() {
               ['Code déchet',viewing.code_dechet],['Désignation',viewing.designation_dechet],
               ['Classe',viewing.classe_dechet],['Quantité totale',`${viewing.quantite} ${viewing.unite_display||viewing.unite}`],
               ['Couleur',viewing.couleur_display],['Niveau de propreté',viewing.niveau_proprete_display],
-              ['Date récupération',viewing.date_recuperation],
+              ['Date récupération',formatDateFR(viewing.date_recuperation)],
               ['Prix unitaire (TTC, DZD)',viewing.prix_unitaire_ttc && `${Number(viewing.prix_unitaire_ttc).toLocaleString('fr-FR')} DZD`],
               ['Prix d\'achat total (TTC, DZD)',viewing.prix_achat_ttc && `${Number(viewing.prix_achat_ttc).toLocaleString('fr-FR')} DZD`],
               ['Transporteur',viewing.transporteur_nom],

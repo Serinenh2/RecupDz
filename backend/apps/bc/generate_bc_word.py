@@ -7,7 +7,7 @@ from docx import Document
 from docx.shared import Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-from .generate_bc import _recuperateur_info, _calc_totaux
+from .generate_bc import _recuperateur_info, _calc_totaux, _fmt_date
 
 
 def generate_bc_docx(data: dict) -> bytes:
@@ -47,7 +47,7 @@ def generate_bc_docx(data: dict) -> bytes:
 
     # ── Date / lieu ─────────────────────────────────────────────────────────────
     doc.add_paragraph()
-    p_date = doc.add_paragraph(f"{rec['commune']} le : {data.get('date_commande', '')}")
+    p_date = doc.add_paragraph(f"{rec['commune']} le : {_fmt_date(data.get('date_commande', ''))}")
     p_date.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
     # ── Client ──────────────────────────────────────────────────────────────────

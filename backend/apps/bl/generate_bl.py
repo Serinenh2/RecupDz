@@ -10,7 +10,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-from apps.bc.generate_bc import _NumberedCanvas, _fmt_montant, _fmt_qte
+from apps.bc.generate_bc import _NumberedCanvas, _fmt_montant, _fmt_qte, _fmt_date
 import io
 
 BLACK = colors.black
@@ -122,7 +122,7 @@ def generate_bl_pdf(data: dict) -> bytes:
     story.append(Spacer(1, 14))
 
     # ── Date / lieu ─────────────────────────────────────────────────────────
-    lieu_date = Table([['', Paragraph(f"{rec['commune']} le : {v('date_livraison')}", LBL)]],
+    lieu_date = Table([['', Paragraph(f"{rec['commune']} le : {_fmt_date(v('date_livraison'))}", LBL)]],
         colWidths=[COL-7*cm, 7*cm])
     story.append(lieu_date)
     story.append(Spacer(1, 8))
@@ -217,7 +217,7 @@ def _generate_bl_pdf_indurex(data: dict, rec: dict, dest: dict) -> bytes:
 
     ref_box_rows = [
         [Paragraph('Référence', LBLB), Paragraph(v('numero'), META)],
-        [Paragraph('Date',      LBLB), Paragraph(v('date_livraison'), META)],
+        [Paragraph('Date',      LBLB), Paragraph(_fmt_date(v('date_livraison')), META)],
         [Paragraph('Montant',   LBLB), Paragraph(_fmt_montant(data.get('montant_reference') or 0), META)],
         [Paragraph('Mode Liv',  LBLB), Paragraph(_MODE_LIV_ABBR.get(v('mode_livraison'), v('mode_livraison')), META)],
     ]

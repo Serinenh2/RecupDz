@@ -16,6 +16,17 @@ GREEN = colors.HexColor('#3B6D11')
 COL   = 17 * cm
 
 
+def _fmt_date(iso):
+    """Convertit une date ISO (YYYY-MM-DD) en JJ/MM/AAAA — inchangé si le format est différent."""
+    if not iso:
+        return ''
+    parts = str(iso).split('-')
+    if len(parts) != 3:
+        return str(iso)
+    y, m, d = parts
+    return f"{d}/{m}/{y}"
+
+
 def _recuperateur_info(data):
     from apps.recuperateurs.models import Recuperateur
     rec_id = data.get('recuperateur') or data.get('recuperateur_id')
@@ -158,6 +169,7 @@ def generate_bc_pdf(data: dict) -> bytes:
     LBL   = ps('LBL',   fontName='Helvetica',             fontSize=9.5,                      leading=15)
     TITRE = ps('TITRE', fontName='Helvetica-BoldOblique', fontSize=13, alignment=TA_CENTER,  leading=16)
     HEAD  = ps('HEAD',  fontName='Helvetica-Bold',        fontSize=9,  alignment=TA_CENTER,  leading=12, textColor=colors.white)
+    HEADR = ps('HEADR', fontName='Helvetica-Bold',        fontSize=9,  alignment=TA_RIGHT,   leading=12, textColor=colors.white)
     CELL  = ps('CELL',  fontName='Helvetica',             fontSize=9,  alignment=TA_CENTER,  leading=12)
     CELLR = ps('CELLR', fontName='Helvetica',             fontSize=9,  alignment=TA_RIGHT,   leading=12)
     SIGN  = ps('SIGN',  fontName='Helvetica',             fontSize=10, alignment=TA_RIGHT,   leading=14)
@@ -204,7 +216,7 @@ def generate_bc_pdf(data: dict) -> bytes:
     story.append(Spacer(1, 10))
 
     # ── Date / lieu ─────────────────────────────────────────────────────────────
-    lieu_date = Table([['', Paragraph(f"{rec['commune']} le : {v('date_commande')}", LBL)]],
+    lieu_date = Table([['', Paragraph(f"{rec['commune']} le : {_fmt_date(v('date_commande'))}", LBL)]],
         colWidths=[COL - 7*cm, 7*cm])
     story.append(lieu_date)
     story.append(Spacer(1, 8))
@@ -232,7 +244,10 @@ def generate_bc_pdf(data: dict) -> bytes:
 
     col_w = [1.2*cm, 6*cm, 2.3*cm, 2*cm, 2.5*cm, 3*cm]
     headers = ['N°', 'Description (Nature des déchets)', 'Quantités', 'Unités', 'Prix unitaires', 'Total HT']
-    rows = [[Paragraph(h, HEAD) for h in headers]]
+    # En-têtes alignés sur le même sens que les cellules de données de leur colonne
+    # (Prix unitaires / Total HT sont à droite, comme les montants qu'ils surplombent).
+    header_styles = [HEAD, HEAD, HEAD, HEAD, HEADR, HEADR]
+    rows = [[Paragraph(h, s) for h, s in zip(headers, header_styles)]]
 
     if not lignes:
         rows.append([Paragraph(str(x), CELL) for x in ['1', '', '', 'KG', 'DZ', 'DZ']])
@@ -366,6 +381,7 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     LBLB    = ps('LBLB',    fontName='Helvetica-Bold',   fontSize=10.5,alignment=TA_LEFT,  leading=15)
     TITRE   = ps('TITRE',   fontName='Helvetica-Bold',   fontSize=16, alignment=TA_CENTER, leading=19)
     HEAD    = ps('HEAD',    fontName='Helvetica-Bold',   fontSize=10, alignment=TA_CENTER, leading=13, textColor=colors.white)
+    HEADR   = ps('HEADR',   fontName='Helvetica-Bold',   fontSize=10, alignment=TA_RIGHT,  leading=13, textColor=colors.white)
     CELL    = ps('CELL',    fontName='Helvetica',        fontSize=10, alignment=TA_CENTER, leading=13)
     CELLR   = ps('CELLR',   fontName='Helvetica',        fontSize=10, alignment=TA_RIGHT,  leading=13)
     RECAPL  = ps('RECAPL',  fontName='Helvetica-Bold',   fontSize=10.5,alignment=TA_LEFT,  leading=14)
@@ -394,10 +410,10 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
 
     ref_box_rows = [
         [Paragraph('Référence', LBLB), Paragraph(v('numero'), META)],
-        [Paragraph('Date',      LBLB), Paragraph(v('date_commande'), META)],
+        [Paragraph('Date',      LBLB), Paragraph(_fmt_date(v('date_commande')), META)],
         [Paragraph('Montant',   LBLB), Paragraph(_fmt_montant(total_ttc), META)],
         [Paragraph('Client',    LBLB), Paragraph(v('ref_client') or v('client_nom'), META)],
-        [Paragraph('Echéance',  LBLB), Paragraph(v('date_echeance'), META)],
+        [Paragraph('Echéance',  LBLB), Paragraph(_fmt_date(v('date_echeance')), META)],
     ]
     ref_box = Table(ref_box_rows, colWidths=[2.6*cm, 4.1*cm])
     ref_box.setStyle(TableStyle([
@@ -483,7 +499,10 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     # ── Tableau des articles ─────────────────────────────────────────────────────
     col_w   = [2.6*cm, 3.3*cm, 1.6*cm, 1.9*cm, 2.1*cm, 2.6*cm, 1.3*cm, 1.6*cm]
     headers = ['Réf Article', 'Désignation', 'Unité', 'Quantité', 'Prix U HT', 'Montant HT', 'R.%', 'Tva%']
-    rows    = [[Paragraph(h, HEAD) for h in headers]]
+    # En-têtes alignés sur le même sens que les cellules de données de leur colonne
+    # (Prix U HT / Montant HT sont à droite, comme les montants qu'ils surplombent).
+    header_styles = [HEAD, HEAD, HEAD, HEAD, HEADR, HEADR, HEAD, HEAD]
+    rows    = [[Paragraph(h, s) for h, s in zip(headers, header_styles)]]
 
     for l in lignes:
         c = _calc_ligne(l, tva_pct)

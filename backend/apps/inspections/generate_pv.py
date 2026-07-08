@@ -26,6 +26,17 @@ def _texte_date(date_str):
         return DOTS, DOTS
 
 
+def _fmt_date(iso):
+    """Convertit une date ISO (YYYY-MM-DD) en JJ/MM/AAAA — inchangé si le format est différent."""
+    if not iso:
+        return ''
+    parts = str(iso).split('-')
+    if len(parts) != 3:
+        return str(iso)
+    y, m, d = parts
+    return f"{d}/{m}/{y}"
+
+
 def generate_pv_pdf(data: dict) -> bytes:
     """
     Procès-verbal d'incinération des Déchets Spéciaux (DS) / Déchets Spéciaux
@@ -87,7 +98,7 @@ def generate_pv_pdf(data: dict) -> bytes:
 
     pv_numero = data.get('pv_numero') or DOTS
     story.append(Paragraph(
-        f"Procès-verbal d'incinération n° <b>{pv_numero}</b> du <b>{data.get('date_inspection') or DOTS}</b>",
+        f"Procès-verbal d'incinération n° <b>{pv_numero}</b> du <b>{_fmt_date(data.get('date_inspection')) or DOTS}</b>",
         TITLE))
 
     story.extend(filet(espace_avant=14, espace_apres=16))
@@ -130,7 +141,7 @@ def generate_pv_pdf(data: dict) -> bytes:
     story.append(Spacer(1, 7))
     story.append(champ('Sise :', data.get('recuperateur_adresse')))
     story.append(Spacer(1, 7))
-    story.append(champ('Agrément n°', data.get('recuperateur_agrement'), suite=f" du {remplir(data.get('recuperateur_agrement_date'))}"))
+    story.append(champ('Agrément n°', data.get('recuperateur_agrement'), suite=f" du {remplir(_fmt_date(data.get('recuperateur_agrement_date')))}"))
     story.append(Spacer(1, 16))
 
     story.append(champ('Les déchets proviennent de :', data.get('generateur_nom')))
