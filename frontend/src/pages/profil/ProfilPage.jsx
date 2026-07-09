@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import {
   User, Shield, Save, Building2, CheckCircle2,
   Award, Plus, X, ChevronDown, ChevronRight, AlertTriangle,
-  Ban, XCircle, Edit2, Layers
+  Ban, XCircle, Edit2, Layers, FileSignature, Stamp
 } from 'lucide-react'
 import { useAuthStore } from '../../store'
 import api from '../../api'
@@ -465,6 +465,8 @@ export default function ProfilPage() {
   const [savingUser,  setSavingUser]  = useState(false)
   const [savingRec,   setSavingRec]   = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingSignature, setUploadingSignature] = useState(false)
+  const [uploadingCachet, setUploadingCachet] = useState(false)
   const [agrement,    setAgrement]    = useState(null)
   const [hasAgrement, setHasAgrement] = useState(null)
   const [showAgrForm, setShowAgrForm] = useState(false)
@@ -528,9 +530,10 @@ export default function ProfilPage() {
   const onSaveRec = async (data) => {
     setSavingRec(true)
     try {
-      // logo n'est jamais modifié depuis ce formulaire (upload dédié via uploadLogo) —
-      // renvoyer l'URL texte reçue du GET casserait la validation ImageField du backend.
-      const { logo, ...payload } = data
+      // logo/signature/cachet ne sont jamais modifiés depuis ce formulaire (upload
+      // dédié via uploadLogo/uploadSignature/uploadCachet) — renvoyer l'URL texte
+      // reçue du GET casserait la validation ImageField du backend.
+      const { logo, signature_electronique, cachet_electronique, ...payload } = data
       await api.patch('/accounts/mon-recuperateur/', payload)
       toast.success('Fiche récupérateur mise à jour')
       const r = await api.get('/accounts/mon-recuperateur/')
@@ -551,6 +554,32 @@ export default function ProfilPage() {
       toast.success('Logo mis à jour')
     } catch { toast.error('Erreur upload du logo') }
     finally { setUploadingLogo(false) }
+  }
+
+  const uploadSignature = async (file) => {
+    if (!file) return
+    setUploadingSignature(true)
+    try {
+      const formData = new FormData()
+      formData.append('signature_electronique', file)
+      const r = await api.patch('/accounts/mon-recuperateur/', formData)
+      setRecup(r.data)
+      toast.success('Signature électronique mise à jour')
+    } catch { toast.error('Erreur upload de la signature') }
+    finally { setUploadingSignature(false) }
+  }
+
+  const uploadCachet = async (file) => {
+    if (!file) return
+    setUploadingCachet(true)
+    try {
+      const formData = new FormData()
+      formData.append('cachet_electronique', file)
+      const r = await api.patch('/accounts/mon-recuperateur/', formData)
+      setRecup(r.data)
+      toast.success('Cachet électronique mis à jour')
+    } catch { toast.error('Erreur upload du cachet') }
+    finally { setUploadingCachet(false) }
   }
 
   const onAgrementSaved = async () => {
@@ -656,21 +685,59 @@ export default function ProfilPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-4 mb-5 pb-5 border-b border-[#E2E8F0]">
-            <div className="w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
-              {recup?.logo
-                ? <img src={recup.logo} alt="Logo" className="w-full h-full object-contain"/>
-                : <Building2 size={22} className="text-slate-300"/>
-              }
+          <div className="flex flex-wrap gap-6 mb-5 pb-5 border-b border-[#E2E8F0]">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
+                {recup?.logo
+                  ? <img src={recup.logo} alt="Logo" className="w-full h-full object-contain"/>
+                  : <Building2 size={22} className="text-slate-300"/>
+                }
+              </div>
+              <div>
+                <label className="label mb-1">Logo de l'entreprise</label>
+                <label className="btn-secondary btn-sm cursor-pointer inline-flex">
+                  {uploadingLogo ? 'Envoi...' : 'Choisir un fichier'}
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingLogo}
+                    onChange={e => uploadLogo(e.target.files?.[0])}/>
+                </label>
+                <p className="text-[11px] text-slate-400 mt-1">Utilisé dans les documents PDF (BL, BSD...)</p>
+              </div>
             </div>
-            <div>
-              <label className="label mb-1">Logo de l'entreprise</label>
-              <label className="btn-secondary btn-sm cursor-pointer inline-flex">
-                {uploadingLogo ? 'Envoi...' : 'Choisir un fichier'}
-                <input type="file" accept="image/*" className="hidden" disabled={uploadingLogo}
-                  onChange={e => uploadLogo(e.target.files?.[0])}/>
-              </label>
-              <p className="text-[11px] text-slate-400 mt-1">Utilisé dans les documents PDF (BL, BSD...)</p>
+
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
+                {recup?.signature_electronique
+                  ? <img src={recup.signature_electronique} alt="Signature" className="w-full h-full object-contain"/>
+                  : <FileSignature size={22} className="text-slate-300"/>
+                }
+              </div>
+              <div>
+                <label className="label mb-1">Signature électronique</label>
+                <label className="btn-secondary btn-sm cursor-pointer inline-flex">
+                  {uploadingSignature ? 'Envoi...' : 'Choisir un fichier'}
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingSignature}
+                    onChange={e => uploadSignature(e.target.files?.[0])}/>
+                </label>
+                <p className="text-[11px] text-slate-400 mt-1">Utilisée dans les documents PDF</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
+                {recup?.cachet_electronique
+                  ? <img src={recup.cachet_electronique} alt="Cachet" className="w-full h-full object-contain"/>
+                  : <Stamp size={22} className="text-slate-300"/>
+                }
+              </div>
+              <div>
+                <label className="label mb-1">Cachet électronique</label>
+                <label className="btn-secondary btn-sm cursor-pointer inline-flex">
+                  {uploadingCachet ? 'Envoi...' : 'Choisir un fichier'}
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingCachet}
+                    onChange={e => uploadCachet(e.target.files?.[0])}/>
+                </label>
+                <p className="text-[11px] text-slate-400 mt-1">Utilisé dans les documents PDF</p>
+              </div>
             </div>
           </div>
 

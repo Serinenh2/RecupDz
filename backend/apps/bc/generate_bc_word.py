@@ -117,6 +117,17 @@ def generate_bc_docx(data: dict) -> bytes:
 
     # ── Signature ───────────────────────────────────────────────────────────────
     doc.add_paragraph()
+    if rec['cachet_path'] or rec['signature_path']:
+        sign_p = doc.add_paragraph()
+        sign_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        if rec['cachet_path']:
+            try: sign_p.add_run().add_picture(rec['cachet_path'], width=Cm(2.8))
+            except Exception: pass
+        if rec['signature_path']:
+            try:
+                sign_p.add_run('   ')
+                sign_p.add_run().add_picture(rec['signature_path'], width=Cm(3))
+            except Exception: pass
     doc.add_paragraph()
     gerant = doc.add_paragraph('Le Gérant')
     gerant.alignment = WD_ALIGN_PARAGRAPH.RIGHT

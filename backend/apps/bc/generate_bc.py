@@ -51,6 +51,8 @@ def _recuperateur_info(data):
                 'compte_bancaire': r.compte_bancaire or '',
                 'responsable':     r.responsable or '',
                 'logo_path':       r.logo.path if r.logo else None,
+                'signature_path':  r.signature_electronique.path if r.signature_electronique else None,
+                'cachet_path':     r.cachet_electronique.path if r.cachet_electronique else None,
             }
         except Recuperateur.DoesNotExist:
             pass
@@ -58,8 +60,29 @@ def _recuperateur_info(data):
         'nom': data.get('recuperateur_nom') or '', 'agrement_num': '', 'agrement_date': '',
         'adresse': '', 'commune': '', 'code_postal': '', 'rc': '', 'nif': '', 'na': '', 'nis': '',
         'telephone': '', 'fax': '', 'email': '', 'compte_bancaire': '',
-        'responsable': '', 'logo_path': None,
+        'responsable': '', 'logo_path': None, 'signature_path': None, 'cachet_path': None,
     }
+
+
+def _signature_flowable(rec, align='RIGHT'):
+    """Table [cachet, signature] (les images présentes) prête à ajouter au story —
+    None si le récupérateur n'a téléversé ni cachet ni signature électronique."""
+    imgs = []
+    if rec.get('cachet_path'):
+        try:
+            imgs.append(Image(rec['cachet_path'], width=2.8*cm, height=2.8*cm))
+        except Exception:
+            pass
+    if rec.get('signature_path'):
+        try:
+            imgs.append(Image(rec['signature_path'], width=3*cm, height=1.6*cm))
+        except Exception:
+            pass
+    if not imgs:
+        return None
+    tbl = Table([imgs], colWidths=[3*cm] * len(imgs))
+    tbl.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), align), ('VALIGN', (0, 0), (-1, -1), 'BOTTOM')]))
+    return tbl
 
 
 def _calc_ligne(l, default_tva_pct):
@@ -312,6 +335,10 @@ def generate_bc_pdf(data: dict) -> bytes:
     story.append(Spacer(1, 30))
 
     # ── Signature ───────────────────────────────────────────────────────────────
+    sign_flowable = _signature_flowable(rec)
+    if sign_flowable:
+        story.append(sign_flowable)
+        story.append(Spacer(1, 4))
     story.append(Paragraph('Le Gérant', SIGN))
     if rec['responsable']:
         story.append(Paragraph(rec['responsable'], SIGN))
@@ -592,7 +619,16 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     # padding (~6pt de chaque côté) non compté dans topMargin/bottomMargin.
     filler_h = max(0.6 * cm, usable_h - top_h - tbl_h - bottom_h - 1.2 * cm)
 
-    rows_with_filler = rows + [['' for _ in headers]]
+    # Cachet/signature électroniques insérés dans la case vide de la zone
+    # articles (comme le cachet humide apposé à la main sur le formulaire papier)
+    # plutôt qu'ajoutés après l'arrêté, qui déborderait sur une 2e page puisque
+    # la hauteur du tableau est calculée pour occuper exactement la page.
+    filler_row = ['' for _ in headers]
+    sign_flowable = _signature_flowable(rec, align='CENTER')
+    if sign_flowable:
+        filler_row[1] = sign_flowable
+
+    rows_with_filler = rows + [filler_row]
     tbl = Table(rows_with_filler, colWidths=col_w, rowHeights=[None] * len(rows) + [filler_h])
     tbl.setStyle(tbl_style)
 

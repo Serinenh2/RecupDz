@@ -37,6 +37,10 @@ class Recuperateur(models.Model):
     statut_juridique   = models.CharField(max_length=15, choices=STATUT_JURIDIQUE, blank=True)
 
     logo               = models.ImageField(upload_to='recuperateurs/logos/', blank=True, null=True)
+    signature_electronique = models.ImageField(upload_to='recuperateurs/signatures/', blank=True, null=True,
+                                                 verbose_name='Signature électronique')
+    cachet_electronique     = models.ImageField(upload_to='recuperateurs/cachets/', blank=True, null=True,
+                                                 verbose_name='Cachet électronique')
     nom_raison_sociale = models.CharField(max_length=300)
     nom_commercial     = models.CharField(max_length=300, blank=True)
     responsable        = models.CharField(max_length=200)

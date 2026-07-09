@@ -10,7 +10,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-from apps.bc.generate_bc import _NumberedCanvas, _fmt_montant, _fmt_qte, _fmt_date
+from apps.bc.generate_bc import _NumberedCanvas, _fmt_montant, _fmt_qte, _fmt_date, _signature_flowable
 import io
 
 BLACK = colors.black
@@ -42,13 +42,15 @@ def _recuperateur_info(data):
                 'compte_bancaire': r.compte_bancaire or '',
                 'responsable':     r.responsable or '',
                 'logo_path':       r.logo.path if r.logo else None,
+                'signature_path':  r.signature_electronique.path if r.signature_electronique else None,
+                'cachet_path':     r.cachet_electronique.path if r.cachet_electronique else None,
             }
         except Recuperateur.DoesNotExist:
             pass
     return {'nom': data.get('recuperateur_nom') or '', 'agrement_num': '', 'agrement_date': '',
             'adresse': '', 'commune': '', 'code_postal': '', 'rc': '', 'nif': '', 'na': '', 'nis': '',
             'telephone': '', 'fax': '', 'email': '', 'compte_bancaire': '',
-            'responsable': '', 'logo_path': None}
+            'responsable': '', 'logo_path': None, 'signature_path': None, 'cachet_path': None}
 
 
 def _destinataire_info(data):
@@ -169,6 +171,10 @@ def generate_bl_pdf(data: dict) -> bytes:
     story.append(Spacer(1, 24))
 
     # ── Signature ───────────────────────────────────────────────────────────
+    sign_flowable = _signature_flowable(rec)
+    if sign_flowable:
+        story.append(sign_flowable)
+        story.append(Spacer(1, 4))
     story.append(Paragraph('Le Gérant', SIGN))
     if rec['responsable']:
         story.append(Paragraph(rec['responsable'], SIGN))
@@ -323,7 +329,14 @@ def _generate_bl_pdf_indurex(data: dict, rec: dict, dest: dict) -> bytes:
     # chaque côté) non compté dans topMargin/bottomMargin.
     filler_h = max(0.6 * cm, usable_h - top_h - tbl_h - 1.2 * cm)
 
-    rows_with_filler = rows + [['' for _ in headers]]
+    # Cachet/signature électroniques insérés dans la case vide de la zone
+    # articles (comme le cachet humide apposé à la main sur le formulaire papier).
+    filler_row = ['' for _ in headers]
+    sign_flowable = _signature_flowable(rec, align='CENTER')
+    if sign_flowable:
+        filler_row[1] = sign_flowable
+
+    rows_with_filler = rows + [filler_row]
     tbl = Table(rows_with_filler, colWidths=col_w, rowHeights=[None] * len(rows) + [filler_h])
     tbl.setStyle(tbl_style)
     story.append(tbl)
