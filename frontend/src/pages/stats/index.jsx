@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Calendar, CalendarRange, CalendarDays, CalendarClock, Package, Download, Loader2, AlertTriangle, Home, Layers, Boxes } from 'lucide-react'
+import { Calendar, CalendarRange, CalendarDays, CalendarClock, Package, Download, Loader2, AlertTriangle, Home, Layers, Boxes, TrendingUp, Activity } from 'lucide-react'
 import api from '../../api'
 import DateInput from '../../components/common/DateInput'
 import { formatDateFR } from '../../utils/formatDate'
@@ -28,6 +28,9 @@ const VUES = [
   { key: 'TOUS',         label: 'Tous les dossiers' },
   { key: 'OPERATION',    label: "Par numéro d'opération" },
   { key: 'GENERATEUR',   label: 'Par générateur' },
+  { key: 'TRANSPORTEUR', label: 'Par transporteur' },
+  { key: 'ELIMINATEUR',  label: 'Par éliminateur' },
+  { key: 'VALORISATEUR', label: 'Par valorisateur' },
   { key: 'TYPE',         label: 'Par type de déchets' },
   { key: 'DESIGNATION',  label: 'Par désignation précise des déchets' },
   { key: 'STOCKAGE',     label: 'Déchets en stock' },
@@ -72,9 +75,12 @@ const DESTINATIONS_PAR_VUE = {
 
 // Vues qui regroupent les dossiers par dimension plutôt que de les lister un par un
 const DIMENSIONS_PAR_VUE = {
-  GENERATEUR:  r => r.generateur_nom || 'Non renseigné',
-  TYPE:        r => CLASSE_LABELS[r.classe_dechet] || r.classe_dechet || 'Non classé',
-  DESIGNATION: r => r.designation_dechet || 'Non renseigné',
+  GENERATEUR:   r => r.generateur_nom || 'Non renseigné',
+  TRANSPORTEUR: r => r.transporteur_nom || 'Non renseigné',
+  ELIMINATEUR:  r => r.eliminateur_nom || 'Non renseigné',
+  VALORISATEUR: r => r.valorisateur_nom || 'Non renseigné',
+  TYPE:         r => CLASSE_LABELS[r.classe_dechet] || r.classe_dechet || 'Non classé',
+  DESIGNATION:  r => r.designation_dechet || 'Non renseigné',
 }
 
 function aggregerParDimension(rows, dim) {
@@ -324,12 +330,226 @@ function RubriqueStock({ rows, loading }) {
   )
 }
 
+// ── Évolution des prix — suivi des prix unitaires des déchets récupérés ──────
+// S'appuie sur les lignes à prix (Proforma/BC/Facture) — la Traçabilité ne
+// porte aucune information de prix, seulement les quantités récupérées.
+function moisLabel(dateStr) {
+  const d = new Date(dateStr)
+  return `${MOIS[d.getMonth()]} ${d.getFullYear()}`
+}
+
+function RubriquePrix({ docs, loading }) {
+  const lignes = useMemo(() => {
+    const out = []
+    docs.forEach(doc => {
+      (doc.lignes || []).forEach(l => {
+        const prix = parseFloat(l.prix_unitaire)
+        if (!doc.date_commande || !prix) return
+        out.push({
+          date:        doc.date_commande,
+          numero:      doc.numero,
+          type_document: doc.type_document,
+          description: l.description || 'Non renseigné',
+          prix_unitaire: prix,
+        })
+      })
+    })
+    return out.sort((a, b) => new Date(b.date) - new Date(a.date))
+  }, [docs])
+
+  const moyennesMensuelles = useMemo(() => {
+    const m = new Map()
+    lignes.forEach(l => {
+      const key = `${l.description}||${moisLabel(l.date)}`
+      const e = m.get(key) || { total: 0, count: 0 }
+      e.total += l.prix_unitaire; e.count++
+      m.set(key, e)
+    })
+    return m
+  }, [lignes])
+
+  const moyennesAnnuelles = useMemo(() => {
+    const m = new Map()
+    lignes.forEach(l => {
+      const annee = new Date(l.date).getFullYear()
+      const key = `${l.description}||${annee}`
+      const e = m.get(key) || { total: 0, count: 0 }
+      e.total += l.prix_unitaire; e.count++
+      m.set(key, e)
+    })
+    return m
+  }, [lignes])
+
+  const fmt = n => n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+  return (
+    <div className="card p-5 space-y-4 border-l-4 border-violet-400">
+      <div>
+        <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <TrendingUp size={18} className="text-violet-600"/> Évolution des prix
+        </h2>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Suivi des prix unitaires des déchets récupérés (Proforma / Bon de Commande / Facture) — moyenne mensuelle et annuelle par type de déchet.
+        </p>
+      </div>
+
+      <div className="rounded-xl overflow-x-auto border border-[#E2E8F0] dark:border-[#2B3D1E]">
+        {loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="w-7 h-7 text-violet-500 animate-spin"/></div>
+        ) : lignes.length === 0 ? (
+          <div className="p-10 text-center">
+            <TrendingUp size={32} className="mx-auto mb-2 text-slate-200"/>
+            <p className="font-semibold text-slate-400 text-sm">Aucune ligne à prix trouvée pour cette période</p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#E2E8F0] dark:border-[#2B3D1E] text-left bg-slate-50 dark:bg-[#16240D]/50">
+                <th className="px-4 py-2.5 font-semibold text-slate-500 text-xs uppercase">Date</th>
+                <th className="px-4 py-2.5 font-semibold text-slate-500 text-xs uppercase">Type de déchet</th>
+                <th className="px-4 py-2.5 font-semibold text-slate-500 text-xs uppercase">Prix unitaire (DZ)</th>
+                <th className="px-4 py-2.5 font-semibold text-slate-500 text-xs uppercase">Prix moyen mensuel (DZ)</th>
+                <th className="px-4 py-2.5 font-semibold text-slate-500 text-xs uppercase">Prix moyen annuel (DZ)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lignes.map((l, idx) => {
+                const moisKey  = `${l.description}||${moisLabel(l.date)}`
+                const anneeKey = `${l.description}||${new Date(l.date).getFullYear()}`
+                const moyMois  = moyennesMensuelles.get(moisKey)
+                const moyAnnee = moyennesAnnuelles.get(anneeKey)
+                return (
+                  <tr key={idx} className="border-b border-slate-50 dark:border-[#16240D] last:border-0 hover:bg-slate-50 dark:hover:bg-[#16240D]/50">
+                    <td className="px-4 py-2.5 text-slate-600 dark:text-slate-300">{formatDateFR(l.date)}</td>
+                    <td className="px-4 py-2.5 font-medium text-slate-700 dark:text-slate-200">{l.description}</td>
+                    <td className="px-4 py-2.5 font-semibold text-slate-800 dark:text-white">{fmt(l.prix_unitaire)}</td>
+                    <td className="px-4 py-2.5 text-violet-700 dark:text-violet-400">
+                      {moyMois ? `${fmt(moyMois.total / moyMois.count)} (${moisLabel(l.date)})` : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-violet-700 dark:text-violet-400">
+                      {moyAnnee ? `${fmt(moyAnnee.total / moyAnnee.count)} (${new Date(l.date).getFullYear()})` : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Évolution des quantités — suivi des quantités récupérées par type de déchet ──
+// Même principe que l'évolution des prix, mais sur les quantités récupérées
+// (Traçabilité) — indépendant de la période sélectionnée ci-dessus, comme le
+// stock actuel, pour donner une vraie vue d'évolution dans le temps.
+function RubriqueQuantites({ rows, loading }) {
+  const lignes = useMemo(() =>
+    rows
+      .filter(r => r.date_recuperation && r.quantite)
+      .map(r => ({
+        date:        r.date_recuperation,
+        numero:      r.numero,
+        designation: r.designation_dechet || r.code_dechet || 'Non renseigné',
+        quantite:    Number(r.quantite),
+        unite:       r.unite_display || r.unite || 'KG',
+      }))
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+  , [rows])
+
+  const moyennesMensuelles = useMemo(() => {
+    const m = new Map()
+    lignes.forEach(l => {
+      const key = `${l.designation}||${moisLabel(l.date)}`
+      const e = m.get(key) || { total: 0, count: 0 }
+      e.total += l.quantite; e.count++
+      m.set(key, e)
+    })
+    return m
+  }, [lignes])
+
+  const moyennesAnnuelles = useMemo(() => {
+    const m = new Map()
+    lignes.forEach(l => {
+      const annee = new Date(l.date).getFullYear()
+      const key = `${l.designation}||${annee}`
+      const e = m.get(key) || { total: 0, count: 0 }
+      e.total += l.quantite; e.count++
+      m.set(key, e)
+    })
+    return m
+  }, [lignes])
+
+  const fmt = n => n.toLocaleString('fr-FR', { maximumFractionDigits: 3 })
+
+  return (
+    <div className="card p-5 space-y-4 border-l-4 border-cyan-400">
+      <div>
+        <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <Activity size={18} className="text-cyan-600"/> Évolution des quantités
+        </h2>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Suivi des quantités récupérées par type de déchet — moyenne mensuelle et annuelle, tous dossiers confondus.
+        </p>
+      </div>
+
+      <div className="rounded-xl overflow-x-auto border border-[#E2E8F0] dark:border-[#2B3D1E]">
+        {loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="w-7 h-7 text-cyan-500 animate-spin"/></div>
+        ) : lignes.length === 0 ? (
+          <div className="p-10 text-center">
+            <Activity size={32} className="mx-auto mb-2 text-slate-200"/>
+            <p className="font-semibold text-slate-400 text-sm">Aucune quantité récupérée trouvée</p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#E2E8F0] dark:border-[#2B3D1E] text-left bg-slate-50 dark:bg-[#16240D]/50">
+                <th className="px-4 py-2.5 font-semibold text-slate-500 text-xs uppercase">Date</th>
+                <th className="px-4 py-2.5 font-semibold text-slate-500 text-xs uppercase">Type de déchet</th>
+                <th className="px-4 py-2.5 font-semibold text-slate-500 text-xs uppercase">Quantité récupérée</th>
+                <th className="px-4 py-2.5 font-semibold text-slate-500 text-xs uppercase">Quantité moyenne mensuelle</th>
+                <th className="px-4 py-2.5 font-semibold text-slate-500 text-xs uppercase">Quantité moyenne annuelle</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lignes.map((l, idx) => {
+                const moisKey  = `${l.designation}||${moisLabel(l.date)}`
+                const anneeKey = `${l.designation}||${new Date(l.date).getFullYear()}`
+                const moyMois  = moyennesMensuelles.get(moisKey)
+                const moyAnnee = moyennesAnnuelles.get(anneeKey)
+                return (
+                  <tr key={idx} className="border-b border-slate-50 dark:border-[#16240D] last:border-0 hover:bg-slate-50 dark:hover:bg-[#16240D]/50">
+                    <td className="px-4 py-2.5 text-slate-600 dark:text-slate-300">{formatDateFR(l.date)}</td>
+                    <td className="px-4 py-2.5 font-medium text-slate-700 dark:text-slate-200">{l.designation}</td>
+                    <td className="px-4 py-2.5 font-semibold text-slate-800 dark:text-white">{fmt(l.quantite)} {l.unite}</td>
+                    <td className="px-4 py-2.5 text-cyan-700 dark:text-cyan-400">
+                      {moyMois ? `${fmt(moyMois.total / moyMois.count)} ${l.unite} (${moisLabel(l.date)})` : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-cyan-700 dark:text-cyan-400">
+                      {moyAnnee ? `${fmt(moyAnnee.total / moyAnnee.count)} ${l.unite} (${new Date(l.date).getFullYear()})` : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Rubrique (Spéciaux/SD ou Ménagers et assimilés) ───────────────────────────
 function Rubrique({ titre, icon: Icon, accent, rows, loading, fichierCsv, vue }) {
   const totaux = useMemo(() => totauxParUnite(rows), [rows])
   const isGroupee = !!DIMENSIONS_PAR_VUE[vue]
   const groupes = useMemo(() => isGroupee ? aggregerParDimension(rows, vue) : [], [rows, vue, isGroupee])
-  const COLONNE_LABELS = { GENERATEUR: 'Générateur', TYPE: 'Type de déchet', DESIGNATION: 'Désignation précise' }
+  const COLONNE_LABELS = {
+    GENERATEUR: 'Générateur', TRANSPORTEUR: 'Transporteur', ELIMINATEUR: 'Éliminateur',
+    VALORISATEUR: 'Valorisateur', TYPE: 'Type de déchet', DESIGNATION: 'Désignation précise',
+  }
 
   return (
     <div className={`card p-5 space-y-4 border-l-4 ${accent.border}`}>
@@ -440,6 +660,10 @@ export default function StatsPage() {
   const [loadingCet, setLoadingCet] = useState(false)
   const [rowsStock,    setRowsStock]    = useState([])
   const [loadingStock, setLoadingStock] = useState(false)
+  const [showPrix,      setShowPrix]      = useState(false)
+  const [priceDocs,     setPriceDocs]     = useState([])
+  const [loadingPrices, setLoadingPrices] = useState(false)
+  const [showQuantites, setShowQuantites] = useState(false)
 
   const rowsFiltrees = useMemo(() => {
     const destinations = DESTINATIONS_PAR_VUE[vue]
@@ -512,8 +736,21 @@ export default function StatsPage() {
     }
   }
 
+  const loadPrices = async () => {
+    setLoadingPrices(true)
+    try {
+      const res = await api.get('/bc/', { params: { page_size: 2000, ordering: '-date_commande' } })
+      setPriceDocs(res.data.results || res.data)
+    } catch {
+      setPriceDocs([])
+    } finally {
+      setLoadingPrices(false)
+    }
+  }
+
   useEffect(() => { load(); loadCet() }, [periode, datePrecise, dateMin, dateMax, mois, annee])
   useEffect(() => { loadStock() }, [])
+  useEffect(() => { if (showPrix && priceDocs.length === 0) loadPrices() }, [showPrix])
 
   return (
     <div className="space-y-5">
@@ -582,13 +819,28 @@ export default function StatsPage() {
           </div>
         )}
 
-        <div className="max-w-sm pt-2 border-t border-[#E2E8F0] dark:border-[#2B3D1E]">
-          <label className="label">Vue</label>
-          <select value={vue} onChange={e=>setVue(e.target.value)} className="input">
-            {VUES.map(v => <option key={v.key} value={v.key}>{v.label}</option>)}
-          </select>
+        <div className="flex items-end gap-3 pt-2 border-t border-[#E2E8F0] dark:border-[#2B3D1E]">
+          <div className="max-w-sm flex-1">
+            <label className="label">Vue</label>
+            <select value={vue} onChange={e=>setVue(e.target.value)} className="input">
+              {VUES.map(v => <option key={v.key} value={v.key}>{v.label}</option>)}
+            </select>
+          </div>
+          <button onClick={() => setShowPrix(v => !v)}
+            title="Suivi des prix unitaires des déchets récupérés"
+            className={showPrix ? 'btn-primary whitespace-nowrap' : 'btn-secondary whitespace-nowrap'}>
+            <TrendingUp size={15}/> Évolution des prix
+          </button>
+          <button onClick={() => setShowQuantites(v => !v)}
+            title="Suivi des quantités récupérées par type de déchet"
+            className={showQuantites ? 'btn-primary whitespace-nowrap' : 'btn-secondary whitespace-nowrap'}>
+            <Activity size={15}/> Évolution des quantités
+          </button>
         </div>
       </div>
+
+      {showPrix && <RubriquePrix docs={priceDocs} loading={loadingPrices} />}
+      {showQuantites && <RubriqueQuantites rows={rowsStock} loading={loadingStock} />}
 
       {vue === 'STOCK_ACTUEL' ? (
         <RubriqueStock rows={rowsStock} loading={loadingStock} />
