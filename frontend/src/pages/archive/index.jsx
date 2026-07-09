@@ -28,6 +28,10 @@ const CATEGORIES = [
   { value: 'CORRESPONDANCE', label: 'Correspondance officielle',   color: 'bg-teal-100 text-teal-700'    },
   { value: 'JURIDIQUE',      label: 'Document juridique',          color: 'bg-red-100 text-red-700'      },
   { value: 'TECHNIQUE',      label: 'Document technique',          color: 'bg-slate-100 text-slate-700'  },
+  { value: 'PROFORMA',       label: 'Proforma',                    color: 'bg-fuchsia-100 text-fuchsia-700' },
+  { value: 'BC',             label: 'Bon de Commande',             color: 'bg-emerald-100 text-emerald-700' },
+  { value: 'BL',             label: 'Bon de Livraison',            color: 'bg-sky-100 text-sky-700'      },
+  { value: 'FACTURE',        label: 'Facture',                     color: 'bg-rose-100 text-rose-700'    },
   { value: 'AUTRE',          label: 'Autre',                       color: 'bg-gray-100 text-gray-600'    },
 ]
 
@@ -50,6 +54,20 @@ function getExtCfg(ext) {
 
 function getCatCfg(cat) {
   return CATEGORIES.find(c => c.value === cat) || CATEGORIES[CATEGORIES.length - 1]
+}
+
+// Documents générés automatiquement à la validation d'un Proforma/BC/BL/Facture
+// portent un tag interne 'dossier:<uuid>' — utilisé pour les regrouper, mais
+// caché de l'affichage des tags (avec le tag 'source:...' associé).
+const INTERNAL_TAG_PREFIXES = ['dossier:', 'source:']
+function visibleTags(doc) {
+  if (!doc.tags) return []
+  return doc.tags.split(',').map(t => t.trim()).filter(t => t && !INTERNAL_TAG_PREFIXES.some(p => t.startsWith(p)))
+}
+function getDossierId(doc) {
+  if (!doc.tags) return null
+  const tag = doc.tags.split(',').map(t => t.trim()).find(t => t.startsWith('dossier:'))
+  return tag ? tag.slice('dossier:'.length) : null
 }
 
 function formatDate(str) {
@@ -209,7 +227,7 @@ function DocumentCard({ doc, onEdit, onDelete, onPreview }) {
   const extCfg = getExtCfg(doc.extension)
   const catCfg = getCatCfg(doc.categorie)
   const Icon   = extCfg.icon
-  const tags   = doc.tags ? doc.tags.split(',').map(t => t.trim()).filter(Boolean) : []
+  const tags   = visibleTags(doc)
 
   return (
     <div className="card p-4 hover:shadow-lg transition-all group">
@@ -326,6 +344,24 @@ export default function ArchivePage() {
   const handleSave = () => { setShowForm(false); setEditing(null); load() }
   const handleEdit = (doc) => { setEditing(doc); setShowForm(true) }
 
+  // Regroupement par dossier — les documents générés depuis la même opération
+  // (Proforma → BC → BL → Facture) partagent un tag 'dossier:<uuid>'.
+  const { dossierGroups, standaloneDocs } = useMemo(() => {
+    const byDossier = {}
+    const standalone = []
+    docs.forEach(d => {
+      const dId = getDossierId(d)
+      if (dId) (byDossier[dId] ||= []).push(d)
+      else standalone.push(d)
+    })
+    const groups = []
+    Object.entries(byDossier).forEach(([dId, items]) => {
+      if (items.length > 1) groups.push({ dossierId: dId, items })
+      else standalone.push(...items)
+    })
+    return { dossierGroups: groups, standaloneDocs: standalone }
+  }, [docs])
+
   // Stats
   const catCounts = useMemo(() => {
     const c = {}
@@ -417,16 +453,39 @@ export default function ArchivePage() {
           )}
         </div>
       ) : (
-        <div className="space-y-2">
-          {docs.map(doc => (
-            <DocumentCard
-              key={doc.id}
-              doc={doc}
-              onEdit={isAdmin ? handleEdit : () => {}}
-              onDelete={isAdmin ? handleDelete : () => {}}
-              onPreview={() => {}}
-            />
+        <div className="space-y-4">
+          {dossierGroups.map(g => (
+            <div key={g.dossierId} className="card p-3 border-2 border-primary-200 bg-primary-50/30 space-y-2">
+              <div className="flex items-center gap-2 px-1">
+                <FolderOpen size={15} className="text-primary-600" />
+                <p className="text-xs font-bold text-primary-800 uppercase tracking-wide">
+                  Dossier — {g.items.length} documents liés
+                </p>
+              </div>
+              <div className="space-y-2">
+                {g.items.map(doc => (
+                  <DocumentCard
+                    key={doc.id}
+                    doc={doc}
+                    onEdit={isAdmin ? handleEdit : () => {}}
+                    onDelete={isAdmin ? handleDelete : () => {}}
+                    onPreview={() => {}}
+                  />
+                ))}
+              </div>
+            </div>
           ))}
+          <div className="space-y-2">
+            {standaloneDocs.map(doc => (
+              <DocumentCard
+                key={doc.id}
+                doc={doc}
+                onEdit={isAdmin ? handleEdit : () => {}}
+                onDelete={isAdmin ? handleDelete : () => {}}
+                onPreview={() => {}}
+              />
+            ))}
+          </div>
         </div>
       )}
 

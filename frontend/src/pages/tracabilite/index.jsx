@@ -463,7 +463,7 @@ function DechetLigneForm({ index, value, onChange, onRemove, canRemove, currentU
             <option value="GAZEUX">Gazeux</option>
           </select>
         </F>
-        <F label="Quantité estimée" req col=""><input value={value.quantite} onChange={e => update({ quantite: e.target.value })} type="number" step="0.001" className="input" placeholder="0.000"/></F>
+        <F label="Quantité" req col=""><input value={value.quantite} onChange={e => update({ quantite: e.target.value })} type="number" step="0.001" className="input" placeholder="0.000"/></F>
         <F label="Unité" req col="">
           <select value={value.unite} className="input" onChange={e => update({ unite: e.target.value })}>
             <option value="KG">Kilogramme (kg)</option>

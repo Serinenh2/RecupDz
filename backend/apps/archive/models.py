@@ -12,6 +12,10 @@ class Document(models.Model):
         ('CORRESPONDANCE', 'Correspondance officielle'),
         ('JURIDIQUE',      'Document juridique'),
         ('TECHNIQUE',      'Document technique'),
+        ('PROFORMA',       'Proforma'),
+        ('BC',             'Bon de Commande'),
+        ('BL',             'Bon de Livraison'),
+        ('FACTURE',        'Facture'),
         ('AUTRE',          'Autre'),
     ]
 

@@ -47,6 +47,7 @@ const blAPI = {
   delete:  (id)   => api.delete(`/bl/${id}/`),
   pdf:     (d)    => api.post('/bl/generate-bl/', d, { responseType:'blob' }),
   word:    (d)    => api.post('/bl/generate-bl-word/', d, { responseType:'blob' }),
+  genererFacture: (id) => api.post(`/bl/${id}/generer_facture/`),
 }
 const bcAPI = {
   getAll:  (p)    => api.get('/bc/', { params: p }),
@@ -55,6 +56,8 @@ const bcAPI = {
   delete:  (id)   => api.delete(`/bc/${id}/`),
   pdf:     (d)    => api.post('/bc/generate-bc/', d, { responseType:'blob' }),
   word:    (d)    => api.post('/bc/generate-bc-word/', d, { responseType:'blob' }),
+  genererBC: (id) => api.post(`/bc/${id}/generer_bc/`),
+  genererBL: (id) => api.post(`/bc/${id}/generer_bl/`),
 }
 const recupAPI = { getAll: () => api.get('/recuperateurs/?page_size=200') }
 const tracaAPI = { getAll: (p) => api.get('/traceability/', { params: p }) }
@@ -65,12 +68,12 @@ const destinatairesAPI = {
 const clientsAPI = { getAll: () => api.get('/operateurs/', { params: { page_size: 500 } }) }
 
 const TABS = [
-  { key:'bl',       label:'BL',       icon:Truck,         desc:"Bon de Livraison — émis par le récupérateur vers l'éliminateur ou le valorisateur" },
-  { key:'bc',       label:'BC',       icon:ShoppingCart,  desc:"Bon de Commande — document commercial avec prix unitaires, TVA et Total TTC" },
   { key:'proforma', label:'Proforma', icon:FileSignature, desc:'Proforma — devis préalable, même contenu que le Bon de Commande' },
-  { key:'bsd',      label:'BSD',      icon:FileText,      desc:'Bordereaux de Suivi des Déchets — documents de traçabilité obligatoires' },
-  { key:'dsd',      label:'DSD',      icon:AlertTriangle, desc:'Déclarations des Déchets Spéciaux Dangereux — formulaire annuel officiel' },
+  { key:'bc',       label:'BC',       icon:ShoppingCart,  desc:"Bon de Commande — document commercial avec prix unitaires, TVA et Total TTC" },
+  { key:'bl',       label:'BL',       icon:Truck,         desc:"Bon de Livraison — émis par le récupérateur vers l'éliminateur ou le valorisateur" },
   { key:'facture',  label:'Facture',  icon:Receipt,       desc:'Facture — document de facturation, même contenu que le Bon de Commande' },
+  { key:'dsd',      label:'DSD',      icon:AlertTriangle, desc:'Déclarations des Déchets Spéciaux Dangereux — formulaire annuel officiel' },
+  { key:'bsd',      label:'BSD',      icon:FileText,      desc:'Bordereaux de Suivi des Déchets — documents de traçabilité obligatoires' },
   { key:'pv',       label:'PV',       icon:Clipboard,     desc:'Procès-Verbaux de contrôle environnemental' },
   { key:'rapports', label:'Rapports', icon:BarChart3,     desc:'Rapports environnementaux périodiques' },
 ]
@@ -332,6 +335,8 @@ function BLForm({ bl, currentUser, dossiers = [], onSave, onClose }) {
   const onSubmit = async (data) => {
     setSaving(true)
     if (!data.montant_reference && data.montant_reference !== 0) delete data.montant_reference
+    if (!isEdit && bl?.bon_commande_origine) data.bon_commande_origine = bl.bon_commande_origine
+    if (!isEdit && bl?.dossier_id) data.dossier_id = bl.dossier_id
     try {
       if (isEdit) { await blAPI.update(bl.id, data); toast.success('BL mis à jour') }
       else        { await blAPI.create(data);          toast.success('BL créé') }
@@ -434,6 +439,16 @@ function BLForm({ bl, currentUser, dossiers = [], onSave, onClose }) {
         <p className="text-[10px] text-slate-400 mt-1">Format : BL + année + n° de bon (ex: BL20260003 = 3ème bon de 2026)</p>
       </F>
 
+      {bl?.client_nom_bc && !watch('destinataire') && (
+        <div className="card p-3 bg-amber-50 border border-amber-200 flex items-start gap-2">
+          <AlertTriangle size={14} className="text-amber-500 flex-shrink-0 mt-0.5"/>
+          <p className="text-xs text-amber-800">
+            Client du BC d'origine : <strong>{bl.client_nom_bc}</strong> — aucune fiche opérateur correspondante
+            trouvée, sélectionnez le destinataire manuellement ci-dessous.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <F label="Destinataire — type" req>
           <select {...register('destinataire_type',{required:true})} className="input"
@@ -471,7 +486,7 @@ function BLForm({ bl, currentUser, dossiers = [], onSave, onClose }) {
               <option value="LIVRAISON">Livraison</option>
             </select>
           </F>
-          <F label="Montant de référence (DZD)"><input {...register('montant_reference')} type="number" step="0.01" className="input" placeholder="0.00"/></F>
+          <F label="Montant (DZD)"><input {...register('montant_reference')} type="number" step="0.01" className="input" placeholder="0.00"/></F>
         </div>
       </div>
 
@@ -584,7 +599,25 @@ function BLForm({ bl, currentUser, dossiers = [], onSave, onClose }) {
   )
 }
 
-function BLCard({ doc, onEdit, onDelete, onPdf, onWord }) {
+function LinkedDocsRow({ origin, generated }) {
+  if (!origin && (!generated || generated.length === 0)) return null
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+      {origin && (
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+          ← généré depuis {origin}
+        </span>
+      )}
+      {(generated||[]).map(c => (
+        <span key={c.id} className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary-50 text-primary-700 border border-primary-200">
+          → {c.numero}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function BLCard({ doc, onEdit, onDelete, onPdf, onWord, onGenererFacture }) {
   const st = BL_ST[doc.statut] || BL_ST.BROUILLON
   const Icon = st.icon
   return (
@@ -608,8 +641,12 @@ function BLCard({ doc, onEdit, onDelete, onPdf, onWord }) {
             <span>{(doc.lignes||[]).length} ligne(s)</span>
             <span className="flex items-center gap-1"><Calendar size={10}/>{formatDateFR(doc.date_livraison)}</span>
           </div>
+          <LinkedDocsRow origin={doc.bon_commande_origine_numero} generated={doc.factures_generees_numeros}/>
         </div>
         <div className="flex gap-1 flex-shrink-0">
+          <button onClick={()=>onGenererFacture(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-emerald-600" title="Générer la Facture">
+            <Receipt size={13}/>
+          </button>
           <button onClick={()=>onPdf(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600" title="PDF">
             <Download size={13}/>
           </button>
@@ -640,8 +677,9 @@ function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument 
       statut: 'BROUILLON',
       type_document: typeDocument,
       date_commande: new Date().toISOString().split('T')[0],
+      date_echeance: new Date().toISOString().split('T')[0],
       tva_pct: 19,
-      lignes: [{ ref_article:'', description:'', quantite:'', unite:'KG', prix_unitaire:'', remise_pct:0, tva_pct:'' }],
+      lignes: [{ ref_article:'', description:'', quantite:'', unite:'KG', prix_unitaire:'', remise_pct:0, tva_pct:19 }],
     }
   })
   const { fields, append, remove } = useFieldArray({ control, name: 'lignes' })
@@ -652,11 +690,13 @@ function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument 
 
   useEffect(() => { if (bc) reset(bc) }, [bc])
   useEffect(() => { clientsAPI.getAll().then(r => setClients(r.data.results || r.data)).catch(()=>{}) }, [])
+  useEffect(() => { if (bc?.client_operateur) setSelectedClient(String(bc.client_operateur)) }, [bc])
 
   const importClientFromOperateur = (operateurId) => {
     setSelectedClient(operateurId)
     const op = clients.find(c => String(c.id) === String(operateurId))
     if (!op) return
+    setValue('client_operateur',     op.id)
     setValue('client_nom',           op.raison_sociale || '')
     setValue('client_adresse',       op.adresse || '')
     setValue('client_rc',            op.registre_commerce || '')
@@ -675,7 +715,7 @@ function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument 
       setValue(`lignes.${lastIdx}.quantite`,     d.quantite || '')
       setValue(`lignes.${lastIdx}.unite`,        d.unite || 'KG')
     } else {
-      append({ ref_article:'', description: d.designation_dechet || '', quantite: d.quantite || '', unite: d.unite || 'KG', prix_unitaire:'', remise_pct:0, tva_pct:'' })
+      append({ ref_article:'', description: d.designation_dechet || '', quantite: d.quantite || '', unite: d.unite || 'KG', prix_unitaire:'', remise_pct:0, tva_pct:19 })
     }
     toast.success(`Désignation du dossier ${d.numero} importée`)
   }
@@ -702,6 +742,9 @@ function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument 
   const onSubmit = async (data) => {
     setSaving(true)
     if (!isEdit) data.type_document = typeDocument
+    if (!isEdit && bc?.proforma_origine)      data.proforma_origine      = bc.proforma_origine
+    if (!isEdit && bc?.bon_livraison_origine) data.bon_livraison_origine = bc.bon_livraison_origine
+    if (!isEdit && bc?.dossier_id)            data.dossier_id            = bc.dossier_id
     try {
       if (isEdit) { await bcAPI.update(bc.id, data); toast.success(`${docLabel} mis${isFacture?'e':''} à jour`) }
       else        { await bcAPI.create(data);          toast.success(`${docLabel} créé${isFacture?'e':''}`) }
@@ -825,7 +868,7 @@ function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument 
 
       <div className="grid grid-cols-3 gap-3">
         <F label="Date de commande" req>
-          <DateInput value={watch('date_commande')||''} onChange={v=>setValue('date_commande',v)}/>
+          <DateInput value={watch('date_commande')||''} onChange={v=>{ setValue('date_commande',v); setValue('date_echeance',v) }}/>
         </F>
         <F label="Échéance">
           <DateInput value={watch('date_echeance')||''} onChange={v=>setValue('date_echeance',v)}/>
@@ -857,7 +900,7 @@ function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument 
         <div className="flex items-center justify-between">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Description (Nature des déchets)</p>
           <button type="button"
-            onClick={()=>append({ ref_article:'', description:'', quantite:'', unite:'KG', prix_unitaire:'', remise_pct:0, tva_pct:'' })}
+            onClick={()=>append({ ref_article:'', description:'', quantite:'', unite:'KG', prix_unitaire:'', remise_pct:0, tva_pct:19 })}
             className="text-xs font-semibold text-primary-600 hover:underline">+ Ajouter une ligne</button>
         </div>
 
@@ -907,7 +950,12 @@ function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument 
               </div>
               <div className="col-span-2">
                 {i===0 && <label className="label text-[10px]">Tva %</label>}
-                <input {...register(`lignes.${i}.tva_pct`)} className="input" type="number" step="0.01" placeholder={watch('tva_pct')||'19'}/>
+                <select {...register(`lignes.${i}.tva_pct`)} className="input"
+                  onChange={e=>{ setValue(`lignes.${i}.tva_pct`, e.target.value); setValue('tva_pct', e.target.value) }}>
+                  <option value="0">0</option>
+                  <option value="9">9</option>
+                  <option value="19">19</option>
+                </select>
               </div>
               <div className="col-span-6">
                 {i===0 && <label className="label text-[10px]">Total HT</label>}
@@ -935,7 +983,11 @@ function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument 
           <div className="flex gap-6 items-center">
             <span className="text-slate-500">TVA</span>
             <div className="flex items-center gap-1">
-              <input {...register('tva_pct')} type="number" className="input w-16 text-sm py-1" step="0.01"/>
+              <select {...register('tva_pct')} className="input w-20 text-sm py-1">
+                <option value="0">0</option>
+                <option value="9">9</option>
+                <option value="19">19</option>
+              </select>
               <span className="text-slate-400 text-xs">%</span>
               <span className="font-semibold w-28 text-right">{fmt(tva)} DZ</span>
             </div>
@@ -972,11 +1024,13 @@ function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument 
   )
 }
 
-function BCCard({ doc, onEdit, onDelete, onPdf, onWord }) {
+function BCCard({ doc, onEdit, onDelete, onPdf, onWord, onGenererBC, onGenererBL }) {
   const st   = BC_ST[doc.statut] || BC_ST.BROUILLON
   const Icon = st.icon
   const total = (doc.lignes||[]).reduce((acc, l) =>
     acc + (parseFloat(l.quantite||0) * parseFloat(l.prix_unitaire||0)), 0)
+  const origin = doc.type_document === 'BC' ? doc.proforma_origine_numero : doc.bon_livraison_origine_numero
+  const generated = doc.type_document === 'PROFORMA' ? doc.bc_generes_numeros : null
   return (
     <div className="card p-4 hover:shadow-md transition-all">
       <div className="flex items-start gap-3">
@@ -994,8 +1048,15 @@ function BCCard({ doc, onEdit, onDelete, onPdf, onWord }) {
             <span className="flex items-center gap-1"><Calendar size={10}/>{formatDateFR(doc.date_commande)}</span>
             {total > 0 && <span className="font-semibold text-emerald-600">TTC ≈ {(total * (1 + parseFloat(doc.tva_pct||19)/100)).toLocaleString('fr-FR',{minimumFractionDigits:2})} DZ</span>}
           </div>
+          <LinkedDocsRow origin={origin} generated={generated || (doc.type_document==='BC' ? doc.bl_generes_numeros : null)}/>
         </div>
         <div className="flex gap-1 flex-shrink-0">
+          {doc.type_document === 'PROFORMA' && (
+            <button onClick={()=>onGenererBC(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-emerald-600" title="Générer le BC"><ShoppingCart size={13}/></button>
+          )}
+          {doc.type_document === 'BC' && (
+            <button onClick={()=>onGenererBL(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600" title="Générer le BL"><Truck size={13}/></button>
+          )}
           <button onClick={()=>onPdf(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-emerald-600" title="PDF"><Download size={13}/></button>
           <button onClick={()=>onWord(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-emerald-600" title="Word"><FileText size={13}/></button>
           <button onClick={()=>onEdit(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-emerald-600"><Edit size={13}/></button>
@@ -1913,7 +1974,7 @@ function PVCard({ doc, onEdit, onDelete, onPdf, onWord }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function DocumentsPage() {
   const { user } = useAuthStore()
-  const [tab,      setTab]      = useState('bl')
+  const [tab,      setTab]      = useState('proforma')
   const [items,    setItems]    = useState([])
   const [loading,  setLoading]  = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -2094,6 +2155,25 @@ export default function DocumentsPage() {
   const handleSave  = () => { setShowForm(false); setEditing(null); load() }
   const handleEdit  = (item) => { setEditing(item); setShowForm(true) }
 
+  const handleGenererBC = async (proforma) => {
+    try {
+      const res = await bcAPI.genererBC(proforma.id)
+      setTab('bc'); setEditing(res.data); setShowForm(true)
+    } catch (err) { toast.error(err?.response?.data?.error || 'Erreur génération BC') }
+  }
+  const handleGenererBL = async (bc) => {
+    try {
+      const res = await bcAPI.genererBL(bc.id)
+      setTab('bl'); setEditing(res.data); setShowForm(true)
+    } catch (err) { toast.error(err?.response?.data?.error || 'Erreur génération BL') }
+  }
+  const handleGenererFacture = async (bl) => {
+    try {
+      const res = await blAPI.genererFacture(bl.id)
+      setTab('facture'); setEditing(res.data); setShowForm(true)
+    } catch (err) { toast.error(err?.response?.data?.error || 'Erreur génération Facture') }
+  }
+
   const currentTab = TABS.find(t=>t.key===tab)
   const TabIcon    = currentTab?.icon || FileText
 
@@ -2167,8 +2247,8 @@ export default function DocumentsPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {tab==='bl'      && items.map(doc=><BLCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleBlPdf} onWord={handleBlWord}/>)}
-          {(tab==='bc'||tab==='proforma'||tab==='facture') && items.map(doc=><BCCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleBcPdf} onWord={handleBcWord}/>)}
+          {tab==='bl'      && items.map(doc=><BLCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleBlPdf} onWord={handleBlWord} onGenererFacture={handleGenererFacture}/>)}
+          {(tab==='bc'||tab==='proforma'||tab==='facture') && items.map(doc=><BCCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleBcPdf} onWord={handleBcWord} onGenererBC={handleGenererBC} onGenererBL={handleGenererBL}/>)}
           {tab==='bsd'     && items.map(doc=><BSDCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleBsdPdf} onWord={handleBsdWord}/>)}
           {tab==='dsd'     && items.map(doc=><DSDCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleDsdPdf} onWord={handleDsdWord}/>)}
           {(tab==='pv'||tab==='rapports') && items.map(doc=><PVCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handlePvPdf} onWord={handlePvWord}/>)}
@@ -2178,7 +2258,7 @@ export default function DocumentsPage() {
       <Modal
         open={showForm}
         onClose={()=>{setShowForm(false);setEditing(null)}}
-        title={editing ? `Modifier ${tab.toUpperCase()}` : getBtnLabel()}
+        title={editing?.id ? `Modifier ${tab.toUpperCase()}` : editing ? `${getBtnLabel()} (généré automatiquement)` : getBtnLabel()}
         size={tab==='dsd' || tab==='bc' || tab==='proforma' || tab==='facture' ? 'max-w-3xl' : 'max-w-2xl'}>
         {tab==='bl' && (
           <BLForm bl={editing} currentUser={user} dossiers={allDossiers}

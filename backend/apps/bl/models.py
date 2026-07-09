@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.conf import settings
 
@@ -26,6 +27,10 @@ class BonLivraison(models.Model):
 
     numero               = models.CharField(max_length=30, unique=True, verbose_name='N° document',
                                              help_text="Saisi par l'utilisateur, ex: BL20260003")
+    dossier_id           = models.UUIDField(default=uuid.uuid4, db_index=True,
+                                             verbose_name='Dossier',
+                                             help_text="Identifiant partagé par tous les documents d'une même "
+                                                        "opération (Proforma → BC → BL → Facture).")
     recuperateur         = models.ForeignKey('recuperateurs.Recuperateur', on_delete=models.PROTECT,
                                               related_name='bons_livraison')
     destinataire_type    = models.CharField(max_length=20, choices=DESTINATAIRE_CHOICES)
@@ -41,6 +46,8 @@ class BonLivraison(models.Model):
     client_fax               = models.CharField(max_length=50, blank=True, verbose_name='Fax client')
     client_email             = models.EmailField(blank=True, verbose_name='Email client')
     pieces_liees             = models.CharField(max_length=200, blank=True, verbose_name='Pièces liées')
+    bon_commande_origine     = models.ForeignKey('bc.BonCommande', null=True, blank=True, on_delete=models.SET_NULL,
+                                                   related_name='bl_generes', verbose_name='BC d\'origine')
     mode_livraison           = models.CharField(max_length=15, choices=MODE_LIVRAISON_CHOICES,
                                                  default='ENLEVEMENT', verbose_name='Mode de livraison')
     montant_reference        = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True,

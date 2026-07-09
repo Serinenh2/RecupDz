@@ -11,11 +11,16 @@ class BLSerializer(serializers.ModelSerializer):
     destinataire_nom          = serializers.CharField(source='destinataire.raison_sociale', read_only=True)
     destinataire_commune      = serializers.CharField(source='destinataire.commune', read_only=True)
     recuperateur_nom          = serializers.CharField(source='recuperateur.nom_raison_sociale', read_only=True)
+    bon_commande_origine_numero = serializers.CharField(source='bon_commande_origine.numero', read_only=True, default=None)
+    factures_generees_numeros   = serializers.SerializerMethodField()
 
     class Meta:
         model = BonLivraison
         fields = '__all__'
         read_only_fields = ['recuperateur']
+
+    def get_factures_generees_numeros(self, obj):
+        return [{'id': f.id, 'numero': f.numero} for f in obj.factures_generees.all()]
 
     def validate(self, data):
         dest_type    = data.get('destinataire_type') or getattr(self.instance, 'destinataire_type', None)
