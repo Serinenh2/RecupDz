@@ -1,0 +1,36 @@
+=== Table 0 ===
+ | SARL INDUREX/INDUSTRIAL WAST RECOVERY AND VALORIZATION | /
+  [nested]
+    Référence | PR20260001
+    Date | 16/07/2026
+    Montant | 428 043.00
+    Client | Client Test
+    Echéance | 01/08/2026
+=== Table 1 ===
+Proforma N°: PR20260001
+=== Table 2 ===
+/ | Client Test/Zone Industrielle/Alger
+  [nested]
+    Réf Client | 
+    N° RC | 
+    NIF | 
+    N° Article | 
+    N° I.S | 
+    Tél | 
+    Fax | 
+    Email | 
+    Pièces Liées | 
+=== Table 3 ===
+Réf Article | Désignation | Unité | Quantité | Prix U HT | Montant HT | R.% | Tva%
+FR01 | Ferraille | KG | 1 000 | 359.70 | 359 700.00 | 0.00 | 19.00
+=== Table 4 ===
+/ | /
+  [nested]
+    Montant HT | TVA | Montant TVA
+    359 700.00 | 19.00 | 68 343.00
+  [nested]
+    TOTAL H.T | 359 700.00
+    TOTAL T.V.A | 68 343.00
+    TOTAL T.T.C | 428 043.00
+     | 
+    NET A PAYER | 428 043.00

@@ -351,11 +351,14 @@ def generate_bc_pdf(data: dict) -> bytes:
     # ── Arrêté de la facture ─────────────────────────────────────────────────────
     arrete_nom = {'PROFORMA': 'présente proforma', 'BC': 'présente commande'}.get(
         data.get('type_document'), 'présente facture')
-    story.append(Paragraph(
+    arrete_txt = (
         f"<u>Arrêter la {arrete_nom} en toutes taxes comprises a la somme de :</u> "
-        f"<b>{total_ttc:,.2f} DZ</b>".replace(',', ' '),
-        FOOT,
-    ))
+        f"<b>{total_ttc:,.2f} DZ</b>".replace(',', ' ')
+    )
+    validite_jours = data.get('validite_offre_jours')
+    if data.get('type_document') == 'PROFORMA' and validite_jours not in (None, ''):
+        arrete_txt += f"<br/><b>Validité de l'offre :</b> {int(validite_jours)} jours"
+    story.append(Paragraph(arrete_txt, FOOT))
     story.append(Spacer(1, 30))
 
     # ── Signature ───────────────────────────────────────────────────────────────
@@ -431,16 +434,19 @@ class _NumberedCanvas(_pdfcanvas.Canvas):
 
     def _draw_footer(self):
         if self._iso_paths or self._footer_paragraphs:
-            # Filet vert séparant le pied de page (badges ISO + identité RC/NIF) du
+            # Filet vert séparant le pied de page (identité RC/NIF + badges ISO) du
             # contenu principal au-dessus (ex. la ligne "Arrêtée ... à la Somme de").
             self.setStrokeColor(_INDUREX_GREEN)
             self.setLineWidth(0.8)
             self.line(_FOOTER_LEFT, 3.45 * cm, _FOOTER_RIGHT, 3.45 * cm)
 
-        badge_right = _FOOTER_LEFT
+        # Badges ISO alignés à droite du pied de page.
+        badge_left = _FOOTER_RIGHT
         if self._iso_paths:
-            size, gap = 2 * cm, 1 * cm
-            x = _FOOTER_LEFT
+            size, gap = 2 * cm, 0.5 * cm
+            total_w = len(self._iso_paths) * size + (len(self._iso_paths) - 1) * gap
+            badge_left = _FOOTER_RIGHT - total_w
+            x = badge_left
             for path in self._iso_paths:
                 try:
                     self.drawImage(path, x, 1.15 * cm, width=size, height=size,
@@ -448,17 +454,17 @@ class _NumberedCanvas(_pdfcanvas.Canvas):
                 except Exception:
                     pass
                 x += size + gap
-            badge_right = x - gap + size
 
         if not self._footer_paragraphs:
             return
-        divider_x = badge_right + 0.6 * cm
+        # Identité RC/NIF/NIS/adresse alignée à gauche, séparée des badges par un filet vert.
+        divider_x = badge_left - 0.6 * cm
         if self._iso_paths:
             self.setStrokeColor(_INDUREX_GREEN)
             self.setLineWidth(0.8)
             self.line(divider_x, 0.95 * cm, divider_x, 3.25 * cm)
-        text_x = divider_x + (0.5 * cm if self._iso_paths else 0)
-        text_w = _FOOTER_RIGHT - text_x
+        text_x = _FOOTER_LEFT
+        text_w = (divider_x - 0.5 * cm if self._iso_paths else _FOOTER_RIGHT) - text_x
         y = 3.25 * cm
         for p in self._footer_paragraphs:
             _, h = p.wrap(text_w, 3 * cm)
@@ -473,7 +479,7 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
         return ParagraphStyle(name, **kw)
 
     NOM     = ps('NOM',     fontName='Montserrat-Bold',     fontSize=20, alignment=TA_LEFT,   leading=23, textColor=_INDUREX_GREEN)
-    SLOGAN  = ps('SLOGAN',  fontName='Montserrat-SemiBold', fontSize=9.5,alignment=TA_LEFT,   leading=13, textColor=_INDUREX_GREEN)
+    SLOGAN  = ps('SLOGAN',  fontName='Montserrat-Bold', fontSize=9.5,alignment=TA_LEFT,   leading=13, textColor=_INDUREX_GREEN)
     META    = ps('META',    fontName='Helvetica',        fontSize=9.5,alignment=TA_LEFT,   leading=13)
     LBL     = ps('LBL',     fontName='Helvetica',        fontSize=10.5,alignment=TA_LEFT,  leading=15)
     LBLB    = ps('LBLB',    fontName='Helvetica-Bold',   fontSize=10.5,alignment=TA_LEFT,  leading=15)
@@ -528,21 +534,23 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     story.append(Spacer(1, 10))
 
     # Identité RC/NIF/NIS/adresse — déplacée en bas de page (voir _NumberedCanvas._draw_footer),
-    # à droite des badges ISO, séparée par un filet vert. FOOTER_META : police compacte pour
-    # tenir dans la largeur réduite de cette colonne de pied de page.
-    FOOTER_META = ps('FOOTER_META', fontName='Helvetica', fontSize=7, alignment=TA_LEFT, leading=8.5)
-    footer_lines = [f"RC: {rec['rc']}", f"NIF: {rec['nif']}", f"Al: {rec['na']}", f"NIS: {rec['nis']}"]
+    # à gauche des badges ISO, séparée par un filet vert. Toujours 3 lignes maximum,
+    # libellés en gras pour un rendu propre malgré la largeur réduite de cette colonne.
+    FOOTER_META = ps('FOOTER_META', fontName='Helvetica', fontSize=6.5, alignment=TA_LEFT, leading=8)
+    footer_lines = [
+        f"<b>RC:</b> {rec['rc']}  <b>NIF:</b> {rec['nif']}  <b>Al:</b> {rec['na']}  <b>NIS:</b> {rec['nis']}"
+    ]
     if rec['adresse']:
         footer_lines.append(rec['adresse'])
-    footer_line_extra = '   '.join(filter(None, [
-        rec['commune'], rec['compte_bancaire'],
-        f"Email: {rec['email']}" if rec['email'] else '',
-        f"Tél: {rec['telephone']}" if rec['telephone'] else '',
-        f"Fax: {rec['fax']}" if rec['fax'] else '',
+    footer_line_extra = '  '.join(filter(None, [
+        rec['commune'],
+        f"<b>Email:</b> {rec['email']}" if rec['email'] else '',
+        f"<b>Tél:</b> {rec['telephone']}" if rec['telephone'] else '',
+        f"<b>Fax:</b> {rec['fax']}" if rec['fax'] else '',
     ]))
     if footer_line_extra:
         footer_lines.append(footer_line_extra)
-    footer_paragraphs = [Paragraph(line, FOOTER_META) for line in footer_lines]
+    footer_paragraphs = [Paragraph(line, FOOTER_META) for line in footer_lines[:3]]
 
     # ── Titre ───────────────────────────────────────────────────────────────────
     type_doc    = data.get('type_document')
@@ -675,9 +683,11 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     # ── Arrêté du bon de commande / proforma (montant en lettres) ─────────────
     arrete_doc_nom = {'PROFORMA': 'la Présente Proforma', 'FACTURE': 'la Présente Facture'}.get(
         type_doc, 'le Présent Bon de Commande')
-    arrete_tbl = Table([[Paragraph(
-        f"Arrêtée {arrete_doc_nom} à la Somme de : <b>{montant_en_lettres(total_ttc)}</b>", FOOT
-    )]], colWidths=[COL])
+    arrete_txt = f"Arrêtée {arrete_doc_nom} à la Somme de : <b>{montant_en_lettres(total_ttc)}</b>"
+    validite_jours = data.get('validite_offre_jours')
+    if is_proforma and validite_jours not in (None, ''):
+        arrete_txt += f"<br/><b>Validité de l'offre :</b> {int(validite_jours)} jours"
+    arrete_tbl = Table([[Paragraph(arrete_txt, FOOT)]], colWidths=[COL])
     arrete_tbl.setStyle(TableStyle([
         ('TOPPADDING', (0, 0), (-1, -1), 6), ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ('LEFTPADDING', (0, 0), (-1, -1), 6),

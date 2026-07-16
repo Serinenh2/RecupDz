@@ -669,6 +669,7 @@ function BLCard({ doc, onEdit, onDelete, onPdf, onWord, onGenererFacture }) {
 function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument = 'BC' }) {
   const isEdit = !!bc?.id
   const isFacture = typeDocument === 'FACTURE'
+  const isProforma = typeDocument === 'PROFORMA'
   const docLabel = typeDocument === 'PROFORMA' ? 'Proforma' : typeDocument === 'FACTURE' ? 'Facture' : 'BC'
   const numeroPrefix = typeDocument === 'PROFORMA' ? 'PR' : typeDocument === 'FACTURE' ? 'FA' : 'CM'
   const { register, handleSubmit, watch, setValue, control, reset } = useForm({
@@ -678,6 +679,7 @@ function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument 
       type_document: typeDocument,
       date_commande: new Date().toISOString().split('T')[0],
       date_echeance: new Date().toISOString().split('T')[0],
+      validite_offre_jours: '',
       tva_pct: 19,
       lignes: [{ ref_article:'', description:'', quantite:'', unite:'KG', prix_unitaire:'', remise_pct:0, tva_pct:19 }],
     }
@@ -742,6 +744,7 @@ function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument 
   const onSubmit = async (data) => {
     setSaving(true)
     if (!isEdit) data.type_document = typeDocument
+    if (data.validite_offre_jours === '') data.validite_offre_jours = null
     if (!isEdit && bc?.proforma_origine)      data.proforma_origine      = bc.proforma_origine
     if (!isEdit && bc?.bon_livraison_origine) data.bon_livraison_origine = bc.bon_livraison_origine
     if (!isEdit && bc?.dossier_id)            data.dossier_id            = bc.dossier_id
@@ -771,6 +774,7 @@ function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument 
     client_email:         watch('client_email'),
     date_commande:        watch('date_commande'),
     date_echeance:        watch('date_echeance'),
+    validite_offre_jours: typeDocument === 'PROFORMA' ? (watch('validite_offre_jours') || null) : null,
     pieces_liees:         watch('pieces_liees'),
     mode_paiement:        watch('mode_paiement'),
     reference_paiement:   watch('reference_paiement'),
@@ -877,6 +881,14 @@ function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument 
           <input {...register('pieces_liees')} className="input" placeholder="Réf. devis, proforma..."/>
         </F>
       </div>
+
+      {isProforma && (
+        <div className="grid grid-cols-3 gap-3">
+          <F label="Validité de l'offre (jours)">
+            <input {...register('validite_offre_jours')} type="number" min="0" className="input" placeholder="Ex: 30"/>
+          </F>
+        </div>
+      )}
 
       {isFacture && (
         <div className="grid grid-cols-2 gap-3">

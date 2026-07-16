@@ -1,0 +1,20 @@
+' le : 16/07/2026'
+'Nome de Client : Client Test'
+'Adresse : Zone Industrielle\nAlger'
+"Arrêter la présente proforma en toutes taxes comprises a la somme de : 428 043.00 DZ\nValidité de l'offre : 7 jours"
+'Le Gérant'
+--- TABLES ---
+Table 0: 1x2
+ | MA PETITE ENTREPRISE
+Table 1: 2x2
+RC  | NIF 
+NA  | NIS 
+Table 2: 1x1
+Proforma
+Table 3: 2x6
+N° | Description (Nature des déchets) | Quantités | Unités | Prix unitaires | Total HT
+1 | Ferraille | 1000 | KG | 359.70 DZ | 359 700.00 DZ
+Table 4: 3x2
+Total HT | 359 700.00 DZ
+TVA (19%) | 68 343.00 DZ
+Total TTC | 428 043.00 DZ

@@ -73,6 +73,9 @@ class BonCommande(models.Model):
     client_email           = models.EmailField(blank=True, verbose_name='Email client')
     date_commande  = models.DateField()
     date_echeance  = models.DateField(null=True, blank=True, verbose_name='Échéance')
+    validite_offre_jours = models.PositiveIntegerField(null=True, blank=True,
+                                       verbose_name="Validité de l'offre (jours)",
+                                       help_text="Proforma uniquement : durée de validité de l'offre, en jours.")
     pieces_liees   = models.CharField(max_length=200, blank=True, verbose_name='Pièces liées')
     mode_paiement       = models.CharField(max_length=100, blank=True, verbose_name='Mode de paiement')
     reference_paiement  = models.CharField(max_length=100, blank=True, verbose_name='Référence de paiement')

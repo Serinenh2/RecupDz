@@ -1,0 +1,28 @@
+=== test_bl_indurex.docx PARAGRAPHS ===
+=== TABLES ===
+-- Table 0 --
+ | SARL INDUREX/INDUSTRIAL WAST RECOVERY AND VALORIZATION | /
+  [nested]
+    Référence | BL20260001
+    Date | 16/07/2026
+    Montant | 428 043.00
+    Mode Liv | ENLEV
+-- Table 1 --
+Bon Livraison N°: BL20260001
+-- Table 2 --
+/ | Destinataire Test/Route Nationale/Oran
+  [nested]
+    Réf Client | 
+    N° RC | 
+    NIF | 
+    N° Article | 
+    N° I.S | 
+    Tél | 
+    Fax | 
+    Email | 
+    Pièces Liées | 
+-- Table 3 --
+Réf Article | Désignation | Unité | Quantité
+FR01 | Ferraille | KG | 1 000
+=== FOOTER ===
+'RC:   NIF:   Al:   NIS: '

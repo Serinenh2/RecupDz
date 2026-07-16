@@ -204,7 +204,7 @@ def _generate_bl_pdf_indurex(data: dict, rec: dict, dest: dict) -> bytes:
         return ParagraphStyle(name, **kw)
 
     NOM    = ps('NOM',    fontName='Montserrat-Bold',     fontSize=20, alignment=TA_LEFT,   leading=23, textColor=_INDUREX_GREEN)
-    SLOGAN = ps('SLOGAN', fontName='Montserrat-SemiBold', fontSize=9.5,alignment=TA_LEFT,   leading=13, textColor=_INDUREX_GREEN)
+    SLOGAN = ps('SLOGAN', fontName='Montserrat-Bold', fontSize=9.5,alignment=TA_LEFT,   leading=13, textColor=_INDUREX_GREEN)
     META   = ps('META',   fontName='Helvetica',      fontSize=9.5,alignment=TA_LEFT,   leading=13)
     LBL    = ps('LBL',    fontName='Helvetica',      fontSize=10.5,alignment=TA_LEFT,  leading=15)
     LBLB   = ps('LBLB',   fontName='Helvetica-Bold', fontSize=10.5,alignment=TA_LEFT,  leading=15)
@@ -249,20 +249,23 @@ def _generate_bl_pdf_indurex(data: dict, rec: dict, dest: dict) -> bytes:
     story.append(Spacer(1, 10))
 
     # Identité RC/NIF/NIS/adresse — déplacée en bas de page (voir _NumberedCanvas._draw_footer),
-    # à droite des badges ISO, séparée par un filet vert.
-    FOOTER_META = ps('FOOTER_META', fontName='Helvetica', fontSize=7, alignment=TA_LEFT, leading=8.5)
-    footer_lines = [f"RC: {rec['rc']}", f"NIF: {rec['nif']}", f"Al: {rec['na']}", f"NIS: {rec['nis']}"]
+    # à gauche des badges ISO, séparée par un filet vert. Toujours 3 lignes maximum,
+    # libellés en gras pour un rendu propre malgré la largeur réduite de cette colonne.
+    FOOTER_META = ps('FOOTER_META', fontName='Helvetica', fontSize=6.5, alignment=TA_LEFT, leading=8)
+    footer_lines = [
+        f"<b>RC:</b> {rec['rc']}  <b>NIF:</b> {rec['nif']}  <b>Al:</b> {rec['na']}  <b>NIS:</b> {rec['nis']}"
+    ]
     if rec['adresse']:
         footer_lines.append(rec['adresse'])
-    footer_line_extra = '   '.join(filter(None, [
-        rec['commune'], rec['compte_bancaire'],
-        f"Email: {rec['email']}" if rec['email'] else '',
-        f"Tél: {rec['telephone']}" if rec['telephone'] else '',
-        f"Fax: {rec['fax']}" if rec['fax'] else '',
+    footer_line_extra = '  '.join(filter(None, [
+        rec['commune'],
+        f"<b>Email:</b> {rec['email']}" if rec['email'] else '',
+        f"<b>Tél:</b> {rec['telephone']}" if rec['telephone'] else '',
+        f"<b>Fax:</b> {rec['fax']}" if rec['fax'] else '',
     ]))
     if footer_line_extra:
         footer_lines.append(footer_line_extra)
-    footer_paragraphs = [Paragraph(line, FOOTER_META) for line in footer_lines]
+    footer_paragraphs = [Paragraph(line, FOOTER_META) for line in footer_lines[:3]]
 
     # ── Titre ───────────────────────────────────────────────────────────────────
     titre_tbl = Table([[Paragraph(f"Bon Livraison N°: {v('numero')}", TITRE)]], colWidths=[COL])

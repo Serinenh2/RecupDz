@@ -1,0 +1,20 @@
+=== test_bl_generic.docx PARAGRAPHS ===
+' le : 16/07/2026'
+'Nom de Client : Destinataire Test'
+'Adresse : Route Nationale\nOran'
+'Nom de chauffeur : Ahmed'
+'Immatriculation de camion : 123456-116-16'
+'Le Gérant'
+=== TABLES ===
+-- Table 0 --
+ | AUTRE ENTREPRISE
+-- Table 1 --
+RC  | NIF 
+NA  | NIS 
+-- Table 2 --
+Bon de livraison
+-- Table 3 --
+N° | Description (Nature des déchets) | Quantités | Unités | Stockage
+1 | Ferraille | 1000 | KG | Zone A
+=== FOOTER ===
+''
