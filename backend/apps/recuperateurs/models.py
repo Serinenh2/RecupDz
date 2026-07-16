@@ -41,6 +41,12 @@ class Recuperateur(models.Model):
                                                  verbose_name='Signature électronique')
     cachet_electronique     = models.ImageField(upload_to='recuperateurs/cachets/', blank=True, null=True,
                                                  verbose_name='Cachet électronique')
+    iso_9001           = models.ImageField(upload_to='recuperateurs/iso/', blank=True, null=True,
+                                            verbose_name='Certification ISO 9001:2015')
+    iso_14001          = models.ImageField(upload_to='recuperateurs/iso/', blank=True, null=True,
+                                            verbose_name='Certification ISO 14001:2015')
+    iso_45001          = models.ImageField(upload_to='recuperateurs/iso/', blank=True, null=True,
+                                            verbose_name='Certification ISO 45001:2018')
     nom_raison_sociale = models.CharField(max_length=300)
     nom_commercial     = models.CharField(max_length=300, blank=True)
     responsable        = models.CharField(max_length=200)

@@ -467,6 +467,9 @@ export default function ProfilPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [uploadingSignature, setUploadingSignature] = useState(false)
   const [uploadingCachet, setUploadingCachet] = useState(false)
+  const [uploadingIso9001, setUploadingIso9001] = useState(false)
+  const [uploadingIso14001, setUploadingIso14001] = useState(false)
+  const [uploadingIso45001, setUploadingIso45001] = useState(false)
   const [agrement,    setAgrement]    = useState(null)
   const [hasAgrement, setHasAgrement] = useState(null)
   const [showAgrForm, setShowAgrForm] = useState(false)
@@ -533,7 +536,7 @@ export default function ProfilPage() {
       // logo/signature/cachet ne sont jamais modifiés depuis ce formulaire (upload
       // dédié via uploadLogo/uploadSignature/uploadCachet) — renvoyer l'URL texte
       // reçue du GET casserait la validation ImageField du backend.
-      const { logo, signature_electronique, cachet_electronique, ...payload } = data
+      const { logo, signature_electronique, cachet_electronique, iso_9001, iso_14001, iso_45001, ...payload } = data
       await api.patch('/accounts/mon-recuperateur/', payload)
       toast.success('Fiche récupérateur mise à jour')
       const r = await api.get('/accounts/mon-recuperateur/')
@@ -581,6 +584,22 @@ export default function ProfilPage() {
     } catch { toast.error('Erreur upload du cachet') }
     finally { setUploadingCachet(false) }
   }
+
+  const uploadIsoBadge = async (field, file, setUploading, label) => {
+    if (!file) return
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append(field, file)
+      const r = await api.patch('/accounts/mon-recuperateur/', formData)
+      setRecup(r.data)
+      toast.success(`${label} mis à jour`)
+    } catch { toast.error(`Erreur upload ${label}`) }
+    finally { setUploading(false) }
+  }
+  const uploadIso9001  = (file) => uploadIsoBadge('iso_9001',  file, setUploadingIso9001,  'Badge ISO 9001')
+  const uploadIso14001 = (file) => uploadIsoBadge('iso_14001', file, setUploadingIso14001, 'Badge ISO 14001')
+  const uploadIso45001 = (file) => uploadIsoBadge('iso_45001', file, setUploadingIso45001, 'Badge ISO 45001')
 
   const onAgrementSaved = async () => {
     setShowAgrForm(false)
@@ -737,6 +756,60 @@ export default function ProfilPage() {
                     onChange={e => uploadCachet(e.target.files?.[0])}/>
                 </label>
                 <p className="text-[11px] text-slate-400 mt-1">Utilisé dans les documents PDF</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
+                {recup?.iso_9001
+                  ? <img src={recup.iso_9001} alt="ISO 9001" className="w-full h-full object-contain"/>
+                  : <Award size={22} className="text-slate-300"/>
+                }
+              </div>
+              <div>
+                <label className="label mb-1">Badge ISO 9001:2015</label>
+                <label className="btn-secondary btn-sm cursor-pointer inline-flex">
+                  {uploadingIso9001 ? 'Envoi...' : 'Choisir un fichier'}
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingIso9001}
+                    onChange={e => uploadIso9001(e.target.files?.[0])}/>
+                </label>
+                <p className="text-[11px] text-slate-400 mt-1">Affiché en bas des documents PDF</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
+                {recup?.iso_14001
+                  ? <img src={recup.iso_14001} alt="ISO 14001" className="w-full h-full object-contain"/>
+                  : <Award size={22} className="text-slate-300"/>
+                }
+              </div>
+              <div>
+                <label className="label mb-1">Badge ISO 14001:2015</label>
+                <label className="btn-secondary btn-sm cursor-pointer inline-flex">
+                  {uploadingIso14001 ? 'Envoi...' : 'Choisir un fichier'}
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingIso14001}
+                    onChange={e => uploadIso14001(e.target.files?.[0])}/>
+                </label>
+                <p className="text-[11px] text-slate-400 mt-1">Affiché en bas des documents PDF</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
+                {recup?.iso_45001
+                  ? <img src={recup.iso_45001} alt="ISO 45001" className="w-full h-full object-contain"/>
+                  : <Award size={22} className="text-slate-300"/>
+                }
+              </div>
+              <div>
+                <label className="label mb-1">Badge ISO 45001:2018</label>
+                <label className="btn-secondary btn-sm cursor-pointer inline-flex">
+                  {uploadingIso45001 ? 'Envoi...' : 'Choisir un fichier'}
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingIso45001}
+                    onChange={e => uploadIso45001(e.target.files?.[0])}/>
+                </label>
+                <p className="text-[11px] text-slate-400 mt-1">Affiché en bas des documents PDF</p>
               </div>
             </div>
           </div>

@@ -9,11 +9,28 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 import io
+import os
+import functools
 
 BLACK = colors.black
 GREEN = colors.HexColor('#3B6D11')
 COL   = 17 * cm
+
+# ── Typographie SARL INDUREX : Montserrat, en-tête vert (#3C7A42) — identité
+#    visuelle propre à cette société, distincte du style générique ci-dessus ──
+_INDUREX_GREEN = colors.HexColor('#3C7A42')
+_FONTS_DIR = os.path.join(os.path.dirname(__file__), 'fonts')
+if 'Montserrat-Bold' not in pdfmetrics.getRegisteredFontNames():
+    pdfmetrics.registerFont(TTFont('Montserrat',          os.path.join(_FONTS_DIR, 'Montserrat-Regular.ttf')))
+    pdfmetrics.registerFont(TTFont('Montserrat-SemiBold', os.path.join(_FONTS_DIR, 'Montserrat-SemiBold.ttf')))
+    pdfmetrics.registerFont(TTFont('Montserrat-Bold',     os.path.join(_FONTS_DIR, 'Montserrat-Bold.ttf')))
+
+# Bande réservée en bas des documents INDUREX pour les 3 badges de certification
+# ISO (9001/14001/45001) — dessinés par _NumberedCanvas au-dessus du numéro de page.
+_INDUREX_BOTTOM_MARGIN = 3.5 * cm
 
 
 def _fmt_date(iso):
@@ -53,6 +70,9 @@ def _recuperateur_info(data):
                 'logo_path':       r.logo.path if r.logo else None,
                 'signature_path':  r.signature_electronique.path if r.signature_electronique else None,
                 'cachet_path':     r.cachet_electronique.path if r.cachet_electronique else None,
+                'iso_9001_path':   r.iso_9001.path if r.iso_9001 else None,
+                'iso_14001_path':  r.iso_14001.path if r.iso_14001 else None,
+                'iso_45001_path':  r.iso_45001.path if r.iso_45001 else None,
             }
         except Recuperateur.DoesNotExist:
             pass
@@ -61,26 +81,30 @@ def _recuperateur_info(data):
         'adresse': '', 'commune': '', 'code_postal': '', 'rc': '', 'nif': '', 'na': '', 'nis': '',
         'telephone': '', 'fax': '', 'email': '', 'compte_bancaire': '',
         'responsable': '', 'logo_path': None, 'signature_path': None, 'cachet_path': None,
+        'iso_9001_path': None, 'iso_14001_path': None, 'iso_45001_path': None,
     }
 
 
-def _signature_flowable(rec, align='RIGHT'):
+def _signature_flowable(rec, align='RIGHT', cachet_size=2.8*cm, sig_w=3*cm, sig_h=1.6*cm):
     """Table [cachet, signature] (les images présentes) prête à ajouter au story —
     None si le récupérateur n'a téléversé ni cachet ni signature électronique."""
     imgs = []
+    widths = []
     if rec.get('cachet_path'):
         try:
-            imgs.append(Image(rec['cachet_path'], width=2.8*cm, height=2.8*cm))
+            imgs.append(Image(rec['cachet_path'], width=cachet_size, height=cachet_size))
+            widths.append(cachet_size + 0.3*cm)
         except Exception:
             pass
     if rec.get('signature_path'):
         try:
-            imgs.append(Image(rec['signature_path'], width=3*cm, height=1.6*cm))
+            imgs.append(Image(rec['signature_path'], width=sig_w, height=sig_h))
+            widths.append(sig_w + 0.3*cm)
         except Exception:
             pass
     if not imgs:
         return None
-    tbl = Table([imgs], colWidths=[3*cm] * len(imgs))
+    tbl = Table([imgs], colWidths=widths)
     tbl.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), align), ('VALIGN', (0, 0), (-1, -1), 'BOTTOM')]))
     return tbl
 
@@ -348,7 +372,9 @@ def generate_bc_pdf(data: dict) -> bytes:
     return buffer.read()
 
 
-# ── Slogan fixe de l'en-tête SARL INDUREX (non stocké en base — identité visuelle propre à cette société) ──
+# ── Nom et slogan fixes de l'en-tête SARL INDUREX (non stockés en base — identité
+#    visuelle propre à cette société, indépendante de nom_commercial/nom_raison_sociale) ──
+_INDUREX_NOM    = 'SARL INDUREX'
 _INDUREX_SLOGAN = 'INDUSTRIAL WAST RECOVERY AND VALORIZATION'
 
 
@@ -372,12 +398,20 @@ def _fmt_qte(n):
 from reportlab.pdfgen import canvas as _pdfcanvas
 
 
-class _NumberedCanvas(_pdfcanvas.Canvas):
-    """Pied de page 'Page: n/total' — bufferise les pages pour connaître le total avant d'écrire."""
+_FOOTER_LEFT, _FOOTER_RIGHT = 2 * cm, A4[0] - 2 * cm  # bord de contenu (aligné avec tous les tableaux)
 
-    def __init__(self, *args, **kwargs):
+
+class _NumberedCanvas(_pdfcanvas.Canvas):
+    """Pied de page 'Page: n/total' — bufferise les pages pour connaître le total avant d'écrire.
+    iso_paths / footer_paragraphs (optionnels, documents SARL INDUREX uniquement) : badges de
+    certification ISO (gauche) et identité RC/NIF/NIS (droite), séparés par un filet vert,
+    affichés sur chaque page au-dessus du numéro de page."""
+
+    def __init__(self, *args, iso_paths=None, footer_paragraphs=None, **kwargs):
         _pdfcanvas.Canvas.__init__(self, *args, **kwargs)
         self._saved_page_states = []
+        self._iso_paths = [p for p in (iso_paths or []) if p]
+        self._footer_paragraphs = footer_paragraphs or []
 
     def showPage(self):
         self._saved_page_states.append(dict(self.__dict__))
@@ -390,9 +424,46 @@ class _NumberedCanvas(_pdfcanvas.Canvas):
             self.saveState()
             self.setFont('Helvetica', 8)
             self.drawCentredString(A4[0] / 2, 0.8 * cm, f"Page: {self._pageNumber}/{total_pages}")
+            self._draw_footer()
             self.restoreState()
             _pdfcanvas.Canvas.showPage(self)
         _pdfcanvas.Canvas.save(self)
+
+    def _draw_footer(self):
+        if self._iso_paths or self._footer_paragraphs:
+            # Filet vert séparant le pied de page (badges ISO + identité RC/NIF) du
+            # contenu principal au-dessus (ex. la ligne "Arrêtée ... à la Somme de").
+            self.setStrokeColor(_INDUREX_GREEN)
+            self.setLineWidth(0.8)
+            self.line(_FOOTER_LEFT, 3.45 * cm, _FOOTER_RIGHT, 3.45 * cm)
+
+        badge_right = _FOOTER_LEFT
+        if self._iso_paths:
+            size, gap = 2 * cm, 1 * cm
+            x = _FOOTER_LEFT
+            for path in self._iso_paths:
+                try:
+                    self.drawImage(path, x, 1.15 * cm, width=size, height=size,
+                                    mask='auto', preserveAspectRatio=True, anchor='c')
+                except Exception:
+                    pass
+                x += size + gap
+            badge_right = x - gap + size
+
+        if not self._footer_paragraphs:
+            return
+        divider_x = badge_right + 0.6 * cm
+        if self._iso_paths:
+            self.setStrokeColor(_INDUREX_GREEN)
+            self.setLineWidth(0.8)
+            self.line(divider_x, 0.95 * cm, divider_x, 3.25 * cm)
+        text_x = divider_x + (0.5 * cm if self._iso_paths else 0)
+        text_w = _FOOTER_RIGHT - text_x
+        y = 3.25 * cm
+        for p in self._footer_paragraphs:
+            _, h = p.wrap(text_w, 3 * cm)
+            y -= h
+            p.drawOn(self, text_x, y)
 
 
 def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
@@ -401,12 +472,12 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     def ps(name, **kw):
         return ParagraphStyle(name, **kw)
 
-    NOM     = ps('NOM',     fontName='Helvetica-Bold',   fontSize=20, alignment=TA_LEFT,   leading=23)
-    SLOGAN  = ps('SLOGAN',  fontName='Helvetica',        fontSize=9.5,alignment=TA_LEFT,   leading=13)
+    NOM     = ps('NOM',     fontName='Montserrat-Bold',     fontSize=20, alignment=TA_LEFT,   leading=23, textColor=_INDUREX_GREEN)
+    SLOGAN  = ps('SLOGAN',  fontName='Montserrat-SemiBold', fontSize=9.5,alignment=TA_LEFT,   leading=13, textColor=_INDUREX_GREEN)
     META    = ps('META',    fontName='Helvetica',        fontSize=9.5,alignment=TA_LEFT,   leading=13)
     LBL     = ps('LBL',     fontName='Helvetica',        fontSize=10.5,alignment=TA_LEFT,  leading=15)
     LBLB    = ps('LBLB',    fontName='Helvetica-Bold',   fontSize=10.5,alignment=TA_LEFT,  leading=15)
-    TITRE   = ps('TITRE',   fontName='Helvetica-Bold',   fontSize=16, alignment=TA_CENTER, leading=19)
+    TITRE   = ps('TITRE',   fontName='Helvetica-Bold',   fontSize=16, alignment=TA_CENTER, leading=19, textColor=colors.white)
     HEAD    = ps('HEAD',    fontName='Helvetica-Bold',   fontSize=10, alignment=TA_CENTER, leading=13, textColor=colors.white)
     HEADR   = ps('HEADR',   fontName='Helvetica-Bold',   fontSize=10, alignment=TA_RIGHT,  leading=13, textColor=colors.white)
     CELL    = ps('CELL',    fontName='Helvetica',        fontSize=10, alignment=TA_CENTER, leading=13)
@@ -424,7 +495,7 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     total_ht, total_tva, total_ttc = _calc_totaux(lignes, tva_pct)
 
     doc = SimpleDocTemplate(buffer, pagesize=A4,
-        topMargin=1*cm, bottomMargin=1.3*cm, leftMargin=1.5*cm, rightMargin=1.5*cm)
+        topMargin=1*cm, bottomMargin=_INDUREX_BOTTOM_MARGIN, leftMargin=1.5*cm, rightMargin=1.5*cm)
     story = []
 
     # ── En-tête : logo + raison sociale + slogan | bloc référence ──────────────
@@ -447,29 +518,31 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
         ('TOPPADDING', (0, 0), (-1, -1), 1), ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
     ]))
 
-    nom_block = [Paragraph(rec['nom'].upper(), NOM), Paragraph(_INDUREX_SLOGAN, SLOGAN)]
+    nom_block = [Paragraph(_INDUREX_NOM, NOM), Paragraph(_INDUREX_SLOGAN, SLOGAN)]
     entete = Table([[logo_cell, nom_block, ref_box]], colWidths=[2.3*cm, COL - 2.3*cm - 6.7*cm, 6.7*cm])
     entete.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('BOX',    (2, 0), (2, 0), 0.6, BLACK),
     ]))
     story.append(entete)
-    story.append(Spacer(1, 8))
+    story.append(Spacer(1, 10))
 
-    story.append(Paragraph(
-        f"RC: {rec['rc']}   NIF: {rec['nif']}   Al: {rec['na']}   NIS: {rec['nis']}", META
-    ))
+    # Identité RC/NIF/NIS/adresse — déplacée en bas de page (voir _NumberedCanvas._draw_footer),
+    # à droite des badges ISO, séparée par un filet vert. FOOTER_META : police compacte pour
+    # tenir dans la largeur réduite de cette colonne de pied de page.
+    FOOTER_META = ps('FOOTER_META', fontName='Helvetica', fontSize=7, alignment=TA_LEFT, leading=8.5)
+    footer_lines = [f"RC: {rec['rc']}", f"NIF: {rec['nif']}", f"Al: {rec['na']}", f"NIS: {rec['nis']}"]
     if rec['adresse']:
-        story.append(Paragraph(rec['adresse'], META))
-    line2 = '   '.join(filter(None, [
+        footer_lines.append(rec['adresse'])
+    footer_line_extra = '   '.join(filter(None, [
         rec['commune'], rec['compte_bancaire'],
         f"Email: {rec['email']}" if rec['email'] else '',
         f"Tél: {rec['telephone']}" if rec['telephone'] else '',
         f"Fax: {rec['fax']}" if rec['fax'] else '',
     ]))
-    if line2:
-        story.append(Paragraph(line2, META))
-    story.append(Spacer(1, 10))
+    if footer_line_extra:
+        footer_lines.append(footer_line_extra)
+    footer_paragraphs = [Paragraph(line, FOOTER_META) for line in footer_lines]
 
     # ── Titre ───────────────────────────────────────────────────────────────────
     type_doc    = data.get('type_document')
@@ -480,7 +553,7 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     titre_tbl = Table([[Paragraph(titre_txt, TITRE)]], colWidths=[COL])
     titre_tbl.setStyle(TableStyle([
         ('BOX', (0, 0), (-1, -1), 0.8, BLACK),
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#E5E5E5')),
+        ('BACKGROUND', (0, 0), (-1, -1), _INDUREX_GREEN),
         ('TOPPADDING', (0, 0), (-1, -1), 6), ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
     ]))
     story.append(titre_tbl)
@@ -505,13 +578,16 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
         ]
     gauche_rows = [[Paragraph(lbl, LBL), Paragraph(val, LBL)] for lbl, val in client_lignes]
     gauche_tbl = Table(gauche_rows, colWidths=[3.5*cm, 5*cm])
-    gauche_tbl.setStyle(TableStyle([('TOPPADDING', (0, 0), (-1, -1), 1), ('BOTTOMPADDING', (0, 0), (-1, -1), 1)]))
+    gauche_tbl.setStyle(TableStyle([
+        ('TOPPADDING', (0, 0), (-1, -1), 1), ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ('LEFTPADDING', (0, 0), (0, -1), 0),
+    ]))
 
     droite_content = [Paragraph(v('client_nom'), LBLB)]
     for ligne_adresse in (v('client_adresse') or '').split('\n'):
         if ligne_adresse.strip():
             droite_content.append(Paragraph(ligne_adresse.strip(), LBL))
-    droite_tbl = Table([[droite_content]], colWidths=[7.8*cm])
+    droite_tbl = Table([[droite_content]], colWidths=[8.5*cm])
     droite_tbl.setStyle(TableStyle([
         ('BOX', (0, 0), (-1, -1), 0.6, BLACK),
         ('TOPPADDING', (0, 0), (-1, -1), 8), ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
@@ -519,7 +595,11 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     ]))
 
     bloc_client = Table([[gauche_tbl, droite_tbl]], colWidths=[8.5*cm, 8.5*cm])
-    bloc_client.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+    bloc_client.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0), ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 0), ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+    ]))
     story.append(bloc_client)
     story.append(Spacer(1, 12))
 
@@ -546,7 +626,7 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
 
     tbl_style = TableStyle([
         ('GRID',          (0, 0), (-1, -1), 0.6, BLACK),
-        ('BACKGROUND',    (0, 0), (-1, 0),  colors.HexColor('#BFBFBF')),
+        ('BACKGROUND',    (0, 0), (-1, 0),  _INDUREX_GREEN),
         ('TOPPADDING',    (0, 0), (-1, -1), 5),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
         ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
@@ -580,13 +660,17 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     ], colWidths=g_col_w, rowHeights=g_row_h)
     recap_g.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 0.5, BLACK),
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#BFBFBF')),
+        ('BACKGROUND', (0, 0), (-1, 0), _INDUREX_GREEN),
         ('TOPPADDING', (0, 0), (-1, -1), 4), ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ('VALIGN', (0, 1), (-1, 1), 'TOP'),
     ]))
 
     recap_wrapper = Table([[recap_g, recap_d]], colWidths=[COL - 7*cm, 7*cm])
-    recap_wrapper.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+    recap_wrapper.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0), ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 0), ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+    ]))
 
     # ── Arrêté du bon de commande / proforma (montant en lettres) ─────────────
     arrete_doc_nom = {'PROFORMA': 'la Présente Proforma', 'FACTURE': 'la Présente Facture'}.get(
@@ -595,7 +679,6 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
         f"Arrêtée {arrete_doc_nom} à la Somme de : <b>{montant_en_lettres(total_ttc)}</b>", FOOT
     )]], colWidths=[COL])
     arrete_tbl.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 0.6, BLACK),
         ('TOPPADDING', (0, 0), (-1, -1), 6), ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ('LEFTPADDING', (0, 0), (-1, -1), 6),
     ]))
@@ -604,7 +687,7 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     # (comme le formulaire papier pré-imprimé où la zone articles est une grande
     # case vide, quel que soit le nombre de lignes réellement saisies).
     avail_w   = A4[0] - 3 * cm
-    usable_h  = A4[1] - 1 * cm - 1.3 * cm
+    usable_h  = A4[1] - 1 * cm - _INDUREX_BOTTOM_MARGIN
     top_h     = sum(fl.wrap(avail_w, 20000)[1] for fl in story)
     tbl_no_filler = Table(rows, colWidths=col_w)
     tbl_no_filler.setStyle(tbl_style)
@@ -624,13 +707,18 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     # plutôt qu'ajoutés après l'arrêté, qui déborderait sur une 2e page puisque
     # la hauteur du tableau est calculée pour occuper exactement la page.
     filler_row = ['' for _ in headers]
-    sign_flowable = _signature_flowable(rec, align='CENTER')
+    sign_flowable = _signature_flowable(rec, align='CENTER', cachet_size=4*cm, sig_w=4.5*cm, sig_h=2.4*cm)
     if sign_flowable:
-        filler_row[1] = sign_flowable
+        filler_row[0] = sign_flowable
 
+    filler_idx = len(rows)
     rows_with_filler = rows + [filler_row]
     tbl = Table(rows_with_filler, colWidths=col_w, rowHeights=[None] * len(rows) + [filler_h])
-    tbl.setStyle(tbl_style)
+    tbl_style_filler = TableStyle(tbl_style.getCommands() + [
+        ('SPAN',  (0, filler_idx), (-1, filler_idx)),
+        ('ALIGN', (0, filler_idx), (-1, filler_idx), 'CENTER'),
+    ])
+    tbl.setStyle(tbl_style_filler)
 
     story.append(tbl)
     story.append(Spacer(1, 8))
@@ -638,6 +726,8 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     story.append(Spacer(1, 12))
     story.append(arrete_tbl)
 
-    doc.build(story, canvasmaker=_NumberedCanvas)
+    iso_paths = [rec.get('iso_9001_path'), rec.get('iso_14001_path'), rec.get('iso_45001_path')]
+    doc.build(story, canvasmaker=functools.partial(
+        _NumberedCanvas, iso_paths=iso_paths, footer_paragraphs=footer_paragraphs))
     buffer.seek(0)
     return buffer.read()
