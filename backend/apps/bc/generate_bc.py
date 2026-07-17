@@ -457,12 +457,8 @@ class _NumberedCanvas(_pdfcanvas.Canvas):
 
         if not self._footer_paragraphs:
             return
-        # Identité RC/NIF/NIS/adresse alignée à gauche, séparée des badges par un filet vert.
+        # Identité RC/NIF/NIS/adresse alignée à gauche, à côté des badges (sans filet séparateur).
         divider_x = badge_left - 0.6 * cm
-        if self._iso_paths:
-            self.setStrokeColor(_INDUREX_GREEN)
-            self.setLineWidth(0.8)
-            self.line(divider_x, 0.95 * cm, divider_x, 3.25 * cm)
         text_x = _FOOTER_LEFT
         text_w = (divider_x - 0.5 * cm if self._iso_paths else _FOOTER_RIGHT) - text_x
         y = 3.25 * cm
