@@ -16,7 +16,7 @@ from apps.bc.generate_bc_word import (
 from .generate_bl import _recuperateur_info, _destinataire_info, _fmt_date, _fmt_montant, _fmt_qte, _is_indurex
 
 _INDUREX_NOM     = 'SARL INDUREX'
-_INDUREX_SLOGAN  = 'INDUSTRIAL WASTE RECOVERY AND VALORIZATION'
+_INDUREX_SLOGAN  = 'INDUSTRIAL RECYCLING SOLUTIONS'
 _INDUREX_CAPITAL = 'AU CAPITAL DE 1 000 000,00 DA'
 _MODE_LIV_ABBR   = {'ENLEVEMENT': 'ENLEV', 'LIVRAISON': 'LIVR'}
 

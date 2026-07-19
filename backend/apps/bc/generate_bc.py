@@ -537,7 +537,7 @@ def generate_bc_pdf(data: dict) -> bytes:
 # ── Nom et slogan fixes de l'en-tête SARL INDUREX (non stockés en base — identité
 #    visuelle propre à cette société, indépendante de nom_commercial/nom_raison_sociale) ──
 _INDUREX_NOM     = 'SARL INDUREX'
-_INDUREX_SLOGAN  = 'INDUSTRIAL WASTE RECOVERY AND VALORIZATION'
+_INDUREX_SLOGAN  = 'INDUSTRIAL RECYCLING SOLUTIONS'
 _INDUREX_CAPITAL      = 'AU CAPITAL DE 1 000 000,00 DA'
 _INDUREX_CAPITAL_VERT = colors.HexColor('#0F452B')
 
@@ -608,6 +608,8 @@ class _NumberedCanvas(_pdfcanvas.Canvas):
         _pdfcanvas.Canvas.save(self)
 
     def _draw_footer(self):
+        _BADGE_BOTTOM, _BADGE_SIZE = 1.15 * cm, 2 * cm
+
         if self._iso_paths or self._footer_paragraphs:
             # Filet vert séparant le pied de page (identité RC/NIF + badges ISO) du
             # contenu principal au-dessus (ex. la ligne "Arrêtée ... à la Somme de").
@@ -618,17 +620,17 @@ class _NumberedCanvas(_pdfcanvas.Canvas):
         # Badges ISO alignés à droite du pied de page.
         badge_left = _FOOTER_RIGHT
         if self._iso_paths:
-            size, gap = 2 * cm, 0.5 * cm
-            total_w = len(self._iso_paths) * size + (len(self._iso_paths) - 1) * gap
+            gap = 0.5 * cm
+            total_w = len(self._iso_paths) * _BADGE_SIZE + (len(self._iso_paths) - 1) * gap
             badge_left = _FOOTER_RIGHT - total_w
             x = badge_left
             for path in self._iso_paths:
                 try:
-                    self.drawImage(path, x, 1.15 * cm, width=size, height=size,
+                    self.drawImage(path, x, _BADGE_BOTTOM, width=_BADGE_SIZE, height=_BADGE_SIZE,
                                     mask='auto', preserveAspectRatio=True, anchor='c')
                 except Exception:
                     pass
-                x += size + gap
+                x += _BADGE_SIZE + gap
 
         if not self._footer_paragraphs:
             return
@@ -636,9 +638,15 @@ class _NumberedCanvas(_pdfcanvas.Canvas):
         divider_x = badge_left - 0.6 * cm
         text_x = _FOOTER_LEFT
         text_w = (divider_x - 0.5 * cm if self._iso_paths else _FOOTER_RIGHT) - text_x
-        y = 3.25 * cm
-        for p in self._footer_paragraphs:
-            _, h = p.wrap(text_w, 3 * cm)
+
+        # Même espace sous le filet vert que les badges ISO. Les visuels PNG des badges ont une
+        # marge transparente interne (~5-6 % de leur canevas) : leur encre visible commence donc
+        # un peu plus bas que le haut de la bbox _BADGE_BOTTOM + _BADGE_SIZE — on en tient compte
+        # ici pour que le haut du texte tombe au même niveau que le haut visible des badges.
+        _BADGE_INK_INSET = 0.11 * cm
+        heights = [p.wrap(text_w, 3 * cm)[1] for p in self._footer_paragraphs]
+        y = _BADGE_BOTTOM + _BADGE_SIZE - _BADGE_INK_INSET
+        for p, h in zip(self._footer_paragraphs, heights):
             y -= h
             p.drawOn(self, text_x, y)
 
@@ -891,7 +899,7 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     # plutôt qu'ajoutés après l'arrêté, qui déborderait sur une 2e page puisque
     # la hauteur du tableau est calculée pour occuper exactement la page.
     filler_row = ['' for _ in headers]
-    sign_flowable = _signature_flowable(rec, align='CENTER', cachet_size=4*cm, sig_w=4.5*cm, sig_h=2.4*cm)
+    sign_flowable = _signature_flowable(rec, align='CENTER', cachet_size=6*cm, sig_w=4.5*cm, sig_h=2.4*cm)
     if sign_flowable:
         filler_row[0] = sign_flowable
 
