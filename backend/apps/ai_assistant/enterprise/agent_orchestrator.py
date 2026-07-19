@@ -61,6 +61,7 @@ class WorkflowState(str, Enum):
     ENTITIES_EXTRACTED = "entities_extracted"
     TOOL_SELECTED = "tool_selected"
     TOOL_EXECUTED = "tool_executed"
+    RAG_RETRIEVED = "rag_retrieved"
     RESPONSE_GENERATED = "response_generated"
     FOLLOWUPS_GENERATED = "followups_generated"
     MEMORY_STORED = "memory_stored"
@@ -368,12 +369,21 @@ class AgentOrchestrator:
             # ── Anti-hallucination guard ──────────────────────────────
             self._validate_tool_data(tool_name, tool_result_data, message)
 
-            # ── Step 7a: Hermes generates response ────────────────────
-            span = self._c.tracer.start_span(trace_id, "7a_response_generation")
+            # ── Step 7: RAG Knowledge Retrieval (company first) ────────
+            span = self._c.tracer.start_span(trace_id, "7_rag_knowledge_retrieval")
+            rag_context = self._retrieve_knowledge(
+                message, tool_name, hermes_up,
+            )
+            state = WorkflowState.RAG_RETRIEVED
+            self._c.tracer.finish_span(span)
+
+            # ── Step 8a: Hermes generates response ────────────────────
+            span = self._c.tracer.start_span(trace_id, "8a_response_generation")
             response_text = self._generate_response(
                 message=message,
                 tool_name=tool_name,
                 tool_result=tool_result_data,
+                rag_context=rag_context,
                 context=ctx,
                 conversation_history=conversation_history,
                 hermes_up=hermes_up,
@@ -381,8 +391,8 @@ class AgentOrchestrator:
             state = WorkflowState.RESPONSE_GENERATED
             self._c.tracer.finish_span(span)
 
-            # ── Step 7b: Follow-up Generation ─────────────────────────
-            span = self._c.tracer.start_span(trace_id, "7b_followup_generation")
+            # ── Step 8b: Follow-up Generation ─────────────────────────
+            span = self._c.tracer.start_span(trace_id, "8b_followup_generation")
             followups = self._generate_followups(
                 message=message,
                 response=response_text,
@@ -394,8 +404,8 @@ class AgentOrchestrator:
             state = WorkflowState.FOLLOWUPS_GENERATED
             self._c.tracer.finish_span(span)
 
-            # ── Step 7c: Memory Storage ───────────────────────────────
-            span = self._c.tracer.start_span(trace_id, "7c_memory_storage")
+            # ── Step 9: Memory Storage ───────────────────────────────
+            span = self._c.tracer.start_span(trace_id, "9_memory_storage")
             self._store_memory(conversation_id, message, response_text, {
                 "tool": tool_name,
                 "tool_needed": hermes_decision.tool_needed,
@@ -804,7 +814,77 @@ class AgentOrchestrator:
                 )
 
     # ==================================================================
-    # Step 7a: Response Generation (Hermes)
+    # Step 7: RAG Knowledge Retrieval
+    # ==================================================================
+
+    def _retrieve_knowledge(
+        self,
+        message: str,
+        tool_name: str,
+        hermes_up: bool,
+    ) -> str:
+        """
+        Search company knowledge BEFORE generating response.
+
+        RAG runs automatically for every query. Company knowledge is injected
+        into the response context so Hermes uses it BEFORE model knowledge.
+
+        Returns context text from RAG, or empty string if no results.
+        """
+        try:
+            # Skip RAG for greetings
+            if tool_name == "greeting":
+                return ""
+
+            search_engine = self._c.search_engine
+
+            # Check if RAG index exists
+            stats = search_engine.stats()
+            if stats.get("total_chunks", 0) == 0:
+                # No index — try to build it
+                if hermes_up:
+                    try:
+                        cfg = self._c.rag_config
+                        search_engine.index_knowledge_base(sources=cfg.sources)
+                        stats = search_engine.stats()
+                    except Exception as exc:
+                        logger.debug("RAG auto-index failed: %s", exc)
+                        return ""
+
+                if stats.get("total_chunks", 0) == 0:
+                    return ""
+
+            # Search for relevant company knowledge
+            result = search_engine.search_for_agent(
+                query=message,
+                intent=tool_name if tool_name not in ("none", "greeting") else "",
+            )
+
+            if not result.has_results:
+                return ""
+
+            # Build company knowledge context
+            context = (
+                "=== COMPANY KNOWLEDGE (RECUP-DZ) ===\n"
+                "Use this information FIRST. Only use general knowledge if "
+                "the company knowledge doesn't answer the question.\n\n"
+                f"{result.context_text}"
+            )
+
+            self._c.metrics.inc_counter("ai.rag.knowledge_found")
+            logger.info(
+                "RAG retrieved %d chunks for '%s' (sources: %s)",
+                len(result.chunks), message[:50], result.sources_used,
+            )
+            return context
+
+        except Exception as exc:
+            logger.debug("RAG retrieval failed: %s", exc)
+            self._c.metrics.inc_counter("ai.rag.retrieval_error")
+            return ""
+
+    # ==================================================================
+    # Step 8a: Response Generation (Hermes)
     # ==================================================================
 
     def _generate_response(
@@ -815,6 +895,7 @@ class AgentOrchestrator:
         context: Context,
         conversation_history: Optional[List[Dict[str, str]]] = None,
         hermes_up: bool = True,
+        rag_context: str = "",
     ) -> str:
         """Generate the professional response via Hermes."""
         if tool_name == "greeting":
@@ -833,6 +914,11 @@ class AgentOrchestrator:
             system_prompt = _DIRECT_RESPONSE_PROMPT
             tool_context = ""
 
+        # Inject RAG company knowledge (company knowledge BEFORE model knowledge)
+        rag_block = ""
+        if rag_context:
+            rag_block = f"\n\n{rag_context}"
+
         history = self._trim_history(conversation_history, max_turns=10)
 
         if not hermes_up:
@@ -842,13 +928,15 @@ class AgentOrchestrator:
                 return self._fallback_format([ToolResult(
                     tool_name=tool_name, success=True, data=tool_result,
                 )])
+            if rag_context:
+                return self._format_rag_fallback(rag_context)
             return "Le service IA est temporairement indisponible. Veuillez réessayer."
 
         try:
             reply = self._c.ollama.chat(
                 message=message,
                 history=history,
-                system_prompt=system_prompt + tool_context,
+                system_prompt=system_prompt + tool_context + rag_block,
             )
             if reply and reply.strip():
                 return reply.strip()
@@ -862,6 +950,8 @@ class AgentOrchestrator:
             return self._fallback_format([ToolResult(
                 tool_name=tool_name, success=True, data=tool_result,
             )])
+        if rag_context:
+            return self._format_rag_fallback(rag_context)
         return "Je suis désolé, une erreur est survenue. Veuillez réessayer."
 
     # ==================================================================
@@ -1094,6 +1184,15 @@ class AgentOrchestrator:
                 else:
                     parts.append(str(r.data)[:300])
         return "\n".join(parts) if parts else "Aucun résultat."
+
+    def _format_rag_fallback(self, rag_context: str) -> str:
+        """Deterministic fallback using RAG context when LLM is unavailable."""
+        parts = [
+            "Voici les informations de la base de connaissances entreprise :",
+            "",
+            rag_context[:2000],
+        ]
+        return "\n".join(parts)
 
     def _build_response(
         self,

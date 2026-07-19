@@ -123,6 +123,30 @@ class ToolConfig:
 
 
 # ---------------------------------------------------------------------------
+# RAG Configuration
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class RAGConfig:
+    """Retrieval Augmented Generation settings."""
+    enabled: bool = field(default_factory=lambda: _env_bool("AI_RAG_ENABLED", True))
+    top_k: int = field(default_factory=lambda: _env_int("AI_RAG_TOP_K", 5))
+    min_score: float = field(default_factory=lambda: _env_float("AI_RAG_MIN_SCORE", 0.1))
+    max_context_chars: int = field(default_factory=lambda: _env_int("AI_RAG_MAX_CONTEXT_CHARS", 4000))
+    chunk_size: int = field(default_factory=lambda: _env_int("AI_RAG_CHUNK_SIZE", 1000))
+    chunk_overlap: int = field(default_factory=lambda: _env_int("AI_RAG_CHUNK_OVERLAP", 200))
+    persist_directory: str = field(default_factory=lambda: _env("AI_RAG_PERSIST_DIR", ""))
+    auto_index_on_startup: bool = field(default_factory=lambda: _env_bool("AI_RAG_AUTO_INDEX", True))
+    search_before_model: bool = field(default_factory=lambda: _env_bool("AI_RAG_SEARCH_BEFORE_MODEL", True))
+    sources: List[str] = field(
+        default_factory=lambda: _env(
+            "AI_RAG_SOURCES",
+            "glossary,nomenclature,regulations,procedures",
+        ).split(",")
+    )
+
+
+# ---------------------------------------------------------------------------
 # Aggregate Configuration
 # ---------------------------------------------------------------------------
 
@@ -133,6 +157,7 @@ class AIConfig:
     memory: MemoryConfig = field(default_factory=MemoryConfig)
     agent: AgentConfig = field(default_factory=AgentConfig)
     tool: ToolConfig = field(default_factory=ToolConfig)
+    rag: RAGConfig = field(default_factory=RAGConfig)
 
     @classmethod
     def from_env(cls) -> "AIConfig":
@@ -142,6 +167,7 @@ class AIConfig:
             memory=MemoryConfig(),
             agent=AgentConfig(),
             tool=ToolConfig(),
+            rag=RAGConfig(),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -165,5 +191,11 @@ class AIConfig:
             "tool": {
                 "enabled_count": len(self.tool.enabled_tools),
                 "disabled_count": len(self.tool.disabled_tools),
+            },
+            "rag": {
+                "enabled": self.rag.enabled,
+                "top_k": self.rag.top_k,
+                "sources": self.rag.sources,
+                "search_before_model": self.rag.search_before_model,
             },
         }

@@ -104,10 +104,15 @@ class MockContainer:
 
         # Mock Search Engine (RAG)
         self.search_engine = MagicMock()
+        self.search_engine.stats.return_value = {"total_chunks": 0, "sources": {}}
         rag_result = MagicMock()
         rag_result.has_results = False
         rag_result.context_text = ""
         self.search_engine.search_for_agent.return_value = rag_result
+
+        # Mock RAG Config
+        self.rag_config = MagicMock()
+        self.rag_config.sources = ["glossary", "nomenclature", "regulations", "procedures"]
 
 
 # ---------------------------------------------------------------------------
