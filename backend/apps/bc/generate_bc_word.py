@@ -13,11 +13,12 @@ from docx.oxml import OxmlElement
 
 from .generate_bc import (
     _recuperateur_info, _calc_totaux, _calc_ligne, _fmt_date, _fmt_montant, _fmt_qte,
-    montant_en_lettres, _is_indurex, _INDUREX_NOM, _INDUREX_SLOGAN,
+    montant_en_lettres, _is_indurex, _INDUREX_NOM, _INDUREX_SLOGAN, _INDUREX_CAPITAL,
 )
 
 _GENERIC_GREEN     = RGBColor(0x3B, 0x6D, 0x11)
 _INDUREX_GREEN     = RGBColor(0x3C, 0x7A, 0x42)
+_INDUREX_CAPITAL_VERT = RGBColor(0x0F, 0x45, 0x2B)
 _INDUREX_GREEN_HEX = '3C7A42'
 _GENERIC_GREEN_HEX = '3B6D11'
 _LIGHT_GREEN_HEX   = 'EAF3DE'
@@ -320,6 +321,7 @@ def _generate_bc_docx_indurex(data: dict, rec: dict) -> bytes:
     _cell_lines(nom_cell, [
         {'text': _INDUREX_NOM, 'font': 'Calibri', 'size': 20, 'bold': True, 'color': _INDUREX_GREEN},
         {'text': _INDUREX_SLOGAN, 'font': 'Calibri', 'size': 9.5, 'bold': True, 'color': _INDUREX_GREEN},
+        {'text': _INDUREX_CAPITAL, 'font': 'Calibri', 'size': 7.5, 'bold': True, 'color': _INDUREX_CAPITAL_VERT},
     ])
 
     ref_cell = entete.rows[0].cells[2]
@@ -351,27 +353,25 @@ def _generate_bc_docx_indurex(data: dict, rec: dict) -> bytes:
 
     # ── Bloc client ──────────────────────────────────────────────────────────────
     client_lignes = [
-        ('Réf Client',   v('ref_client')),
-        ('N° RC',        v('client_rc')),
-        ('NIF',          v('client_nif')),
-        ('N° Article',   v('client_numero_article')),
-        ('N° I.S',       v('client_nis')),
-        ('Tél',          v('client_telephone')),
-        ('Fax',          v('client_fax')),
-        ('Email',        v('client_email')),
-        ('Pièces Liées', v('pieces_liees')),
+        ('Réf Client:',   v('ref_client')),
+        ('N° RC:',        v('client_rc')),
+        ('NIF:',          v('client_nif')),
+        ('N° Article:',   v('client_numero_article')),
+        ('N° I.S:',       v('client_nis')),
+        ('Tél:',          v('client_telephone')),
+        ('Pièces Liées:', v('pieces_liees')),
     ]
     if is_facture:
         client_lignes += [
-            ('Mode Paiement', v('mode_paiement')),
-            ('Référence',     v('reference_paiement')),
+            ('Mode Paiement:', v('mode_paiement')),
+            ('Référence:',     v('reference_paiement')),
         ]
 
     bloc_client = doc.add_table(rows=1, cols=2)
     _set_col_widths(bloc_client, [8.5, 8.5])
     gauche_cell = bloc_client.rows[0].cells[0]
     gauche_tbl  = gauche_cell.add_table(rows=len(client_lignes), cols=2)
-    _set_col_widths(gauche_tbl, [3.5, 5])
+    _set_col_widths(gauche_tbl, [2.9, 5.6])
     _kv_rows(gauche_tbl, client_lignes, label_size=10.5, value_size=10.5)
 
     # Nichée dans sa propre table (plutôt que bordée directement sur la cellule de

@@ -11,13 +11,14 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from apps.bc.generate_bc_word import (
     _shade_cell, _cell_borders, _set_col_widths, _set_run, _cell_lines, _kv_rows,
     _add_picture_safe, _zero_spacing, _doc_p, _GENERIC_GREEN, _INDUREX_GREEN,
-    _INDUREX_GREEN_HEX, _GENERIC_GREEN_HEX, _WHITE, COL,
+    _INDUREX_GREEN_HEX, _GENERIC_GREEN_HEX, _WHITE, COL, _INDUREX_CAPITAL_VERT,
 )
 from .generate_bl import _recuperateur_info, _destinataire_info, _fmt_date, _fmt_montant, _fmt_qte, _is_indurex
 
-_INDUREX_NOM    = 'SARL INDUREX'
-_INDUREX_SLOGAN = 'INDUSTRIAL WAST RECOVERY AND VALORIZATION'
-_MODE_LIV_ABBR  = {'ENLEVEMENT': 'ENLEV', 'LIVRAISON': 'LIVR'}
+_INDUREX_NOM     = 'SARL INDUREX'
+_INDUREX_SLOGAN  = 'INDUSTRIAL WASTE RECOVERY AND VALORIZATION'
+_INDUREX_CAPITAL = 'AU CAPITAL DE 1 000 000,00 DA'
+_MODE_LIV_ABBR   = {'ENLEVEMENT': 'ENLEV', 'LIVRAISON': 'LIVR'}
 
 
 def generate_bl_docx(data: dict) -> bytes:
@@ -147,6 +148,7 @@ def _generate_bl_docx_indurex(data: dict, rec: dict, dest: dict) -> bytes:
     _cell_lines(entete.rows[0].cells[1], [
         {'text': _INDUREX_NOM, 'size': 20, 'bold': True, 'color': _INDUREX_GREEN},
         {'text': _INDUREX_SLOGAN, 'size': 9.5, 'bold': True, 'color': _INDUREX_GREEN},
+        {'text': _INDUREX_CAPITAL, 'size': 7.5, 'bold': True, 'color': _INDUREX_CAPITAL_VERT},
     ])
 
     ref_cell = entete.rows[0].cells[2]
@@ -174,21 +176,19 @@ def _generate_bl_docx_indurex(data: dict, rec: dict, dest: dict) -> bytes:
     _doc_p(doc)
 
     client_lignes = [
-        ('Réf Client',   v('ref_client')),
-        ('N° RC',        v('client_rc')),
-        ('NIF',          v('client_nif')),
-        ('N° Article',   v('client_numero_article')),
-        ('N° I.S',       v('client_nis')),
-        ('Tél',          v('client_telephone')),
-        ('Fax',          v('client_fax')),
-        ('Email',        v('client_email')),
-        ('Pièces Liées', v('pieces_liees')),
+        ('Réf Client:',   v('ref_client')),
+        ('N° RC:',        v('client_rc')),
+        ('NIF:',          v('client_nif')),
+        ('N° Article:',   v('client_numero_article')),
+        ('N° I.S:',       v('client_nis')),
+        ('Tél:',          v('client_telephone')),
+        ('Pièces Liées:', v('pieces_liees')),
     ]
     bloc_client = doc.add_table(rows=1, cols=2)
     _set_col_widths(bloc_client, [8.5, 8.5])
     gauche_cell = bloc_client.rows[0].cells[0]
     gauche_tbl  = gauche_cell.add_table(rows=len(client_lignes), cols=2)
-    _set_col_widths(gauche_tbl, [2.6, 5.9])
+    _set_col_widths(gauche_tbl, [2.4, 6.1])
     _kv_rows(gauche_tbl, client_lignes, label_size=10.5, value_size=10.5)
 
     # Nichée dans sa propre table (cf. generate_bc_word.py) pour que le cadre

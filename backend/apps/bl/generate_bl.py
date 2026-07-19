@@ -192,9 +192,11 @@ def generate_bl_pdf(data: dict) -> bytes:
     return buffer.read()
 
 
-_INDUREX_NOM    = 'SARL INDUREX'
-_INDUREX_SLOGAN = 'INDUSTRIAL WAST RECOVERY AND VALORIZATION'
-_MODE_LIV_ABBR  = {'ENLEVEMENT': 'ENLEV', 'LIVRAISON': 'LIVR'}
+_INDUREX_NOM     = 'SARL INDUREX'
+_INDUREX_SLOGAN  = 'INDUSTRIAL WASTE RECOVERY AND VALORIZATION'
+_INDUREX_CAPITAL      = 'AU CAPITAL DE 1 000 000,00 DA'
+_INDUREX_CAPITAL_VERT = colors.HexColor('#0F452B')
+_MODE_LIV_ABBR   = {'ENLEVEMENT': 'ENLEV', 'LIVRAISON': 'LIVR'}
 
 
 def _generate_bl_pdf_indurex(data: dict, rec: dict, dest: dict) -> bytes:
@@ -203,9 +205,10 @@ def _generate_bl_pdf_indurex(data: dict, rec: dict, dest: dict) -> bytes:
     def ps(name, **kw):
         return ParagraphStyle(name, **kw)
 
-    NOM    = ps('NOM',    fontName='Montserrat-Bold',     fontSize=20, alignment=TA_LEFT,   leading=23, textColor=_INDUREX_GREEN)
-    SLOGAN = ps('SLOGAN', fontName='Montserrat-Bold', fontSize=9.5,alignment=TA_LEFT,   leading=13, textColor=_INDUREX_GREEN)
-    META   = ps('META',   fontName='Helvetica',      fontSize=9.5,alignment=TA_LEFT,   leading=13)
+    NOM     = ps('NOM',     fontName='Montserrat-Bold',     fontSize=20, alignment=TA_LEFT,   leading=23, textColor=_INDUREX_GREEN)
+    SLOGAN  = ps('SLOGAN',  fontName='Montserrat-Bold', fontSize=9.5,alignment=TA_LEFT,   leading=13, textColor=_INDUREX_GREEN)
+    CAPITAL = ps('CAPITAL', fontName='Montserrat-Bold', fontSize=7.5,alignment=TA_LEFT,   leading=10, textColor=_INDUREX_CAPITAL_VERT)
+    META    = ps('META',    fontName='Helvetica',      fontSize=9.5,alignment=TA_LEFT,   leading=13)
     LBL    = ps('LBL',    fontName='Helvetica',      fontSize=10.5,alignment=TA_LEFT,  leading=15)
     LBLB   = ps('LBLB',   fontName='Helvetica-Bold', fontSize=10.5,alignment=TA_LEFT,  leading=15)
     TITRE  = ps('TITRE',  fontName='Helvetica-Bold', fontSize=16, alignment=TA_CENTER, leading=19, textColor=colors.white)
@@ -239,7 +242,7 @@ def _generate_bl_pdf_indurex(data: dict, rec: dict, dest: dict) -> bytes:
     ref_box = Table(ref_box_rows, colWidths=[2.6*cm, 4.1*cm])
     ref_box.setStyle(TableStyle([('TOPPADDING', (0, 0), (-1, -1), 1), ('BOTTOMPADDING', (0, 0), (-1, -1), 1)]))
 
-    nom_block = [Paragraph(_INDUREX_NOM, NOM), Paragraph(_INDUREX_SLOGAN, SLOGAN)]
+    nom_block = [Paragraph(_INDUREX_NOM, NOM), Paragraph(_INDUREX_SLOGAN, SLOGAN), Paragraph(_INDUREX_CAPITAL, CAPITAL)]
     entete = Table([[logo_cell, nom_block, ref_box]], colWidths=[2.3*cm, COL - 2.3*cm - 6.7*cm, 6.7*cm])
     entete.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -279,21 +282,21 @@ def _generate_bl_pdf_indurex(data: dict, rec: dict, dest: dict) -> bytes:
 
     # ── Bloc client (réf/RC/NIF/... à gauche, raison sociale/adresse à droite) ─
     client_lignes = [
-        ('Réf Client',   v('ref_client')),
-        ('N° RC',        v('client_rc')),
-        ('NIF',          v('client_nif')),
-        ('N° Article',   v('client_numero_article')),
-        ('N° I.S',       v('client_nis')),
-        ('Tél',          v('client_telephone')),
-        ('Fax',          v('client_fax')),
-        ('Email',        v('client_email')),
-        ('Pièces Liées', v('pieces_liees')),
+        ('Réf Client:',   v('ref_client')),
+        ('N° RC:',        v('client_rc')),
+        ('NIF:',          v('client_nif')),
+        ('N° Article:',   v('client_numero_article')),
+        ('N° I.S:',       v('client_nis')),
+        ('Tél:',          v('client_telephone')),
+        ('Pièces Liées:', v('pieces_liees')),
     ]
     gauche_rows = [[Paragraph(lbl, LBL), Paragraph(val, LBL)] for lbl, val in client_lignes]
-    gauche_tbl = Table(gauche_rows, colWidths=[2.6*cm, 5.9*cm])
+    gauche_tbl = Table(gauche_rows, colWidths=[2.4*cm, 6.1*cm])
     gauche_tbl.setStyle(TableStyle([
         ('TOPPADDING', (0, 0), (-1, -1), 1), ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
         ('LEFTPADDING', (0, 0), (0, -1), 0),
+        ('RIGHTPADDING', (0, 0), (0, -1), 2),
+        ('LEFTPADDING', (1, 0), (1, -1), 3),
     ]))
 
     droite_content = [Paragraph(dest['nom'], LBLB)]

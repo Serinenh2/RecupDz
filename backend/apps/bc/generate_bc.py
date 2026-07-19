@@ -7,8 +7,9 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image,
+                                PageBreak, Frame, PageTemplate, NextPageTemplate)
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import io
@@ -205,6 +206,151 @@ def _is_indurex(rec):
     return 'INDUREX' in (rec.get('nom') or '').upper()
 
 
+# ── Page CGV pleine page (verso de la Facture) : reproduit les marges du
+#    document papier original (~1 cm de chaque côté), sans pied de page ISO
+#    ni identité RC/NIF — ceux-ci restent sur la page 1 uniquement. ──
+_CGV_MARGIN_LR     = 1.05 * cm   # marges gauche/droite du scan (~5%% de la largeur)
+_CGV_MARGIN_TOP    = 1.15 * cm
+_CGV_MARGIN_BOTTOM = 0.75 * cm   # cadre jusqu'à ~97%% de la page, comme le scan
+_CGV_WIDTH         = A4[0] - 2 * _CGV_MARGIN_LR
+
+
+def _add_cgv_page_template(doc):
+    """Ajoute au document le gabarit pleine page 'CGV' utilisé par le verso de la
+    Facture (activé par NextPageTemplate dans _conditions_generales_story).
+    Doit être appelé AVANT doc.build() ; SimpleDocTemplate ajoutera ensuite ses
+    gabarits 'First'/'Later', d'où le _firstPageTemplateIndex pointé sur 'First'."""
+    frame = Frame(_CGV_MARGIN_LR, _CGV_MARGIN_BOTTOM, _CGV_WIDTH,
+                  A4[1] - _CGV_MARGIN_TOP - _CGV_MARGIN_BOTTOM, id='cgv',
+                  leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+    doc.addPageTemplates([PageTemplate(id='CGV', frames=[frame], pagesize=A4)])
+    doc._firstPageTemplateIndex = 1
+
+
+# Rouge du document original (texte, intitulés, titre et cadre).
+_CGV_ROUGE = colors.HexColor('#E03A3A')
+
+# ── Sections 1 à 7 : texte courant ────────────────────────────────────────────
+_CGV_SECTIONS = [
+    ("1 - Application des conditions générales de vente",
+     "La remise de toute commande implique, de la part de l'acheteur, l'acceptation sans réserve des présentes "
+     "conditions générales de vente, auxquelles il ne peut être dérogé que par accord exprès dans notre "
+     "confirmation. Ces conditions priment les conditions d'achat pouvant figurer sur les documents de "
+     "l'acheteur, sauf accord contraire et écrit de notre Société."),
+    ("2 - Commandes",
+     "Les marchés et commandes ne deviennent valables et définitifs qu'après acceptation expresse de notre part "
+     "et confirmation par écrit. Nos agents n'ont pas qualité pour traiter définitivement. Toutes les commandes "
+     "enregistrées par eux sont prises sous réserve d'acceptation de notre Société."),
+    ("3 - Délais",
+     "Les délais portés sur nos documents commerciaux sont toujours indicatifs. Notre Société se réserve le droit "
+     "de modifier, suspendre ou annuler ses engagements, en cas de non-respect réitéré des conditions de "
+     "paiement, de non fourniture de renseignements nécessaires à l'exécution des commandes, de guerre civile ou "
+     "autre, grève, lock-out, accident d'outillage, interruption ou retard dans les approvisionnements, sinistre "
+     "de toute nature, fait du prince et, de façon générale, en cas de force majeure, sans que la modification, "
+     "suspension ou annulation puisse donner lieu à indemnité de quelque nature que ce soit. En cas de "
+     "difficultés d'approvisionnement, notre Société informera le client des cas ou événements ci-dessus, non "
+     "limitativement énumérés, et lui fera connaître éventuellement les nouveaux délais de livraison."),
+    ("4 - Livraisons",
+     "Quelles que soient la destination des produits et matériels, et les conditions de vente, la livraison est "
+     "réputée effectuée dans nos entrepôts, et implique transfert de responsabilité à la charge de l'acheteur. "
+     "Dans tous les cas ceux-ci voyagent aux risques et périls de l'acheteur, et ce principe ne saurait subir de "
+     "dérogation par le fait d'indications telles que remise franco, contre remboursement, ou avance des frais de "
+     "transport... Il appartient donc à l'acheteur de faire, à l'arrivée des produits et matériels, toutes "
+     "vérifications utiles et s'il y a lieu, d'effectuer toutes réserves et démarches en cas de perte partielle "
+     "ou totale, d'avarie, de retard, ainsi que d'exercer tout recourt contre le transporteur. La responsabilité "
+     "civile de notre Société ne pourra être mise en cause, en cas de détérioration, avarie ou perte totale ou "
+     "partielle des produits et matériels, quelle qu'en soit la cause lorsque ceux-ci, mis à disposition du "
+     "client, auront à sa demande été entreposés par nos soins dans nos ateliers ou dans les locaux appartenant "
+     "à des tiers."),
+    ("5 - Prix",
+     "Nos prix s'entendent pour des produits pris et emballés en nos ateliers. Les produits sont facturés au prix "
+     "convenu lors de la commande ou de la confirmation. Nos factures, outre les indications légales, "
+     "mentionnent le cas échéant :<br/>"
+     " - les remises acquises dans leur principe et leur montant,<br/>"
+     " - la ou les dates de règlement, - l'escompte applicable en cas de paiement anticipé par rapport aux "
+     "présentes conditions générales de vente.<br/>"
+     " - les pénalités de retard en cas de non-paiement aux échéances fixées."),
+    ("6 - Paiement",
+     "En cas de remise d'un chèque ou de création d'un effet de commerce, le paiement ne sera réputé réaliser "
+     "qu'au moment de l'encaissement ou du règlement à échéances convenues. Tous nos produits et matériels sont "
+     "payables selon les conditions préalablement entendues entre les deux parties, sauf convention contraire, "
+     "spéciale pour chaque affaire traitée et pour laquelle notre accord préalable et écrit sera nécessaire. La "
+     "date de mise à disposition ou à défaut la date d'expédition, constitue le point de départ du ou des délais "
+     "de paiement convenus. Toute détérioration du crédit de l'acheteur pourra justifier l'exigence de garanties, "
+     "ou d'un règlement comptant ou par traite payable à vue, avant l'exécution des commandes reçues."),
+    ("7 - Réclamations et garantie",
+     "Notre Société assure la garantie des vices cachés dans les conditions légales : toutefois, l'acheteur "
+     "dispose d'un délai de 30 jours à compter de la découverte du vice caché pour nous notifier ses réserves. "
+     "En ce qui concerne les vices apparents, l'acheteur doit émettre les réserves nécessaires dans les 3 jours "
+     "suivant la réception des produits, par lettre recommandée avec A.R. Pour être recevables, les réclamations "
+     "devront être détaillées et précises, en particulier s'il s'agit de malfaçons ou d'erreurs de spécification. "
+     "En aucun cas une quelconque réclamation n'autorise l'acheteur à suspendre ou refuser le paiement du prix."),
+]
+
+# ── Sections 8 et 9 : présentées dans un cadre rouge (comme sur l'original) ──
+_CGV_SECTIONS_ENCADREES = [
+    ("8 - Clause de réserve de propriété",
+     "Toutes nos ventes sont conclues avec réserve de propriété. En conséquence, le transfert à l'acheteur de la "
+     "propriété des produits vendus est suspendu jusqu'au paiement intégral du prix, intérêts et accessoires. "
+     "Les risques sont mis à la charge de l'acheteur dès la mise à disposition des produits vendus sous réserve "
+     "de propriété. L'acheteur doit donc veiller jusqu'au transfert de propriété à son profit, à la bonne "
+     "conservation des produits et de leurs spécifications conformes aux documents de vente, ainsi qu'à la "
+     "sauvegarde de leur identification. En outre et nonobstant l'application du paragraphe 6 qui précède, en "
+     "cas de non-paiement aux échéances prévues, comme en cas d'inexécution de l'un quelconque des engagements "
+     "de l'acheteur, le contrat de vente sera résolu de plein droit, si bon semble à notre Société, sans "
+     "formalité judiciaire ou extra-judiciaire. 8 jours après une simple mise en demeure, par lettre "
+     "recommandée, restée sans effet. La reprise par nos soins de produits revendiqués impose à l'acheteur "
+     "l'obligation de réparer le préjudice résultant de l'indisponibilité des marchandises concernées. En "
+     "conséquence, l'acheteur devra à titre de clause pénale, une indemnité fixée à 5% du prix convenu, par mois "
+     "de détention des produits restitués. Si la résolution du contrat nous rend débiteurs d'acomptes "
+     "préalablement reçus de l'acheteur, notre Société sera en droit de procéder à la compensation de cette "
+     "dette avec la créance née de l'application de la clause pénale ci-dessus stipulée. En cas de revente ou de "
+     "transformation des produits sous réserve de propriété par l'acheteur dans le cadre de son activité "
+     "normale, et dans le cas où le prix n'en aurait pas été intégralement acquitté, l'acheteur cèdera à notre "
+     "profit les créances nées de la revente, ou si notre produit est inclus dans un ensemble, le prorata de ses "
+     "créances correspondant au montant de sa réserve de propriété."),
+    ("9 - Différents",
+     "Nonobstant toute stipulation contraire, en cas de contestation relative à une fourniture ou à son "
+     "règlement, le tribunal de Rouiba sont seuls compétents, quelles que soient les conditions de vente et le "
+     "mode de paiement accepté, même en cas d'appel en garantie ou de pluralité de défendeurs"),
+]
+
+
+def _conditions_generales_story():
+    """Page 2 (verso) de la Facture : reproduction fidèle du document original —
+    pleine page (gabarit 'CGV'), tout le texte en rouge, intitulés soulignés,
+    sections 8 et 9 encadrées, aux dimensions du document papier."""
+    TITRE   = ParagraphStyle('CGV_TITRE',   fontName='Helvetica-Bold', fontSize=15.5, alignment=TA_CENTER,
+                              leading=18, spaceAfter=8, textColor=_CGV_ROUGE)
+    SECTION = ParagraphStyle('CGV_SECTION', fontName='Helvetica-Bold', fontSize=9.0, alignment=TA_LEFT,
+                              leading=11.0, spaceBefore=7.5, spaceAfter=1.5, textColor=_CGV_ROUGE)
+    BODY    = ParagraphStyle('CGV_BODY',    fontName='Helvetica',      fontSize=8.5, alignment=TA_JUSTIFY,
+                              leading=10.9, textColor=_CGV_ROUGE)
+
+    story = [NextPageTemplate('CGV'), PageBreak(),
+             Paragraph('CONDITIONS GENERALES DE VENTE', TITRE)]
+    for titre, texte in _CGV_SECTIONS:
+        story.append(Paragraph(f"<u>{titre}</u>", SECTION))
+        story.append(Paragraph(texte, BODY))
+
+    # Sections 8 et 9 dans un cadre rouge pleine largeur, comme sur le document original.
+    encadre_flowables = []
+    for titre, texte in _CGV_SECTIONS_ENCADREES:
+        encadre_flowables.append(Paragraph(f"<u>{titre}</u>", SECTION))
+        encadre_flowables.append(Paragraph(texte, BODY))
+    encadre = Table([[encadre_flowables]], colWidths=[_CGV_WIDTH])
+    encadre.setStyle(TableStyle([
+        ('BOX',           (0, 0), (-1, -1), 1.2, _CGV_ROUGE),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 7),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 7),
+        ('TOPPADDING',    (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(Spacer(1, 5))
+    story.append(encadre)
+    return story
+
+
 def generate_bc_pdf(data: dict) -> bytes:
     buffer = io.BytesIO()
 
@@ -233,6 +379,7 @@ def generate_bc_pdf(data: dict) -> bytes:
 
     doc = SimpleDocTemplate(buffer, pagesize=A4,
         topMargin=1.2*cm, bottomMargin=1.2*cm, leftMargin=1.5*cm, rightMargin=1.5*cm)
+    _add_cgv_page_template(doc)
     story = []
 
     # ── En-tête : logo + raison sociale ────────────────────────────────────────
@@ -370,15 +517,29 @@ def generate_bc_pdf(data: dict) -> bytes:
     if rec['responsable']:
         story.append(Paragraph(rec['responsable'], SIGN))
 
-    doc.build(story)
+    if data.get('type_document') == 'FACTURE':
+        story.extend(_conditions_generales_story())
+
+        def _first_page_footer(canvas_obj, _doc):
+            canvas_obj.saveState()
+            canvas_obj.setFont('Helvetica-Bold', 9)
+            canvas_obj.setFillColor(_CGV_ROUGE)
+            canvas_obj.drawCentredString(A4[0] / 2, 1.0 * cm, 'Voir conditions générales de vente au verso')
+            canvas_obj.restoreState()
+
+        doc.build(story, onFirstPage=_first_page_footer)
+    else:
+        doc.build(story)
     buffer.seek(0)
     return buffer.read()
 
 
 # ── Nom et slogan fixes de l'en-tête SARL INDUREX (non stockés en base — identité
 #    visuelle propre à cette société, indépendante de nom_commercial/nom_raison_sociale) ──
-_INDUREX_NOM    = 'SARL INDUREX'
-_INDUREX_SLOGAN = 'INDUSTRIAL WAST RECOVERY AND VALORIZATION'
+_INDUREX_NOM     = 'SARL INDUREX'
+_INDUREX_SLOGAN  = 'INDUSTRIAL WASTE RECOVERY AND VALORIZATION'
+_INDUREX_CAPITAL      = 'AU CAPITAL DE 1 000 000,00 DA'
+_INDUREX_CAPITAL_VERT = colors.HexColor('#0F452B')
 
 
 def _fmt_montant(n):
@@ -410,11 +571,15 @@ class _NumberedCanvas(_pdfcanvas.Canvas):
     certification ISO (gauche) et identité RC/NIF/NIS (droite), séparés par un filet vert,
     affichés sur chaque page au-dessus du numéro de page."""
 
-    def __init__(self, *args, iso_paths=None, footer_paragraphs=None, **kwargs):
+    def __init__(self, *args, iso_paths=None, footer_paragraphs=None, verso_note=None, **kwargs):
         _pdfcanvas.Canvas.__init__(self, *args, **kwargs)
         self._saved_page_states = []
         self._iso_paths = [p for p in (iso_paths or []) if p]
         self._footer_paragraphs = footer_paragraphs or []
+        # Note "Voir conditions générales de vente au verso" (Facture uniquement) —
+        # affichée en rouge, centrée, sous les badges ISO/l'identité RC/NIF, en bas
+        # de la 1re page seulement (la 2e page est le verso lui-même).
+        self._verso_note = verso_note
 
     def showPage(self):
         self._saved_page_states.append(dict(self.__dict__))
@@ -422,12 +587,22 @@ class _NumberedCanvas(_pdfcanvas.Canvas):
 
     def save(self):
         total_pages = len(self._saved_page_states)
-        for state in self._saved_page_states:
+        for i, state in enumerate(self._saved_page_states):
             self.__dict__.update(state)
             self.saveState()
+            page_num_y = 0.8 * cm if i == 0 else 0.3 * cm  # verso CGV pleine page : numéro sous le cadre
+            if i == 0 and self._verso_note:
+                self.setFont('Helvetica-Bold', 9)
+                self.setFillColor(_CGV_ROUGE)
+                self.drawCentredString(A4[0] / 2, 0.8 * cm, self._verso_note)
+                page_num_y = 0.35 * cm
             self.setFont('Helvetica', 8)
-            self.drawCentredString(A4[0] / 2, 0.8 * cm, f"Page: {self._pageNumber}/{total_pages}")
-            self._draw_footer()
+            self.setFillColor(colors.black)
+            self.drawCentredString(A4[0] / 2, page_num_y, f"Page: {self._pageNumber}/{total_pages}")
+            if i == 0:
+                # Badges ISO et identité RC/NIF sur la 1re page uniquement — le verso
+                # CGV reproduit le document papier original, sans pied de page.
+                self._draw_footer()
             self.restoreState()
             _pdfcanvas.Canvas.showPage(self)
         _pdfcanvas.Canvas.save(self)
@@ -476,6 +651,7 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
 
     NOM     = ps('NOM',     fontName='Montserrat-Bold',     fontSize=20, alignment=TA_LEFT,   leading=23, textColor=_INDUREX_GREEN)
     SLOGAN  = ps('SLOGAN',  fontName='Montserrat-Bold', fontSize=9.5,alignment=TA_LEFT,   leading=13, textColor=_INDUREX_GREEN)
+    CAPITAL = ps('CAPITAL', fontName='Montserrat-Bold', fontSize=7.5,alignment=TA_LEFT,   leading=10, textColor=_INDUREX_CAPITAL_VERT)
     META    = ps('META',    fontName='Helvetica',        fontSize=9.5,alignment=TA_LEFT,   leading=13)
     LBL     = ps('LBL',     fontName='Helvetica',        fontSize=10.5,alignment=TA_LEFT,  leading=15)
     LBLB    = ps('LBLB',    fontName='Helvetica-Bold',   fontSize=10.5,alignment=TA_LEFT,  leading=15)
@@ -498,6 +674,7 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
 
     doc = SimpleDocTemplate(buffer, pagesize=A4,
         topMargin=1*cm, bottomMargin=_INDUREX_BOTTOM_MARGIN, leftMargin=1.5*cm, rightMargin=1.5*cm)
+    _add_cgv_page_template(doc)
     story = []
 
     # ── En-tête : logo + raison sociale + slogan | bloc référence ──────────────
@@ -520,7 +697,7 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
         ('TOPPADDING', (0, 0), (-1, -1), 1), ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
     ]))
 
-    nom_block = [Paragraph(_INDUREX_NOM, NOM), Paragraph(_INDUREX_SLOGAN, SLOGAN)]
+    nom_block = [Paragraph(_INDUREX_NOM, NOM), Paragraph(_INDUREX_SLOGAN, SLOGAN), Paragraph(_INDUREX_CAPITAL, CAPITAL)]
     entete = Table([[logo_cell, nom_block, ref_box]], colWidths=[2.3*cm, COL - 2.3*cm - 6.7*cm, 6.7*cm])
     entete.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -565,26 +742,26 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
 
     # ── Bloc client (réf/RC/NIF/... à gauche, raison sociale/adresse à droite) ─
     client_lignes = [
-        ('Réf Client',   v('ref_client')),
-        ('N° RC',        v('client_rc')),
-        ('NIF',          v('client_nif')),
-        ('N° Article',   v('client_numero_article')),
-        ('N° I.S',       v('client_nis')),
-        ('Tél',          v('client_telephone')),
-        ('Fax',          v('client_fax')),
-        ('Email',        v('client_email')),
-        ('Pièces Liées', v('pieces_liees')),
+        ('Réf Client:',   v('ref_client')),
+        ('N° RC:',        v('client_rc')),
+        ('NIF:',          v('client_nif')),
+        ('N° Article:',   v('client_numero_article')),
+        ('N° I.S:',       v('client_nis')),
+        ('Tél:',          v('client_telephone')),
+        ('Pièces Liées:', v('pieces_liees')),
     ]
     if is_facture:
         client_lignes += [
-            ('Mode Paiement', v('mode_paiement')),
-            ('Référence',     v('reference_paiement')),
+            ('Mode Paiement:', v('mode_paiement')),
+            ('Référence:',     v('reference_paiement')),
         ]
     gauche_rows = [[Paragraph(lbl, LBL), Paragraph(val, LBL)] for lbl, val in client_lignes]
-    gauche_tbl = Table(gauche_rows, colWidths=[3.5*cm, 5*cm])
+    gauche_tbl = Table(gauche_rows, colWidths=[2.9*cm, 5.6*cm])
     gauche_tbl.setStyle(TableStyle([
         ('TOPPADDING', (0, 0), (-1, -1), 1), ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
         ('LEFTPADDING', (0, 0), (0, -1), 0),
+        ('RIGHTPADDING', (0, 0), (0, -1), 2),
+        ('LEFTPADDING', (1, 0), (1, -1), 3),
     ]))
 
     droite_content = [Paragraph(v('client_nom'), LBLB)]
@@ -698,6 +875,7 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     tbl_no_filler = Table(rows, colWidths=col_w)
     tbl_no_filler.setStyle(tbl_style)
     tbl_h     = tbl_no_filler.wrap(avail_w, 20000)[1]
+
     bottom_h  = (
         8 +  # Spacer après le tableau
         recap_wrapper.wrap(avail_w, 20000)[1] +
@@ -732,8 +910,12 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     story.append(Spacer(1, 12))
     story.append(arrete_tbl)
 
-    iso_paths = [rec.get('iso_9001_path'), rec.get('iso_14001_path'), rec.get('iso_45001_path')]
+    if is_facture:
+        story.extend(_conditions_generales_story())
+
+    iso_paths  = [rec.get('iso_9001_path'), rec.get('iso_14001_path'), rec.get('iso_45001_path')]
+    verso_note = 'Voir conditions générales de vente au verso' if is_facture else None
     doc.build(story, canvasmaker=functools.partial(
-        _NumberedCanvas, iso_paths=iso_paths, footer_paragraphs=footer_paragraphs))
+        _NumberedCanvas, iso_paths=iso_paths, footer_paragraphs=footer_paragraphs, verso_note=verso_note))
     buffer.seek(0)
     return buffer.read()
