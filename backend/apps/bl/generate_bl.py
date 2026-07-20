@@ -193,7 +193,7 @@ def generate_bl_pdf(data: dict) -> bytes:
 
 
 _INDUREX_NOM     = 'SARL INDUREX'
-_INDUREX_SLOGAN  = 'INDUSTRIAL RECYCLING SOLUTIONS'
+_INDUREX_SLOGAN  = 'INDUSTRIAL WASTE RECOVERY AND VALORIZATION'
 _INDUREX_CAPITAL      = 'AU CAPITAL DE 1 000 000,00 DA'
 _INDUREX_CAPITAL_VERT = colors.HexColor('#0F452B')
 _MODE_LIV_ABBR   = {'ENLEVEMENT': 'ENLEV', 'LIVRAISON': 'LIVR'}
@@ -355,7 +355,7 @@ def _generate_bl_pdf_indurex(data: dict, rec: dict, dest: dict) -> bytes:
     # Cachet/signature électroniques insérés dans la case vide de la zone
     # articles (comme le cachet humide apposé à la main sur le formulaire papier).
     filler_row = ['' for _ in headers]
-    sign_flowable = _signature_flowable(rec, align='CENTER', cachet_size=6*cm, sig_w=4.5*cm, sig_h=2.4*cm)
+    sign_flowable = _signature_flowable(rec, align='CENTER', cachet_size=4*cm, sig_w=4.5*cm, sig_h=2.4*cm)
     if sign_flowable:
         filler_row[0] = sign_flowable
 

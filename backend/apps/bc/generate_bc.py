@@ -537,7 +537,7 @@ def generate_bc_pdf(data: dict) -> bytes:
 # ── Nom et slogan fixes de l'en-tête SARL INDUREX (non stockés en base — identité
 #    visuelle propre à cette société, indépendante de nom_commercial/nom_raison_sociale) ──
 _INDUREX_NOM     = 'SARL INDUREX'
-_INDUREX_SLOGAN  = 'INDUSTRIAL RECYCLING SOLUTIONS'
+_INDUREX_SLOGAN  = 'INDUSTRIAL WASTE RECOVERY AND VALORIZATION'
 _INDUREX_CAPITAL      = 'AU CAPITAL DE 1 000 000,00 DA'
 _INDUREX_CAPITAL_VERT = colors.HexColor('#0F452B')
 
@@ -639,13 +639,11 @@ class _NumberedCanvas(_pdfcanvas.Canvas):
         text_x = _FOOTER_LEFT
         text_w = (divider_x - 0.5 * cm if self._iso_paths else _FOOTER_RIGHT) - text_x
 
-        # Même espace sous le filet vert que les badges ISO. Les visuels PNG des badges ont une
-        # marge transparente interne (~5-6 % de leur canevas) : leur encre visible commence donc
-        # un peu plus bas que le haut de la bbox _BADGE_BOTTOM + _BADGE_SIZE — on en tient compte
-        # ici pour que le haut du texte tombe au même niveau que le haut visible des badges.
-        _BADGE_INK_INSET = 0.11 * cm
+        # Bloc de texte centré verticalement sur la hauteur des badges ISO : le milieu
+        # du bloc (RC/NIF/NIS + adresse) tombe au même niveau que le milieu des badges.
         heights = [p.wrap(text_w, 3 * cm)[1] for p in self._footer_paragraphs]
-        y = _BADGE_BOTTOM + _BADGE_SIZE - _BADGE_INK_INSET
+        badge_center = _BADGE_BOTTOM + _BADGE_SIZE / 2
+        y = badge_center + sum(heights) / 2
         for p, h in zip(self._footer_paragraphs, heights):
             y -= h
             p.drawOn(self, text_x, y)
@@ -899,7 +897,7 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
     # plutôt qu'ajoutés après l'arrêté, qui déborderait sur une 2e page puisque
     # la hauteur du tableau est calculée pour occuper exactement la page.
     filler_row = ['' for _ in headers]
-    sign_flowable = _signature_flowable(rec, align='CENTER', cachet_size=6*cm, sig_w=4.5*cm, sig_h=2.4*cm)
+    sign_flowable = _signature_flowable(rec, align='CENTER', cachet_size=4*cm, sig_w=4.5*cm, sig_h=2.4*cm)
     if sign_flowable:
         filler_row[0] = sign_flowable
 
