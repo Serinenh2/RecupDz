@@ -601,6 +601,25 @@ export default function ProfilPage() {
   const uploadIso14001 = (file) => uploadIsoBadge('iso_14001', file, setUploadingIso14001, 'Badge ISO 14001')
   const uploadIso45001 = (file) => uploadIsoBadge('iso_45001', file, setUploadingIso45001, 'Badge ISO 45001')
 
+  // Suppression d'une image (logo/signature/cachet/badges ISO) : PATCH JSON { champ: null }
+  // — indépendant de l'upload, qui utilise un FormData multipart pour envoyer le fichier.
+  const deleteImage = async (field, setUploading, label, feminin = false) => {
+    if (!window.confirm(`Supprimer ${label} ?`)) return
+    setUploading(true)
+    try {
+      const r = await api.patch('/accounts/mon-recuperateur/', { [field]: null })
+      setRecup(r.data)
+      toast.success(`${label} supprimé${feminin ? 'e' : ''}`)
+    } catch { toast.error(`Erreur suppression ${label.toLowerCase()}`) }
+    finally { setUploading(false) }
+  }
+  const deleteLogo      = () => deleteImage('logo',                    setUploadingLogo,      'Logo')
+  const deleteSignature = () => deleteImage('signature_electronique',  setUploadingSignature, 'Signature électronique', true)
+  const deleteCachet    = () => deleteImage('cachet_electronique',     setUploadingCachet,    'Cachet électronique')
+  const deleteIso9001   = () => deleteImage('iso_9001',                setUploadingIso9001,   'Badge ISO 9001')
+  const deleteIso14001  = () => deleteImage('iso_14001',               setUploadingIso14001,  'Badge ISO 14001')
+  const deleteIso45001  = () => deleteImage('iso_45001',               setUploadingIso45001,  'Badge ISO 45001')
+
   const onAgrementSaved = async () => {
     setShowAgrForm(false)
     if (user?.recuperateur_id) {
@@ -706,11 +725,17 @@ export default function ProfilPage() {
 
           <div className="flex flex-wrap gap-6 mb-5 pb-5 border-b border-[#E2E8F0]">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
+              <div className="relative w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
                 {recup?.logo
                   ? <img src={recup.logo} alt="Logo" className="w-full h-full object-contain"/>
                   : <Building2 size={22} className="text-slate-300"/>
                 }
+                {recup?.logo && (
+                  <button type="button" onClick={deleteLogo} disabled={uploadingLogo} title="Supprimer le logo"
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow disabled:opacity-50">
+                    <X size={12}/>
+                  </button>
+                )}
               </div>
               <div>
                 <label className="label mb-1">Logo de l'entreprise</label>
@@ -724,11 +749,17 @@ export default function ProfilPage() {
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
+              <div className="relative w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
                 {recup?.signature_electronique
                   ? <img src={recup.signature_electronique} alt="Signature" className="w-full h-full object-contain"/>
                   : <FileSignature size={22} className="text-slate-300"/>
                 }
+                {recup?.signature_electronique && (
+                  <button type="button" onClick={deleteSignature} disabled={uploadingSignature} title="Supprimer la signature"
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow disabled:opacity-50">
+                    <X size={12}/>
+                  </button>
+                )}
               </div>
               <div>
                 <label className="label mb-1">Signature électronique</label>
@@ -742,11 +773,17 @@ export default function ProfilPage() {
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
+              <div className="relative w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
                 {recup?.cachet_electronique
                   ? <img src={recup.cachet_electronique} alt="Cachet" className="w-full h-full object-contain"/>
                   : <Stamp size={22} className="text-slate-300"/>
                 }
+                {recup?.cachet_electronique && (
+                  <button type="button" onClick={deleteCachet} disabled={uploadingCachet} title="Supprimer le cachet"
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow disabled:opacity-50">
+                    <X size={12}/>
+                  </button>
+                )}
               </div>
               <div>
                 <label className="label mb-1">Cachet électronique</label>
@@ -760,11 +797,17 @@ export default function ProfilPage() {
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
+              <div className="relative w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
                 {recup?.iso_9001
                   ? <img src={recup.iso_9001} alt="ISO 9001" className="w-full h-full object-contain"/>
                   : <Award size={22} className="text-slate-300"/>
                 }
+                {recup?.iso_9001 && (
+                  <button type="button" onClick={deleteIso9001} disabled={uploadingIso9001} title="Supprimer le badge"
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow disabled:opacity-50">
+                    <X size={12}/>
+                  </button>
+                )}
               </div>
               <div>
                 <label className="label mb-1">Badge ISO 9001:2015</label>
@@ -778,11 +821,17 @@ export default function ProfilPage() {
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
+              <div className="relative w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
                 {recup?.iso_14001
                   ? <img src={recup.iso_14001} alt="ISO 14001" className="w-full h-full object-contain"/>
                   : <Award size={22} className="text-slate-300"/>
                 }
+                {recup?.iso_14001 && (
+                  <button type="button" onClick={deleteIso14001} disabled={uploadingIso14001} title="Supprimer le badge"
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow disabled:opacity-50">
+                    <X size={12}/>
+                  </button>
+                )}
               </div>
               <div>
                 <label className="label mb-1">Badge ISO 14001:2015</label>
@@ -796,11 +845,17 @@ export default function ProfilPage() {
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
+              <div className="relative w-16 h-16 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] flex items-center justify-center overflow-hidden bg-slate-50 flex-shrink-0">
                 {recup?.iso_45001
                   ? <img src={recup.iso_45001} alt="ISO 45001" className="w-full h-full object-contain"/>
                   : <Award size={22} className="text-slate-300"/>
                 }
+                {recup?.iso_45001 && (
+                  <button type="button" onClick={deleteIso45001} disabled={uploadingIso45001} title="Supprimer le badge"
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow disabled:opacity-50">
+                    <X size={12}/>
+                  </button>
+                )}
               </div>
               <div>
                 <label className="label mb-1">Badge ISO 45001:2018</label>
