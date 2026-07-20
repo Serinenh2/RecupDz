@@ -118,6 +118,38 @@ class MockContainer:
         from apps.ai_assistant.enterprise.parameter_validator import ToolParameterValidator
         self.parameter_validator = ToolParameterValidator()
 
+        # Enterprise memory components (used by ConversationOrchestrator)
+        self.conversation_memory = MagicMock()
+        self.conversation_memory.exists.return_value = True
+        self.conversation_memory.get_llm_messages.return_value = []
+        self.conversation_memory.total_turns.return_value = 0
+        self.conversation_memory.list_conversations.return_value = []
+        self.conversation_memory.stats.return_value = {}
+        snapshot = MagicMock()
+        snapshot.summaries = []
+        self.conversation_memory.retrieve.return_value = snapshot
+
+        self.session_memory = MagicMock()
+        self.session_memory.get.return_value = None
+        self.session_memory.get_entity.return_value = None
+        self.session_memory.get_company.return_value = None
+        self.session_memory.get_declaration.return_value = None
+        self.session_memory.get_recent_actions.return_value = []
+        self.session_memory.get_mode.return_value = "standard"
+
+        self.user_memory = MagicMock()
+        self.user_memory.get_profile.return_value = None
+        self.user_memory.get_preferences.return_value = None
+        self.user_memory.get_frequent_entities.return_value = []
+
+        # AgentOrchestrator (used by ConversationOrchestrator)
+        from apps.ai_assistant.enterprise.agent_orchestrator import AgentOrchestrator
+        self.orchestrator = AgentOrchestrator(container=self)
+
+        # ConversationOrchestrator (used by EnterprisePipeline)
+        from apps.ai_assistant.enterprise.conversation_orchestrator import ConversationOrchestrator
+        self.conversation_orchestrator = ConversationOrchestrator(container=self)
+
 
 # ---------------------------------------------------------------------------
 # Test Suite
@@ -317,7 +349,7 @@ class TestPipelineBusinessFirst(unittest.TestCase):
             "confidence": 0.95,
         }
         mock_router.route.return_value = mock_result
-        self.pipeline._orch._ai_router_instance = mock_router
+        self.container.orchestrator._ai_router_instance = mock_router
 
         self.container.ollama.chat.side_effect = [
             '{"tool_needed": true, "tool": "waste_tool", "action": "search"}',
@@ -374,8 +406,7 @@ class TestPipelineCacheObservability(unittest.TestCase):
 
     def test_memory_stored(self):
         self.pipeline.handle("test", user_id="u1")
-        self.container.memory.store_user_message.assert_called_once()
-        self.container.memory.store_assistant_message.assert_called_once()
+        self.container.conversation_memory.store.assert_called()
 
 
 class TestPipelineCacheHit(unittest.TestCase):
@@ -475,9 +506,8 @@ class TestPipelineParseHermesGate(unittest.TestCase):
 
     def setUp(self):
         self.container = MockContainer()
-        from apps.ai_assistant.enterprise.pipeline import EnterprisePipeline
-        self.pipeline = EnterprisePipeline(container=self.container)
-        self.orchestrator = self.pipeline._orch
+        from apps.ai_assistant.enterprise.agent_orchestrator import AgentOrchestrator
+        self.orchestrator = AgentOrchestrator(container=self.container)
 
     def test_valid_json(self):
         raw = '{"tool": "waste_tool", "action": "search", "parameters": {"query": "oil"}, "reasoning": "test"}'
@@ -504,9 +534,8 @@ class TestPipelineResponseEnvelope(unittest.TestCase):
 
     def setUp(self):
         self.container = MockContainer()
-        from apps.ai_assistant.enterprise.pipeline import EnterprisePipeline
-        self.pipeline = EnterprisePipeline(container=self.container)
-        self.orchestrator = self.pipeline._orch
+        from apps.ai_assistant.enterprise.agent_orchestrator import AgentOrchestrator
+        self.orchestrator = AgentOrchestrator(container=self.container)
 
     def test_success_envelope(self):
         result = self.orchestrator._build_response(

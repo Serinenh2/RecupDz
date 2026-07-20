@@ -1,7 +1,7 @@
 """
 Unit Tests — ExecutionOrchestrator.
 
-Tests the full pipeline: ReasoningOrchestrator → ToolPlanner → ToolExecutorV2.
+Tests the full pipeline: ReasoningOrchestrator → KnowledgeSearch → ToolPlanner → ToolExecutorV2.
 All dependencies are mocked — no real components.
 """
 
@@ -94,17 +94,40 @@ def _failed_result():
     )
 
 
+def _mock_knowledge(has_results=False):
+    """Build a mock KnowledgeSearchEngine."""
+    ks = MagicMock()
+    if has_results:
+        ks.search.return_value = MagicMock(
+            has_results=True,
+            to_context_string=lambda: "=== Glossaire ===\n- BSD: Bordereau de Suivi des Déchets",
+            confidence=0.85,
+        )
+    else:
+        ks.search.return_value = MagicMock(
+            has_results=False,
+            to_context_string=lambda: "",
+            confidence=0.0,
+        )
+    return ks
+
+
 def _make_mocks(
     reason_proposal=None,
     plan_result=None,
     execute_result=None,
+    knowledge_results=None,
 ):
-    """Build mock reasoning_orchestrator, tool_planner, tool_executor_v2."""
+    """Build mock reasoning_orchestrator, knowledge_search, tool_planner, tool_executor_v2."""
     ro = MagicMock()
     if reason_proposal is not None:
         ro.reason.return_value = reason_proposal
     else:
         ro.reason.return_value = _proposal()
+
+    ks = _mock_knowledge(has_results=False)
+    if knowledge_results is not None:
+        ks.search.return_value = knowledge_results
 
     tp = MagicMock()
     if plan_result is not None:
@@ -118,7 +141,7 @@ def _make_mocks(
     else:
         te.execute_plan.return_value = _success_result()
 
-    return ro, tp, te
+    return ro, ks, tp, te
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -129,13 +152,15 @@ def _make_mocks(
 class TestExecutionOrchestratorInit(unittest.TestCase):
 
     def test_all_components(self):
-        ro, tp, te = _make_mocks()
+        ro, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
         self.assertTrue(eo.has_reasoning_orchestrator)
+        self.assertTrue(eo.has_knowledge_search)
         self.assertTrue(eo.has_tool_planner)
         self.assertTrue(eo.has_tool_executor_v2)
         self.assertTrue(eo.is_available)
@@ -143,17 +168,31 @@ class TestExecutionOrchestratorInit(unittest.TestCase):
     def test_no_components(self):
         eo = ExecutionOrchestrator()
         self.assertFalse(eo.has_reasoning_orchestrator)
+        self.assertFalse(eo.has_knowledge_search)
         self.assertFalse(eo.has_tool_planner)
         self.assertFalse(eo.has_tool_executor_v2)
         self.assertFalse(eo.is_available)
 
     def test_partial_components(self):
-        ro, _, _ = _make_mocks()
+        ro, _, _, _ = _make_mocks()
         eo = ExecutionOrchestrator(reasoning_orchestrator=ro)
         self.assertTrue(eo.has_reasoning_orchestrator)
+        self.assertFalse(eo.has_knowledge_search)
         self.assertFalse(eo.has_tool_planner)
         self.assertFalse(eo.has_tool_executor_v2)
         self.assertFalse(eo.is_available)
+
+    def test_without_knowledge_search(self):
+        ro, _, tp, te = _make_mocks()
+        eo = ExecutionOrchestrator(
+            reasoning_orchestrator=ro,
+            knowledge_search=None,
+            tool_planner=tp,
+            tool_executor_v2=te,
+        )
+        self.assertTrue(eo.has_reasoning_orchestrator)
+        self.assertFalse(eo.has_knowledge_search)
+        self.assertTrue(eo.is_available)
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -164,9 +203,10 @@ class TestExecutionOrchestratorInit(unittest.TestCase):
 class TestExecutionOrchestratorExecute(unittest.TestCase):
 
     def test_full_pipeline(self):
-        ro, tp, te = _make_mocks()
+        ro, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
@@ -176,19 +216,32 @@ class TestExecutionOrchestratorExecute(unittest.TestCase):
         self.assertTrue(result.has_data)
 
     def test_calls_reasoning_orchestrator(self):
-        ro, tp, te = _make_mocks()
+        ro, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
         eo.execute("bonjour")
         ro.reason.assert_called_once_with("bonjour", context=None)
 
-    def test_calls_tool_planner_with_proposal(self):
-        ro, tp, te = _make_mocks()
+    def test_calls_knowledge_search(self):
+        ro, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
+            tool_planner=tp,
+            tool_executor_v2=te,
+        )
+        eo.execute("code 01.01.01")
+        ks.search.assert_called_once()
+
+    def test_calls_tool_planner_with_proposal(self):
+        ro, ks, tp, te = _make_mocks()
+        eo = ExecutionOrchestrator(
+            reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
@@ -198,9 +251,10 @@ class TestExecutionOrchestratorExecute(unittest.TestCase):
         self.assertIsInstance(call_args[0][0], DecisionProposal)
 
     def test_calls_tool_executor_with_plan(self):
-        ro, tp, te = _make_mocks()
+        ro, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
@@ -210,9 +264,10 @@ class TestExecutionOrchestratorExecute(unittest.TestCase):
         self.assertIsInstance(call_args[0][0], ExecutionPlan)
 
     def test_passes_context(self):
-        ro, tp, te = _make_mocks()
+        ro, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
@@ -223,9 +278,10 @@ class TestExecutionOrchestratorExecute(unittest.TestCase):
         self.assertIs(call_kwargs[1].get("context", call_kwargs[0][1] if len(call_args := call_kwargs[0]) > 1 else None), ctx)
 
     def test_no_reasoning_orchestrator(self):
-        _, tp, te = _make_mocks()
+        _, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=None,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
@@ -234,9 +290,10 @@ class TestExecutionOrchestratorExecute(unittest.TestCase):
         self.assertEqual(result.messages, ["Raisonnement indisponible."])
 
     def test_no_tool_planner(self):
-        ro, _, te = _make_mocks()
+        ro, ks, _, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=None,
             tool_executor_v2=te,
         )
@@ -245,9 +302,10 @@ class TestExecutionOrchestratorExecute(unittest.TestCase):
         self.assertEqual(result.messages, ["Planification indisponible."])
 
     def test_no_tool_executor(self):
-        ro, tp, _ = _make_mocks()
+        ro, ks, tp, _ = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=None,
         )
@@ -262,9 +320,10 @@ class TestExecutionOrchestratorExecute(unittest.TestCase):
         self.assertEqual(result.messages, ["Raisonnement indisponible."])
 
     def test_empty_proposal(self):
-        ro, tp, te = _make_mocks(reason_proposal=_empty_proposal())
+        ro, ks, tp, te = _make_mocks(reason_proposal=_empty_proposal())
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
@@ -274,9 +333,10 @@ class TestExecutionOrchestratorExecute(unittest.TestCase):
         tp.plan.assert_not_called()
 
     def test_empty_plan(self):
-        ro, tp, te = _make_mocks(plan_result=_empty_plan())
+        ro, ks, tp, te = _make_mocks(plan_result=_empty_plan())
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
@@ -288,10 +348,12 @@ class TestExecutionOrchestratorExecute(unittest.TestCase):
     def test_reasoning_exception(self):
         ro = MagicMock()
         ro.reason.side_effect = RuntimeError("boom")
+        ks = _mock_knowledge()
         tp = MagicMock()
         te = MagicMock()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
@@ -303,11 +365,13 @@ class TestExecutionOrchestratorExecute(unittest.TestCase):
     def test_planner_exception(self):
         ro = MagicMock()
         ro.reason.return_value = _proposal()
+        ks = _mock_knowledge()
         tp = MagicMock()
         tp.plan.side_effect = RuntimeError("boom")
         te = MagicMock()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
@@ -317,10 +381,11 @@ class TestExecutionOrchestratorExecute(unittest.TestCase):
         te.execute_plan.assert_not_called()
 
     def test_executor_exception(self):
-        ro, tp, te = _make_mocks()
+        ro, ks, tp, te = _make_mocks()
         te.execute_plan.side_effect = RuntimeError("boom")
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
@@ -329,15 +394,47 @@ class TestExecutionOrchestratorExecute(unittest.TestCase):
         self.assertEqual(result.messages, ["Exécution échouée."])
 
     def test_executor_failure(self):
-        ro, tp, te = _make_mocks(execute_result=_failed_result())
+        ro, ks, tp, te = _make_mocks(execute_result=_failed_result())
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
         result = eo.execute("test")
         self.assertFalse(result.success)
         self.assertEqual(result.steps_failed, 1)
+
+    def test_knowledge_search_exception_does_not_block(self):
+        ro = MagicMock()
+        ro.reason.return_value = _proposal()
+        ks = MagicMock()
+        ks.search.side_effect = RuntimeError("boom")
+        tp = MagicMock()
+        tp.plan.return_value = _plan()
+        te = MagicMock()
+        te.execute_plan.return_value = _success_result()
+        eo = ExecutionOrchestrator(
+            reasoning_orchestrator=ro,
+            knowledge_search=ks,
+            tool_planner=tp,
+            tool_executor_v2=te,
+        )
+        result = eo.execute("test")
+        self.assertTrue(result.success)
+        te.execute_plan.assert_called_once()
+
+    def test_knowledge_search_none_does_not_block(self):
+        ro, _, tp, te = _make_mocks()
+        eo = ExecutionOrchestrator(
+            reasoning_orchestrator=ro,
+            knowledge_search=None,
+            tool_planner=tp,
+            tool_executor_v2=te,
+        )
+        result = eo.execute("test")
+        self.assertTrue(result.success)
+        self.assertTrue(result.has_data)
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -347,90 +444,113 @@ class TestExecutionOrchestratorExecute(unittest.TestCase):
 
 class TestExecutionOrchestratorExecuteWithTrace(unittest.TestCase):
 
-    def test_returns_three_tuple(self):
-        ro, tp, te = _make_mocks()
+    def test_returns_four_tuple(self):
+        ro, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
         result = eo.execute_with_trace("code 01.01.01")
-        self.assertEqual(len(result), 3)
+        self.assertEqual(len(result), 4)
 
     def test_result_is_tool_execution_result(self):
-        ro, tp, te = _make_mocks()
+        ro, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
-        execution_result, proposal, plan = eo.execute_with_trace("test")
+        execution_result, proposal, plan, knowledge = eo.execute_with_trace("test")
         self.assertIsInstance(execution_result, ToolExecutionResult)
 
     def test_proposal_is_decision_proposal(self):
-        ro, tp, te = _make_mocks()
+        ro, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
-        _, proposal, plan = eo.execute_with_trace("test")
+        _, proposal, _, _ = eo.execute_with_trace("test")
         self.assertIsInstance(proposal, DecisionProposal)
 
     def test_plan_is_execution_plan(self):
-        ro, tp, te = _make_mocks()
+        ro, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
-        _, proposal, plan = eo.execute_with_trace("test")
+        _, _, plan, _ = eo.execute_with_trace("test")
         self.assertIsInstance(plan, ExecutionPlan)
 
-    def test_trace_no_reasoning(self):
-        _, tp, te = _make_mocks()
+    def test_knowledge_results_returned(self):
+        ro, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
-            reasoning_orchestrator=None,
+            reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
-        result, proposal, plan = eo.execute_with_trace("test")
+        _, _, _, knowledge = eo.execute_with_trace("test")
+        # knowledge is a MagicMock (from _mock_knowledge)
+        self.assertIsNotNone(knowledge)
+
+    def test_trace_no_reasoning(self):
+        _, ks, tp, te = _make_mocks()
+        eo = ExecutionOrchestrator(
+            reasoning_orchestrator=None,
+            knowledge_search=ks,
+            tool_planner=tp,
+            tool_executor_v2=te,
+        )
+        result, proposal, plan, knowledge = eo.execute_with_trace("test")
         self.assertTrue(result.success)
         self.assertIsNone(proposal)
         self.assertIsNone(plan)
+        self.assertIsNone(knowledge)
 
     def test_trace_empty_proposal(self):
-        ro, tp, te = _make_mocks(reason_proposal=_empty_proposal())
+        ro, ks, tp, te = _make_mocks(reason_proposal=_empty_proposal())
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
-        result, proposal, plan = eo.execute_with_trace("test")
+        result, proposal, plan, knowledge = eo.execute_with_trace("test")
         self.assertTrue(result.success)
         self.assertIsNotNone(proposal)
         self.assertIsNone(plan)
+        # Knowledge search runs even for non-tool proposals (greetings, general knowledge)
+        self.assertIsNotNone(knowledge)
 
     def test_trace_no_planner(self):
-        ro, _, te = _make_mocks()
+        ro, ks, _, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=None,
             tool_executor_v2=te,
         )
-        result, proposal, plan = eo.execute_with_trace("test")
+        result, proposal, plan, knowledge = eo.execute_with_trace("test")
         self.assertTrue(result.success)
         self.assertIsNotNone(proposal)
         self.assertIsNone(plan)
 
     def test_trace_empty_plan(self):
-        ro, tp, te = _make_mocks(plan_result=_empty_plan())
+        ro, ks, tp, te = _make_mocks(plan_result=_empty_plan())
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
-        result, proposal, plan = eo.execute_with_trace("test")
+        result, proposal, plan, knowledge = eo.execute_with_trace("test")
         self.assertTrue(result.success)
         self.assertIsNotNone(proposal)
         self.assertIsNotNone(plan)
@@ -440,13 +560,77 @@ class TestExecutionOrchestratorExecuteWithTrace(unittest.TestCase):
         ro.reason.side_effect = RuntimeError("boom")
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=MagicMock(),
             tool_planner=MagicMock(),
             tool_executor_v2=MagicMock(),
         )
-        result, proposal, plan = eo.execute_with_trace("test")
+        result, proposal, plan, knowledge = eo.execute_with_trace("test")
         self.assertTrue(result.success)
         self.assertIsNone(proposal)
         self.assertIsNone(plan)
+        self.assertIsNone(knowledge)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Tests — Knowledge Integration
+# ══════════════════════════════════════════════════════════════════════
+
+
+class TestExecutionOrchestratorKnowledge(unittest.TestCase):
+
+    def test_knowledge_injected_into_result_messages(self):
+        ro, ks, tp, te = _make_mocks(
+            knowledge_results=MagicMock(
+                has_results=True,
+                to_context_string=lambda: "=== Glossaire ===\n- BSD: Bordereau",
+            ),
+        )
+        eo = ExecutionOrchestrator(
+            reasoning_orchestrator=ro,
+            knowledge_search=ks,
+            tool_planner=tp,
+            tool_executor_v2=te,
+        )
+        result = eo.execute("code 01.01.01")
+        self.assertTrue(result.success)
+        # First message should be the knowledge context
+        self.assertTrue(any("[CONNAISSANCES_ENTREPRISE]" in m for m in result.messages))
+
+    def test_no_knowledge_when_no_results(self):
+        ro, ks, tp, te = _make_mocks(
+            knowledge_results=MagicMock(
+                has_results=False,
+                to_context_string=lambda: "",
+            ),
+        )
+        eo = ExecutionOrchestrator(
+            reasoning_orchestrator=ro,
+            knowledge_search=ks,
+            tool_planner=tp,
+            tool_executor_v2=te,
+        )
+        result = eo.execute("code 01.01.01")
+        self.assertTrue(result.success)
+        self.assertFalse(any("[CONNAISSANCES_ENTREPRISE]" in m for m in result.messages))
+
+    def test_knowledge_exception_does_not_affect_result(self):
+        ro = MagicMock()
+        ro.reason.return_value = _proposal()
+        ks = MagicMock()
+        ks.search.side_effect = RuntimeError("search boom")
+        tp = MagicMock()
+        tp.plan.return_value = _plan()
+        te = MagicMock()
+        te.execute_plan.return_value = _success_result()
+        eo = ExecutionOrchestrator(
+            reasoning_orchestrator=ro,
+            knowledge_search=ks,
+            tool_planner=tp,
+            tool_executor_v2=te,
+        )
+        result = eo.execute("test")
+        self.assertTrue(result.success)
+        self.assertTrue(result.has_data)
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -457,9 +641,10 @@ class TestExecutionOrchestratorExecuteWithTrace(unittest.TestCase):
 class TestExecutionOrchestratorEdgeCases(unittest.TestCase):
 
     def test_empty_message(self):
-        ro, tp, te = _make_mocks()
+        ro, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
@@ -467,9 +652,10 @@ class TestExecutionOrchestratorEdgeCases(unittest.TestCase):
         self.assertIsInstance(result, ToolExecutionResult)
 
     def test_none_message(self):
-        ro, tp, te = _make_mocks()
+        ro, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
@@ -477,9 +663,10 @@ class TestExecutionOrchestratorEdgeCases(unittest.TestCase):
         self.assertIsInstance(result, ToolExecutionResult)
 
     def test_long_message(self):
-        ro, tp, te = _make_mocks()
+        ro, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
@@ -487,9 +674,10 @@ class TestExecutionOrchestratorEdgeCases(unittest.TestCase):
         self.assertIsInstance(result, ToolExecutionResult)
 
     def test_proposal_with_context(self):
-        ro, tp, te = _make_mocks()
+        ro, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
@@ -497,9 +685,10 @@ class TestExecutionOrchestratorEdgeCases(unittest.TestCase):
         self.assertIsInstance(result, ToolExecutionResult)
 
     def test_multiple_calls_same_instance(self):
-        ro, tp, te = _make_mocks()
+        ro, ks, tp, te = _make_mocks()
         eo = ExecutionOrchestrator(
             reasoning_orchestrator=ro,
+            knowledge_search=ks,
             tool_planner=tp,
             tool_executor_v2=te,
         )
@@ -508,6 +697,7 @@ class TestExecutionOrchestratorEdgeCases(unittest.TestCase):
         self.assertIsInstance(r1, ToolExecutionResult)
         self.assertIsInstance(r2, ToolExecutionResult)
         self.assertEqual(ro.reason.call_count, 2)
+        self.assertEqual(ks.search.call_count, 2)
 
 
 if __name__ == "__main__":

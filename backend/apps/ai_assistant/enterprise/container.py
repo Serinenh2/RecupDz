@@ -301,7 +301,21 @@ class Container:
     @property
     def knowledge_search(self):
         from apps.ai_assistant.enterprise.knowledge_search import KnowledgeSearchEngine
+        from apps.ai_assistant.enterprise.knowledge_adapters import (
+            make_glossary_adapter,
+            make_nomenclature_adapter,
+            make_regulations_adapter,
+            make_procedures_adapter,
+            make_internal_docs_adapter,
+            make_reports_adapter,
+        )
         return self._get_or_create("knowledge_search", lambda: KnowledgeSearchEngine(
+            glossary_repo=make_glossary_adapter(),
+            nomenclature_repo=make_nomenclature_adapter(),
+            regulations_repo=make_regulations_adapter(),
+            procedures_repo=make_procedures_adapter(),
+            internal_docs_repo=make_internal_docs_adapter(),
+            reports_repo=make_reports_adapter(),
             default_limit=self._config.get("knowledge_limit", 10),
         ))
 
@@ -350,13 +364,44 @@ class Container:
         from apps.ai_assistant.enterprise.execution_orchestrator import ExecutionOrchestrator
         return self._get_or_create("execution_orchestrator", lambda: ExecutionOrchestrator(
             reasoning_orchestrator=self.reasoning_orchestrator,
+            knowledge_search=self.knowledge_search,
             tool_planner=self.tool_planner,
             tool_executor_v2=self.tool_executor_v2,
+            safety_layer=self.safety_layer,
+        ))
+
+    # ------------------------------------------------------------------
+    # Memory — Session & User (used by ConversationOrchestrator)
+    # ------------------------------------------------------------------
+
+    @property
+    def session_memory(self):
+        from apps.ai_assistant.memory.session_memory import SessionMemory
+        return self._get_or_create("session_memory", lambda: SessionMemory(
+            max_sessions=self._config.get("session_max_sessions", 50),
+            session_ttl_seconds=self._config.get("session_ttl", 3600.0),
+        ))
+
+    @property
+    def user_memory(self):
+        from apps.ai_assistant.memory.user_memory import UserMemory
+        return self._get_or_create("user_memory", lambda: UserMemory(
+            max_users=self._config.get("user_memory_max_users", 100),
+            max_actions_per_user=self._config.get("user_memory_max_actions", 100),
         ))
 
     # ------------------------------------------------------------------
     # Orchestrator + Pipeline
     # ------------------------------------------------------------------
+
+    @property
+    def conversation_orchestrator(self):
+        from apps.ai_assistant.enterprise.conversation_orchestrator import ConversationOrchestrator
+        return self._get_or_create("conversation_orchestrator", lambda: ConversationOrchestrator(
+            container=self,
+            summary_threshold=self._config.get("summary_threshold", 10),
+            max_history_turns=self._config.get("max_history_turns", 20),
+        ))
 
     @property
     def orchestrator(self):
