@@ -653,7 +653,7 @@ class TestToolExecutor(unittest.TestCase):
     def test_execute_tool_not_found(self):
         result = self.executor.execute("nope", {})
         self.assertFalse(result.success)
-        self.assertIn("not found", result.message)
+        self.assertIn("disponible", result.message.lower())
 
     def test_execute_with_context(self):
         ctx = ToolContext(user_id="u1")
@@ -663,7 +663,7 @@ class TestToolExecutor(unittest.TestCase):
     def test_execute_exception(self):
         result = self.executor.execute("failing_tool", {})
         self.assertFalse(result.success)
-        self.assertIn("ValueError", result.message)
+        self.assertIn("erreur", result.message.lower())
 
     def test_execute_timeout(self):
         result = self.executor.execute(
@@ -671,7 +671,7 @@ class TestToolExecutor(unittest.TestCase):
             timeout=0.1,
         )
         self.assertFalse(result.success)
-        self.assertIn("timed out", result.message)
+        self.assertIn("trop de temps", result.message.lower())
 
     def test_middleware_before_blocks(self):
         class BlockMiddleware(ToolMiddleware):

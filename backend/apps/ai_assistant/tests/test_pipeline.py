@@ -114,6 +114,10 @@ class MockContainer:
         self.rag_config = MagicMock()
         self.rag_config.sources = ["glossary", "nomenclature", "regulations", "procedures"]
 
+        # Tool Parameter Validator
+        from apps.ai_assistant.enterprise.parameter_validator import ToolParameterValidator
+        self.parameter_validator = ToolParameterValidator()
+
 
 # ---------------------------------------------------------------------------
 # Test Suite

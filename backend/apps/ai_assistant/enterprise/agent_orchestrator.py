@@ -35,7 +35,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from apps.ai_assistant.core.interfaces import (
     Context,
@@ -46,6 +46,12 @@ from apps.ai_assistant.core.interfaces import (
     TaskStep,
     ToolResult,
 )
+from apps.ai_assistant.enterprise.reference_classifier import (
+    ReferenceClassifier,
+    classify_reference,
+)
+from apps.ai_assistant.enterprise.clarification_manager import ClarificationManager
+from apps.ai_assistant.enterprise.ai_search_strategy import AISearchStrategy, SearchResult
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +62,11 @@ logger = logging.getLogger(__name__)
 class WorkflowState(str, Enum):
     RECEIVED = "received"
     CONVERSATION_LOADED = "conversation_loaded"
+    SHORT_QUERY_DETECTED = "short_query_detected"
+    SEARCH_COMPLETED = "search_completed"
     HERMES_GATE = "hermes_gate"
     AI_ROUTER_REFINED = "ai_router_refined"
+    CLARIFICATION_NEEDED = "clarification_needed"
     ENTITIES_EXTRACTED = "entities_extracted"
     TOOL_SELECTED = "tool_selected"
     TOOL_EXECUTED = "tool_executed"
@@ -95,6 +104,7 @@ class EntityExtraction:
     phones: List[str] = field(default_factory=list)
     percentages: List[str] = field(default_factory=list)
     raw_entities: List[Dict[str, Any]] = field(default_factory=list)
+    classified_references: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -106,6 +116,7 @@ class EntityExtraction:
             "emails": self.emails,
             "phones": self.phones,
             "percentages": self.percentages,
+            "classified_references": self.classified_references,
         }
 
     @property
@@ -240,6 +251,33 @@ class AgentOrchestrator:
     def __init__(self, container: Any) -> None:
         self._c = container
         self._ai_router_instance = None
+        # Enterprise components (lazily resolved from container)
+        self._prompt_builder = None
+        self._conversation_memory = None
+        self._knowledge_search = None
+        self._tool_planner = None
+        self._tool_executor_v2 = None
+        self._reasoning_policy = None
+        self._decision_engine = None
+        self._safety_layer = None
+
+    def _get_enterprise(self, name: str) -> Any:
+        """Lazy-resolve an enterprise component from the container.
+
+        Returns None if the component is not wired — callers must
+        always fall back to the original behaviour.
+        """
+        attr = f"_{name}"
+        val = getattr(self, attr, None)
+        if val is not None:
+            return val
+        try:
+            val = getattr(self._c, name, None)
+            if val is not None:
+                setattr(self, attr, val)
+        except Exception:
+            val = None
+        return val
 
     # ==================================================================
     # Public API
@@ -257,13 +295,16 @@ class AgentOrchestrator:
 
         Steps:
             1. Receive message + start trace + cache check
-            2. Load conversation history
+            2. Load conversation history + build context
             3. Hermes gate — does the user need a business tool?
             4. AI Router — fast deterministic tool matching (if tool needed)
             5. Entity extraction
             6. Tool execution → structured JSON
-            7. Hermes generates final response + follow-ups
-            8. Memory storage
+            7. Anti-hallucination validation
+            8. RAG knowledge retrieval
+            9a. Hermes generates final response
+            9b. Hermes generates follow-up questions
+            10. Memory storage (short-term + tracker + long-term)
 
         Returns: {"success", "message", "data", "meta", "followups"}
         """
@@ -313,6 +354,26 @@ class AgentOrchestrator:
                 )
             self._c.metrics.inc_counter("ai.orchestrator.cache.miss")
 
+            # ── Safety: Input Check ──────────────────────────────────
+            input_safety = self._enterprise_check_safety_input(message, user_id)
+            if input_safety is not None and input_safety.blocked:
+                elapsed = (time.monotonic() - start) * 1000
+                self._c.metrics.inc_counter("ai.orchestrator.safety.input_blocked")
+                self._c.tracer.finish_trace(trace_id)
+                return self._build_response(
+                    success=True,
+                    message=input_safety.block_response(),
+                    data={},
+                    followups=[],
+                    meta={
+                        "request_id": request_id,
+                        "safety_blocked": True,
+                        "elapsed_ms": round(elapsed, 1),
+                        "trace_id": trace_id,
+                        "workflow_state": WorkflowState.ERROR.value,
+                    },
+                )
+
             # ── Hermes availability guard ──────────────────────────────
             hermes_up = self._hermes_available()
             if not hermes_up:
@@ -321,8 +382,8 @@ class AgentOrchestrator:
 
             # ── Step 2: Conversation Management ───────────────────────
             span = self._c.tracer.start_span(trace_id, "2_conversation_management")
-            conversation_history = self._load_conversation(
-                conversation_id, user_id, message,
+            conversation_history = self._enterprise_load_conversation(
+                conversation_id, user_id,
             )
             ctx = self._build_context(
                 message, conversation_id, user_id, contexte_supp,
@@ -346,14 +407,106 @@ class AgentOrchestrator:
 
             tool_name = tool_selection.tool
             action = tool_selection.action
-            parameters = tool_selection.parameters
+            parameters = dict(tool_selection.parameters)
+            if action and "action" not in parameters:
+                parameters["action"] = action
             selection_source = tool_selection.source
 
-            # ── Step 5: Entity Extraction ─────────────────────────────
+            # ── Step 5: Entity Extraction + Reasoning ────────────────
             span = self._c.tracer.start_span(trace_id, "5_entity_extraction")
             entities = self._extract_entities(message)
+            reasoning = self._enterprise_reason(message)
+            if reasoning is not None:
+                decision = self._enterprise_decide(message)
+                if decision is not None and decision.confidence >= 0.8:
+                    if decision.tool_name and decision.tool_name not in ("none", "greeting"):
+                        tool_name = decision.tool_name
+                        action = decision.action
+                        parameters = dict(decision.parameters)
+                        if action and "action" not in parameters:
+                            parameters["action"] = action
+                        selection_source = "decision_engine"
+                        self._c.metrics.inc_counter("ai.orchestrator.decision_engine.used")
             state = WorkflowState.ENTITIES_EXTRACTED
             self._c.tracer.finish_span(span)
+
+            # ── Step 5.5: Clarification Check ────────────────────────
+            span = self._c.tracer.start_span(trace_id, "5.5_clarification_check")
+            clarification = self._check_clarification(
+                message, entities.classified_references,
+            )
+            if clarification is not None:
+                state = WorkflowState.CLARIFICATION_NEEDED
+                self._c.tracer.finish_span(span)
+                elapsed = (time.monotonic() - start) * 1000
+                self._c.metrics.inc_counter("ai.orchestrator.clarification")
+                self._c.tracer.finish_trace(trace_id)
+                return self._build_response(
+                    success=True,
+                    message=clarification.question,
+                    data={
+                        "clarification": True,
+                        "options": [opt.to_dict() for opt in clarification.options],
+                    },
+                    followups=[],
+                    meta={
+                        "request_id": request_id,
+                        "clarification": True,
+                        "clarification_reason": clarification.reason,
+                        "elapsed_ms": round(elapsed, 1),
+                        "trace_id": trace_id,
+                        "workflow_state": state.value,
+                    },
+                )
+            self._c.tracer.finish_span(span)
+
+            # ── Step 5.75: Short Query Search Fallback ───────────────
+            # When Hermes says "no tool" but the query is short,
+            # search all knowledge sources as a fallback.
+            if tool_name == "none":
+                span = self._c.tracer.start_span(trace_id, "5.75_short_query_search")
+                search_result = self._short_query_search(message)
+                if search_result is not None and search_result.is_short:
+                    state = WorkflowState.SHORT_QUERY_DETECTED
+                    # Clarification needed → return early
+                    if search_result.needs_clarification:
+                        self._c.tracer.finish_span(span)
+                        elapsed = (time.monotonic() - start) * 1000
+                        self._c.metrics.inc_counter("ai.orchestrator.search.clarification")
+                        self._c.tracer.finish_trace(trace_id)
+                        return self._build_response(
+                            success=True,
+                            message=search_result.clarification_question,
+                            data={
+                                "search_clarification": True,
+                                "query": search_result.query,
+                                "options": search_result.clarification_options,
+                                "matches": [m.to_dict() for m in search_result.all_matches],
+                            },
+                            followups=[],
+                            meta={
+                                "request_id": request_id,
+                                "search_clarification": True,
+                                "elapsed_ms": round(elapsed, 1),
+                                "trace_id": trace_id,
+                                "workflow_state": WorkflowState.CLARIFICATION_NEEDED.value,
+                            },
+                        )
+                    # Clear best match → override tool selection
+                    if search_result.has_result:
+                        tool_name = search_result.best_match.tool
+                        action = search_result.best_match.action
+                        parameters = dict(search_result.best_match.parameters)
+                        if action and "action" not in parameters:
+                            parameters["action"] = action
+                        selection_source = f"search:{search_result.best_match.source}"
+                        state = WorkflowState.SEARCH_COMPLETED
+                        self._c.metrics.inc_counter("ai.orchestrator.search.fallback_match")
+                        logger.info(
+                            "Search fallback: '%s' → %s.%s (%.2f)",
+                            message, tool_name, action, search_result.best_match.score,
+                        )
+                self._c.tracer.finish_span(span)
 
             # ── Step 6: Tool Execution ────────────────────────────────
             span = self._c.tracer.start_span(trace_id, "6_tool_execution")
@@ -361,7 +514,9 @@ class AgentOrchestrator:
                 tool_result_data = None
                 tool_results: List[ToolResult] = []
             else:
-                tool_results = self._execute_tool(tool_name, parameters, ctx, message)
+                tool_results = self._enterprise_plan_and_execute(
+                    tool_name, action, parameters, ctx, message,
+                )
                 tool_result_data = tool_results[0].data if tool_results else None
             state = WorkflowState.TOOL_EXECUTED
             self._c.tracer.finish_span(span)
@@ -371,9 +526,11 @@ class AgentOrchestrator:
 
             # ── Step 7: RAG Knowledge Retrieval (company first) ────────
             span = self._c.tracer.start_span(trace_id, "7_rag_knowledge_retrieval")
-            rag_context = self._retrieve_knowledge(
-                message, tool_name, hermes_up,
-            )
+            rag_context = self._enterprise_search_knowledge(message, tool_name)
+            if not rag_context:
+                rag_context = self._retrieve_knowledge(
+                    message, tool_name, hermes_up,
+                )
             state = WorkflowState.RAG_RETRIEVED
             self._c.tracer.finish_span(span)
 
@@ -388,6 +545,7 @@ class AgentOrchestrator:
                 conversation_history=conversation_history,
                 hermes_up=hermes_up,
             )
+            response_text = self._enterprise_check_safety_output(response_text)
             state = WorkflowState.RESPONSE_GENERATED
             self._c.tracer.finish_span(span)
 
@@ -406,11 +564,13 @@ class AgentOrchestrator:
 
             # ── Step 9: Memory Storage ───────────────────────────────
             span = self._c.tracer.start_span(trace_id, "9_memory_storage")
-            self._store_memory(conversation_id, message, response_text, {
-                "tool": tool_name,
-                "tool_needed": hermes_decision.tool_needed,
-                "entities": entities.to_dict(),
-            })
+            self._enterprise_store_memory(
+                conversation_id, message, response_text, {
+                    "tool": tool_name,
+                    "tool_needed": hermes_decision.tool_needed,
+                    "entities": entities.to_dict(),
+                }, user_id=user_id,
+            )
             state = WorkflowState.MEMORY_STORED
             self._c.tracer.finish_span(span)
 
@@ -710,6 +870,7 @@ class AgentOrchestrator:
         Extract entities from the user message.
 
         Uses regex patterns for structured data (waste codes, BSD numbers, etc.)
+        Uses ReferenceClassifier for bare numeric disambiguation.
         No LLM call — deterministic extraction.
         """
         import re
@@ -738,6 +899,16 @@ class AgentOrchestrator:
         for bsd in bsd_numbers:
             raw_entities.append({"type": "bsd_number", "value": bsd})
 
+        classified_references = []
+        dotted_numerics = set(re.findall(r"\b\d+(?:\.\d+){1,3}\b", message))
+        for ref in dotted_numerics:
+            result = classify_reference(ref)
+            classified_references.append({
+                "reference": ref,
+                "reference_type": result["reference_type"],
+                "confidence": result["confidence"],
+            })
+
         return EntityExtraction(
             waste_codes=waste_codes,
             bsd_numbers=bsd_numbers,
@@ -748,6 +919,7 @@ class AgentOrchestrator:
             phones=phones,
             percentages=percentages,
             raw_entities=raw_entities,
+            classified_references=classified_references,
         )
 
     # ==================================================================
@@ -762,6 +934,20 @@ class AgentOrchestrator:
         user_message: str,
     ) -> List[ToolResult]:
         """Execute the selected tool via the executor adapter."""
+        validation = self._c.parameter_validator.validate(tool_name, parameters)
+        if not validation.valid:
+            logger.info(
+                "Parameter validation failed for '%s' action='%s': %s",
+                tool_name, validation.action,
+                [mp.name for mp in validation.missing_parameters],
+            )
+            return [ToolResult(
+                tool_name=tool_name,
+                success=False,
+                data={"missing_parameters": [mp.to_dict() for mp in validation.missing_parameters]},
+                error=f"Paramètres manquants: {', '.join(mp.name for mp in validation.missing_parameters)}",
+            )]
+
         plan = ExecutionPlan(
             steps=[TaskStep(
                 id="step_1",
@@ -812,6 +998,92 @@ class AgentOrchestrator:
                     "Anti-hallucination: tool '%s' returned error: %s",
                     tool_name, tool_result.get("error"),
                 )
+
+    # ==================================================================
+    # Step 5.5: Clarification Check
+    # ==================================================================
+
+    def _check_clarification(
+        self,
+        message: str,
+        classified_references: List[Any],
+    ) -> Optional[Any]:
+        """Check if clarification is needed before executing a tool.
+
+        Uses the ClarificationManager to detect:
+        - Ambiguous references (dotted numerics with low confidence)
+        - Routing candidates that are too close to call
+
+        Returns ClarificationResult if clarification needed, None otherwise.
+        """
+        try:
+            mgr = ClarificationManager()
+            candidates = self._get_routing_candidates(message)
+            return mgr.analyze(
+                message=message,
+                candidates=candidates,
+                classified_references=classified_references,
+            )
+        except Exception as exc:
+            logger.warning("Clarification check failed: %s", exc)
+            return None
+
+    def _get_routing_candidates(self, message: str) -> List[Any]:
+        """Get ranked tool candidates from the AI Router classify()."""
+        try:
+            from apps.ai_assistant.enterprise.ai_router import AIRouter
+            if self._ai_router_instance is None:
+                self._ai_router_instance = AIRouter()
+            result = self._ai_router_instance.classify(message)
+            if result is not None and result.candidates:
+                return result.candidates
+        except Exception as exc:
+            logger.debug("Could not get routing candidates: %s", exc)
+        return []
+
+    # ==================================================================
+    # Step 2.5: Short Query Search Strategy
+    # ==================================================================
+
+    def _short_query_search(self, message: str) -> Optional[SearchResult]:
+        """Detect short queries and search all knowledge sources.
+
+        When the user sends only a word, code, number, or short expression,
+        searches automatically across:
+            1. Glossary        — terminology, definitions, abbreviations
+            2. Nomenclature    — waste classification codes
+            3. Regulations     — laws, decrees, referentiels
+            4. Procedures      — operational procedures
+            5. Traceability    — waste recovery operations
+            6. Reports         — operational report generation
+
+        Returns SearchResult with best_match (if clear winner)
+        or clarification_question (if ambiguous).
+        Returns None if the query is NOT a short query (normal flow continues).
+        """
+        try:
+            strategy = AISearchStrategy(container=self._c)
+            result = strategy.search(message)
+
+            if not result.is_short:
+                return None
+
+            self._c.metrics.inc_counter("ai.orchestrator.short_query.detected")
+            if result.has_result:
+                logger.info(
+                    "Search strategy: '%s' → %s (%.2f)",
+                    message, result.best_match.source, result.best_match.score,
+                )
+            elif result.needs_clarification:
+                logger.info("Search strategy: '%s' → clarification needed", message)
+            else:
+                logger.info("Search strategy: '%s' → no matches", message)
+
+            return result
+
+        except Exception as exc:
+            logger.warning("Short query search failed: %s", exc)
+            return None
 
     # ==================================================================
     # Step 7: RAG Knowledge Retrieval
@@ -1193,6 +1465,243 @@ class AgentOrchestrator:
             rag_context[:2000],
         ]
         return "\n".join(parts)
+
+    # ════════════════════════════════════════════════════════════════
+    # Enterprise-Enhanced Methods
+    # ════════════════════════════════════════════════════════════════
+
+    def _enterprise_load_conversation(
+        self,
+        conversation_id: str,
+        user_id: str,
+    ) -> List[Dict[str, str]]:
+        """Load conversation using EnterpriseConversationMemory."""
+        mem = self._get_enterprise("conversation_memory")
+        if mem is None:
+            return self._load_conversation(conversation_id, user_id, "")
+        try:
+            return mem.get_llm_messages(conversation_id, max_turns=10)
+        except Exception as exc:
+            logger.debug("Enterprise memory load failed, falling back: %s", exc)
+            return self._load_conversation(conversation_id, user_id, "")
+
+    def _enterprise_store_memory(
+        self,
+        conversation_id: str,
+        user_message: str,
+        assistant_message: str,
+        metadata: Optional[Dict[str, Any]] = None,
+        user_id: str = "",
+    ) -> None:
+        """Store conversation using EnterpriseConversationMemory."""
+        mem = self._get_enterprise("conversation_memory")
+        if mem is None:
+            self._store_memory(conversation_id, user_message, assistant_message, metadata)
+            return
+        try:
+            from apps.ai_assistant.enterprise.conversation_memory import MemoryTurn
+            meta = metadata or {}
+            user_turn = MemoryTurn(
+                role="user",
+                content=user_message,
+                intent=meta.get("tool", ""),
+                entities=meta.get("entities", {}),
+            )
+            assistant_turn = MemoryTurn(
+                role="assistant",
+                content=assistant_message,
+                intent=meta.get("tool", ""),
+            )
+            mem.store(conversation_id, user_turn, user_id=user_id)
+            mem.store(conversation_id, assistant_turn, user_id=user_id)
+        except Exception as exc:
+            logger.debug("Enterprise memory store failed, falling back: %s", exc)
+            self._store_memory(conversation_id, user_message, assistant_message, metadata)
+
+    def _enterprise_build_gate_prompt(
+        self,
+        message: str,
+        tools_desc: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+    ) -> str:
+        """Build gate prompt using PromptBuilder."""
+        pb = self._get_enterprise("prompt_builder")
+        if pb is None:
+            return _HERMES_GATE_PROMPT.format(tools_desc=tools_desc)
+        try:
+            ctx = pb.build_gate_prompt(
+                message=message,
+                tools_description=tools_desc,
+                conversation_history=conversation_history,
+            )
+            return ctx.system_prompt
+        except Exception as exc:
+            logger.debug("PromptBuilder failed, falling back: %s", exc)
+            return _HERMES_GATE_PROMPT.format(tools_desc=tools_desc)
+
+    def _enterprise_build_response_prompt(
+        self,
+        message: str,
+        tool_name: str,
+        tool_result: Optional[Any],
+        rag_context: str = "",
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+    ) -> str:
+        """Build response prompt using PromptBuilder."""
+        pb = self._get_enterprise("prompt_builder")
+        if pb is None:
+            return _RESPONSE_PROMPT
+        try:
+            ctx = pb.build_response_prompt(
+                message=message,
+                tool_results=tool_result,
+                tool_name=tool_name,
+                company_knowledge=rag_context,
+                conversation_history=conversation_history,
+            )
+            return ctx.system_prompt
+        except Exception as exc:
+            logger.debug("PromptBuilder response failed, falling back: %s", exc)
+            return _RESPONSE_PROMPT
+
+    def _enterprise_build_followup_prompt(
+        self,
+        message: str,
+        response: str,
+        tool_name: str = "",
+        tool_result: Optional[Any] = None,
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+    ) -> str:
+        """Build follow-up prompt using PromptBuilder."""
+        pb = self._get_enterprise("prompt_builder")
+        if pb is None:
+            return _FOLLOWUP_PROMPT
+        try:
+            ctx = pb.build_followup_prompt(
+                message=message,
+                response=response,
+                tool_results=tool_result,
+                tool_name=tool_name,
+                conversation_history=conversation_history,
+            )
+            return ctx.system_prompt
+        except Exception as exc:
+            logger.debug("PromptBuilder followup failed, falling back: %s", exc)
+            return _FOLLOWUP_PROMPT
+
+    def _enterprise_reason(self, message: str) -> Optional[Any]:
+        """Run AIReasoningPolicy analysis."""
+        rp = self._get_enterprise("reasoning_policy")
+        if rp is None:
+            return None
+        try:
+            return rp.analyze(message)
+        except Exception as exc:
+            logger.debug("AIReasoningPolicy failed: %s", exc)
+            return None
+
+    def _enterprise_decide(
+        self,
+        message: str,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Any]:
+        """Run DecisionEngine for tool selection."""
+        de = self._get_enterprise("decision_engine")
+        if de is None:
+            return None
+        try:
+            return de.decide(message, context=context)
+        except Exception as exc:
+            logger.debug("DecisionEngine failed: %s", exc)
+            return None
+
+    def _enterprise_plan_and_execute(
+        self,
+        tool_name: str,
+        action: str,
+        parameters: Dict[str, Any],
+        ctx: Any,
+        user_message: str,
+    ) -> List[ToolResult]:
+        """Plan with ToolPlanner, execute with ToolExecutorV2."""
+        tp = self._get_enterprise("tool_planner")
+        te = self._get_enterprise("tool_executor_v2")
+        if tp is None or te is None:
+            return self._execute_tool(tool_name, parameters, ctx, user_message)
+        try:
+            from apps.ai_assistant.enterprise.tool_planner import DecisionProposal
+            proposal = DecisionProposal(
+                tool=tool_name,
+                action=action,
+                parameters=parameters,
+                confidence=0.8,
+            )
+            plan = tp.plan(proposal)
+            exec_result = te.execute_plan(plan, context=ctx)
+            if not exec_result.success and exec_result.step_results:
+                return [ToolResult(
+                    tool_name=tool_name,
+                    success=False,
+                    data=exec_result.merged_data,
+                    error=f"Exécution échouée: {exec_result.steps_failed} étape(s)",
+                )]
+            return [ToolResult(
+                tool_name=tool_name,
+                success=True,
+                data=exec_result.merged_data,
+            )]
+        except Exception as exc:
+            logger.debug("Enterprise plan+execute failed, falling back: %s", exc)
+            return self._execute_tool(tool_name, parameters, ctx, user_message)
+
+    def _enterprise_search_knowledge(
+        self,
+        message: str,
+        tool_name: str = "",
+    ) -> str:
+        """Search company knowledge using KnowledgeSearchEngine."""
+        ks = self._get_enterprise("knowledge_search")
+        if ks is None:
+            return ""
+        try:
+            from apps.ai_assistant.enterprise.knowledge_search import SearchMode
+            results = ks.search(message, mode=SearchMode.HYBRID)
+            if not results.has_results:
+                return ""
+            return (
+                "=== COMPANY KNOWLEDGE (RECUP-DZ) ===\n"
+                "Use this information FIRST. Only use general knowledge if "
+                "the company knowledge doesn't answer the question.\n\n"
+                f"{results.to_context_string()}"
+            )
+        except Exception as exc:
+            logger.debug("KnowledgeSearchEngine failed: %s", exc)
+            return ""
+
+    def _enterprise_check_safety_input(self, text: str, user_id: str = "") -> Optional[Any]:
+        """Check input safety using AISafetyLayer."""
+        sl = self._get_enterprise("safety_layer")
+        if sl is None:
+            return None
+        try:
+            return sl.check_input(text, user_id=user_id)
+        except Exception as exc:
+            logger.debug("AISafetyLayer input check failed: %s", exc)
+            return None
+
+    def _enterprise_check_safety_output(self, text: str) -> str:
+        """Check and sanitize output using AISafetyLayer."""
+        sl = self._get_enterprise("safety_layer")
+        if sl is None:
+            return text
+        try:
+            result = sl.check_output(text)
+            if result.sanitized_text:
+                return result.sanitized_text
+            return sl.sanitize_output(text)
+        except Exception as exc:
+            logger.debug("AISafetyLayer output check failed: %s", exc)
+            return text
 
     def _build_response(
         self,

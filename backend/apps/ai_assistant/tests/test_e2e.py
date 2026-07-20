@@ -72,6 +72,10 @@ class IntegrationContainer:
         rag_result.context_text = ""
         self.search_engine.search_for_agent.return_value = rag_result
 
+        # Tool Parameter Validator
+        from apps.ai_assistant.enterprise.parameter_validator import ToolParameterValidator
+        self.parameter_validator = ToolParameterValidator()
+
         self._orchestrator = None
 
     @property

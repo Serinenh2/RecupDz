@@ -19,6 +19,14 @@ from apps.traceability.models import Traceability
 
 
 from .glossaire_data import rechercher_glossaire, formater_glossaire, detecter_langue
+from .conversation_manager import ConversationManager
+
+
+def _get_pipeline():
+    """Lazy singleton for the enterprise pipeline."""
+    from apps.ai_assistant.enterprise.container import Container
+    container = Container()
+    return container.pipeline
 
 
 def detecter_anomalies_bsd():
@@ -132,6 +140,40 @@ class AIConversationViewSet(viewsets.ModelViewSet):
         return Response({'reponse': reponse_ia['message'], 'contexte': reponse_ia.get('contexte', {})})
 
     def _generer_reponse_intelligente(self, message, conversation, contexte_supp):
+        # ------------------------------------------------------------------
+        # Step 1: Try Enterprise Pipeline (mandatory 7-step workflow)
+        # ------------------------------------------------------------------
+        try:
+            pipeline = _get_pipeline()
+            result = pipeline.handle(
+                message=message,
+                user_id=str(conversation.user_id) if hasattr(conversation, 'user_id') else "",
+                conversation_id=str(conversation.id) if conversation else "",
+                contexte_supp=contexte_supp,
+            )
+            if result.get("success"):
+                response_data = {
+                    'message': result['message'],
+                    'contexte': result.get('data', {}),
+                }
+                if result.get('followups'):
+                    response_data['followups'] = result['followups']
+                return response_data
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("Enterprise pipeline failed: %s", exc)
+
+        # ------------------------------------------------------------------
+        # Step 2: Try Ollama (Hermes3) via ConversationManager
+        # ------------------------------------------------------------------
+        manager = ConversationManager()
+        ollama_response = manager.generate(message, conversation, contexte_supp)
+        if ollama_response is not None:
+            return {'message': ollama_response}
+
+        # ------------------------------------------------------------------
+        # Step 2: Fallback — rule-based assistant (existing logic)
+        # ------------------------------------------------------------------
         msg_lower = message.lower()
         contexte_type = conversation.contexte
         langue = detecter_langue(message)

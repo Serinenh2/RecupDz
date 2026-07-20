@@ -1,24 +1,22 @@
 """
-Document Loader — loads and chunks documents from various sources.
+Document Loader — file loading and text chunking only.
 
-Supports:
-    - PDF (via PyPDF2)
-    - DOCX (via python-docx)
-    - TXT / Markdown (plain text)
-    - Regulations (from database)
-    - Waste Codes (from database)
-    - Internal Procedures (from database)
+Responsibilities:
+    - Load files (PDF, DOCX, TXT, Markdown) from disk
+    - Split text into overlapping chunks
+    - Delegate database sources to DocumentService
 
-Each document is split into overlapping chunks for retrieval.
+Does NOT access Django ORM or import Django models.
+Does NOT import repositories directly.
+Communicates with DocumentService for all database sources.
 """
 
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, List, Optional
 
 from apps.ai_assistant.rag.vector_store import DocumentChunk
 
@@ -71,7 +69,6 @@ class TextChunker:
 
             # Try to break at sentence boundary
             if end < len(text):
-                # Look for sentence end in the last 200 chars
                 search_start = max(start + self._chunk_size - 200, start)
                 last_period = -1
                 for punct in ["\n\n", "\n", ". ", "! ", "? ", "؛", "。"]:
@@ -99,24 +96,36 @@ class TextChunker:
 
 class DocumentLoader:
     """
-    Loads documents from files and databases, splits into chunks.
+    Loads documents from files and chunks them into DocumentChunks.
+
+    For database sources (regulations, waste codes, glossary, procedures),
+    delegates to DocumentService.
 
     Usage:
         loader = DocumentLoader()
         chunks = loader.load_file("regulation.pdf")
         chunks = loader.load_directory("/path/to/docs/")
-        chunks = loader.load_regulations()
+        chunks = loader.load_from_service(service, ["regulations", "glossary"])
     """
 
     def __init__(
         self,
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
+        service=None,
     ) -> None:
         self._chunker = TextChunker(chunk_size=chunk_size, overlap=chunk_overlap)
+        self._service = service
+
+    @property
+    def service(self):
+        if self._service is None:
+            from apps.ai_assistant.services.document_service import DocumentService
+            self._service = DocumentService()
+        return self._service
 
     # ------------------------------------------------------------------
-    # File loading
+    # File loading (pure file I/O)
     # ------------------------------------------------------------------
 
     def load_file(self, path: str, source_type: Optional[str] = None) -> List[DocumentChunk]:
@@ -167,201 +176,63 @@ class DocumentLoader:
         return all_chunks
 
     # ------------------------------------------------------------------
-    # Database loading
+    # Database loading (delegates to DocumentService)
     # ------------------------------------------------------------------
 
-    def load_regulations(self, limit: int = 500) -> List[DocumentChunk]:
-        """Load regulations from the KnowledgeBase."""
-        try:
-            from apps.ai_assistant.repositories.knowledge_repository import KnowledgeBaseRepository
-            repo = KnowledgeBaseRepository()
-            articles = repo.list(limit=limit)
-
-            chunks = []
-            for article in articles:
-                title = article.get("titre", "")
-                content = article.get("contenu", "")
-                categorie = article.get("categorie", "")
-                reference = article.get("reference", "")
-
-                full_text = f"{title}\n\n{content}"
-                if reference:
-                    full_text = f"Référence: {reference}\n{full_text}"
-
-                loaded = LoadedDocument(
-                    text=full_text,
-                    source=f"regulation:{article.get('id', '')}",
-                    source_type="regulation",
-                    metadata={
-                        "categorie": categorie,
-                        "reference": reference,
-                        "titre": title,
-                    },
-                )
-                chunks.extend(self._to_chunks(loaded))
-
-            logger.info("Loaded %d regulation chunks", len(chunks))
-            return chunks
-
-        except Exception as exc:
-            logger.error("Failed to load regulations: %s", exc)
-            return []
-
-    def load_waste_codes(self, limit: int = 1000) -> List[DocumentChunk]:
-        """Load waste codes from the Nomenclature."""
-        try:
-            from apps.ai_assistant.repositories.nomenclature_repository import NomenclatureRepository
-            repo = NomenclatureRepository()
-            codes = repo.list(limit=limit)
-
-            chunks = []
-            for code in codes:
-                text = (
-                    f"Code: {code.get('code', '')}\n"
-                    f"Famille: {code.get('famille', '')} - {code.get('sous_famille', '')}\n"
-                    f"Désignation FR: {code.get('designation_fr', '')}\n"
-                    f"Désignation AR: {code.get('designation_ar', '')}\n"
-                    f"Classe: {code.get('classe', '')}\n"
-                    f"Dangerosité: {code.get('dangerosite_fr', '')}\n"
-                    f"Annexe: {code.get('annexe', '')}\n"
-                    f"BSD obligatoire: {code.get('bsd_obligatoire', '')}\n"
-                    f"Agrément requis: {code.get('agrement_requis', '')}"
-                )
-
-                loaded = LoadedDocument(
-                    text=text,
-                    source=f"waste_code:{code.get('id', '')}",
-                    source_type="waste_code",
-                    metadata={
-                        "code": code.get("code", ""),
-                        "famille": code.get("famille", ""),
-                        "classe": code.get("classe", ""),
-                    },
-                )
-                chunks.extend(self._to_chunks(loaded))
-
-            logger.info("Loaded %d waste code chunks", len(chunks))
-            return chunks
-
-        except Exception as exc:
-            logger.error("Failed to load waste codes: %s", exc)
-            return []
-
-    def load_glossary(self, limit: int = 200) -> List[DocumentChunk]:
-        """Load glossary terms from the in-memory GLOSSAIRE + KnowledgeBase."""
-        try:
-            from apps.ai_assistant.glossaire_data import GLOSSAIRE
-
-            chunks = []
-            for entry in GLOSSAIRE[:limit]:
-                term_fr = entry.get("terme_fr", "")
-                term_ar = entry.get("terme_ar", "")
-                def_fr = entry.get("definition_fr", "")
-                def_ar = entry.get("definition_ar", "")
-                reference = entry.get("reference", "")
-                categorie = entry.get("categorie", "")
-
-                text = f"Terme: {term_fr}"
-                if term_ar:
-                    text += f" ({term_ar})"
-                text += f"\nDéfinition: {def_fr}"
-                if def_ar:
-                    text += f"\nالتعريف: {def_ar}"
-                if reference:
-                    text += f"\nRéférence: {reference}"
-
-                loaded = LoadedDocument(
-                    text=text,
-                    source=f"glossary:{term_fr}",
-                    source_type="glossary",
-                    metadata={
-                        "term_fr": term_fr,
-                        "term_ar": term_ar,
-                        "categorie": categorie,
-                        "reference": reference,
-                    },
-                )
-                chunks.extend(self._to_chunks(loaded))
-
-            logger.info("Loaded %d glossary chunks", len(chunks))
-            return chunks
-
-        except ImportError:
-            logger.warning("glossaire_data.py not found — skipping glossary indexing")
-            return []
-        except Exception as exc:
-            logger.error("Failed to load glossary: %s", exc)
-            return []
-
-    def load_procedures(self, limit: int = 200) -> List[DocumentChunk]:
-        """Load internal procedures from the archive.Document model.
-
-        Looks for documents categorized as procedures, guides, or SOPs.
+    def load_from_service(
+        self,
+        sources: Optional[List[str]] = None,
+        limit: int = 500,
+    ) -> List[DocumentChunk]:
         """
-        try:
-            from django.apps import apps
-
-            DocumentModel = apps.get_model("archive", "Document")
-            qs = DocumentModel.objects.filter(
-                categorie__in=["PROCEDURE", "GUIDE", "SOP", "MANUAL", "PROCÉDURE"]
-            )[:limit]
-
-            chunks = []
-            for doc in qs:
-                title = getattr(doc, "titre", getattr(doc, "name", ""))
-                description = getattr(doc, "description", "")
-                content = getattr(doc, "contenu", getattr(doc, "content", ""))
-
-                text = f"{title}\n\n{description}"
-                if content:
-                    text += f"\n\n{content}"
-
-                if text.strip():
-                    loaded = LoadedDocument(
-                        text=text,
-                        source=f"procedure:{getattr(doc, 'pk', 'unknown')}",
-                        source_type="procedure",
-                        metadata={
-                            "title": title,
-                            "categorie": getattr(doc, "categorie", ""),
-                        },
-                    )
-                    chunks.extend(self._to_chunks(loaded))
-
-            logger.info("Loaded %d procedure chunks", len(chunks))
-            return chunks
-
-        except LookupError:
-            logger.info("archive.Document model not available — skipping procedures")
-            return []
-        except Exception as exc:
-            logger.error("Failed to load procedures: %s", exc)
-            return []
-
-    def load_all(self, sources: Optional[List[str]] = None) -> List[DocumentChunk]:
-        """Load all knowledge sources.
+        Load documents from database via DocumentService.
 
         Args:
             sources: Which sources to load. None = all sources.
-                Options: glossary, nomenclature, regulations, procedures
+            limit: Maximum documents per source.
         """
-        all_sources = sources or ["glossary", "nomenclature", "regulations", "procedures"]
-        chunks: List[DocumentChunk] = []
+        try:
+            documents = self.service.load_all(sources=sources)
 
-        if "regulations" in all_sources:
-            chunks.extend(self.load_regulations())
-        if "nomenclature" in all_sources:
-            chunks.extend(self.load_waste_codes())
-        if "glossary" in all_sources:
-            chunks.extend(self.load_glossary())
-        if "procedures" in all_sources:
-            chunks.extend(self.load_procedures())
+            all_chunks = []
+            for doc in documents:
+                loaded = LoadedDocument(
+                    text=doc["text"],
+                    source=doc["source"],
+                    source_type=doc["source_type"],
+                    metadata=doc.get("metadata", {}),
+                )
+                all_chunks.extend(self._to_chunks(loaded))
 
-        logger.info("Loaded %d total chunks from sources: %s", len(chunks), all_sources)
-        return chunks
+            logger.info("Loaded %d chunks from service", len(all_chunks))
+            return all_chunks
+
+        except Exception as exc:
+            logger.error("Failed to load from service: %s", exc)
+            return []
+
+    def load_regulations(self, limit: int = 500) -> List[DocumentChunk]:
+        """Load regulations from database via DocumentService."""
+        return self.load_from_service(sources=["regulations"], limit=limit)
+
+    def load_waste_codes(self, limit: int = 1000) -> List[DocumentChunk]:
+        """Load waste codes from database via DocumentService."""
+        return self.load_from_service(sources=["nomenclature"], limit=limit)
+
+    def load_glossary(self, limit: int = 200) -> List[DocumentChunk]:
+        """Load glossary from database via DocumentService."""
+        return self.load_from_service(sources=["glossary"], limit=limit)
+
+    def load_procedures(self, limit: int = 200) -> List[DocumentChunk]:
+        """Load procedures from database via DocumentService."""
+        return self.load_from_service(sources=["procedures"], limit=limit)
+
+    def load_all(self, sources: Optional[List[str]] = None) -> List[DocumentChunk]:
+        """Load all knowledge sources via DocumentService."""
+        return self.load_from_service(sources=sources)
 
     # ------------------------------------------------------------------
-    # File format loaders
+    # File format loaders (pure file I/O)
     # ------------------------------------------------------------------
 
     def _load_pdf(self, path: str) -> LoadedDocument:

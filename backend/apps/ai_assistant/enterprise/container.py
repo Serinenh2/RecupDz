@@ -80,10 +80,36 @@ class Container:
         ))
 
     @property
+    def conversation_repository(self):
+        from apps.ai_assistant.repositories.conversation_repository import ConversationRepository
+        return self._get_or_create("conversation_repository", ConversationRepository)
+
+    @property
+    def conversation_history_repository(self):
+        from apps.ai_assistant.repositories.conversation_history_repository import (
+            ConversationHistoryRepository,
+        )
+        return self._get_or_create("conversation_history_repository",
+                                   ConversationHistoryRepository)
+
+    @property
+    def conversation_service(self):
+        from apps.ai_assistant.services.conversation_service import ConversationService
+        return self._get_or_create(
+            "conversation_service",
+            lambda: ConversationService(history_repo=self.conversation_history_repository),
+        )
+
+    @property
     def conversation_manager(self):
         from apps.ai_assistant.conversation_manager import ConversationManager
-        return self._get_or_create("conversation_manager",
-                                   lambda: ConversationManager(ollama=self.ollama))
+        return self._get_or_create(
+            "conversation_manager",
+            lambda: ConversationManager(
+                ollama=self.ollama,
+                service=self.conversation_service,
+            ),
+        )
 
     # ------------------------------------------------------------------
     # Core Adapters (bridge tools framework → core interfaces)
@@ -137,6 +163,11 @@ class Container:
         return self._get_or_create("executor",
                                    lambda: ToolExecutorAdapter(self.tool_executor))
 
+    @property
+    def parameter_validator(self):
+        from apps.ai_assistant.enterprise.parameter_validator import ToolParameterValidator
+        return self._get_or_create("parameter_validator", ToolParameterValidator)
+
     # ------------------------------------------------------------------
     # Planner + Reasoner (core interfaces)
     # ------------------------------------------------------------------
@@ -156,20 +187,26 @@ class Container:
         return self._get_or_create("memory_config", MemoryConfig)
 
     @property
+    def prompt_registry(self):
+        from apps.ai_assistant.core.prompts import PromptRegistry
+        return self._get_or_create("prompt_registry", PromptRegistry)
+
+    @property
+    def data_provider(self):
+        from apps.ai_assistant.core.context import DataProvider
+        return self._get_or_create("data_provider", DataProvider)
+
+    @property
     def planner(self):
         from apps.ai_assistant.core.planner import LLMPlanner
-        from apps.ai_assistant.core.prompts import PromptRegistry
-        registry = PromptRegistry()
         return self._get_or_create("planner",
-                                   lambda: LLMPlanner(self.llm, self.agent_config, registry))
+                                   lambda: LLMPlanner(self.llm, self.agent_config, self.prompt_registry))
 
     @property
     def reasoner(self):
         from apps.ai_assistant.core.reasoning import LLMReasoner
-        from apps.ai_assistant.core.prompts import PromptRegistry
-        registry = PromptRegistry()
         return self._get_or_create("reasoner",
-                                   lambda: LLMReasoner(self.llm, self.agent_config, registry))
+                                   lambda: LLMReasoner(self.llm, self.agent_config, self.prompt_registry))
 
     @property
     def formatter(self):
@@ -182,10 +219,9 @@ class Container:
 
     @property
     def context_builder(self):
-        from apps.ai_assistant.core.context import DefaultContextBuilder, DataProvider
-        dp = DataProvider()
+        from apps.ai_assistant.core.context import DefaultContextBuilder
         return self._get_or_create("context_builder",
-                                   lambda: DefaultContextBuilder(data_provider=dp))
+                                   lambda: DefaultContextBuilder(data_provider=self.data_provider))
 
     # ------------------------------------------------------------------
     # Memory
@@ -234,6 +270,89 @@ class Container:
             engine.load()
             return engine
         return self._get_or_create("search_engine", build)
+
+    # ------------------------------------------------------------------
+    # Enterprise Components
+    # ------------------------------------------------------------------
+
+    @property
+    def prompt_builder(self):
+        from apps.ai_assistant.enterprise.prompt_builder import PromptBuilder
+        return self._get_or_create("prompt_builder", lambda: PromptBuilder(
+            max_history=self._config.get("prompt_max_history", 10),
+            max_tool_result_chars=self._config.get("prompt_max_tool_chars", 3000),
+        ))
+
+    @property
+    def conversation_memory(self):
+        from apps.ai_assistant.enterprise.conversation_memory import (
+            EnterpriseConversationMemory,
+            ExpirationPolicy,
+        )
+        return self._get_or_create("conversation_memory", lambda: EnterpriseConversationMemory(
+            max_turns=self._config.get("memory_max_turns", 20),
+            max_conversations=self._config.get("memory_max_conversations", 100),
+            summary_threshold=self._config.get("memory_summary_threshold", 5),
+            expiration_policy=ExpirationPolicy.LRU,
+            ttl_seconds=self._config.get("memory_ttl", 3600.0),
+            auto_summarize=True,
+        ))
+
+    @property
+    def knowledge_search(self):
+        from apps.ai_assistant.enterprise.knowledge_search import KnowledgeSearchEngine
+        return self._get_or_create("knowledge_search", lambda: KnowledgeSearchEngine(
+            default_limit=self._config.get("knowledge_limit", 10),
+        ))
+
+    @property
+    def tool_planner(self):
+        from apps.ai_assistant.enterprise.tool_planner import ToolPlanner
+        return self._get_or_create("tool_planner", ToolPlanner)
+
+    @property
+    def tool_executor_v2(self):
+        from apps.ai_assistant.enterprise.tool_executor_v2 import ToolExecutorV2
+        return self._get_or_create("tool_executor_v2", lambda: ToolExecutorV2(
+            registry=self.tool_registry,
+            default_timeout=self._config.get("executor_v2_timeout", 30.0),
+            max_retries=self._config.get("executor_v2_retries", 1),
+        ))
+
+    @property
+    def reasoning_policy(self):
+        from apps.ai_assistant.enterprise.reasoning_policy import AIReasoningPolicy
+        return self._get_or_create("reasoning_policy", AIReasoningPolicy)
+
+    @property
+    def decision_engine(self):
+        from apps.ai_assistant.enterprise.decision_engine import DecisionEngine
+        return self._get_or_create("decision_engine", lambda: DecisionEngine(container=self))
+
+    @property
+    def reasoning_orchestrator(self):
+        from apps.ai_assistant.enterprise.reasoning_orchestrator import ReasoningOrchestrator
+        return self._get_or_create("reasoning_orchestrator", lambda: ReasoningOrchestrator(
+            reasoning_policy=self.reasoning_policy,
+            decision_engine=self.decision_engine,
+        ))
+
+    @property
+    def safety_layer(self):
+        from apps.ai_assistant.enterprise.ai_safety_layer import AISafetyLayer
+        return self._get_or_create("safety_layer", lambda: AISafetyLayer(
+            rate_limit_max=self._config.get("safety_rate_limit", 30),
+            rate_limit_window=self._config.get("safety_rate_window", 60.0),
+        ))
+
+    @property
+    def execution_orchestrator(self):
+        from apps.ai_assistant.enterprise.execution_orchestrator import ExecutionOrchestrator
+        return self._get_or_create("execution_orchestrator", lambda: ExecutionOrchestrator(
+            reasoning_orchestrator=self.reasoning_orchestrator,
+            tool_planner=self.tool_planner,
+            tool_executor_v2=self.tool_executor_v2,
+        ))
 
     # ------------------------------------------------------------------
     # Orchestrator + Pipeline
