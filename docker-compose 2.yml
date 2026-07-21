@@ -1,0 +1,155 @@
+# =============================================================================
+# RecupDZ — Docker Compose (Development + Production)
+# =============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # PostgreSQL Database
+  # --------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: recupdz_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-recupdz_db}
+      POSTGRES_USER: ${DB_USER:-recupdz_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-recupdz_password}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-recupdz_user} -d ${DB_NAME:-recupdz_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - recupdz_network
+
+  # --------------------------------------------------------------------------
+  # Redis (Caching + Rate Limiting)
+  # --------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: recupdz_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - recupdz_network
+
+  # --------------------------------------------------------------------------
+  # Ollama LLM Server
+  # --------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: recupdz_ollama
+    restart: unless-stopped
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - recupdz_network
+
+  # --------------------------------------------------------------------------
+  # Django Backend
+  # --------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: recupdz_backend
+    restart: unless-stopped
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - DEBUG=${DEBUG:-false}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME:-recupdz_db}
+      - DB_USER=${DB_USER:-recupdz_user}
+      - DB_PASSWORD=${DB_PASSWORD:-recupdz_password}
+      - REDIS_URL=redis://redis:6379/0
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-hermes3:latest}
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:5175}
+      - RATE_LIMIT_ENABLED=true
+      - CACHE_BACKEND=redis
+      - METRICS_ENABLED=true
+      - TRACING_ENABLED=true
+      - AUDIT_ENABLED=true
+    ports:
+      - "${BACKEND_PORT:-8002}:8002"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    networks:
+      - recupdz_network
+
+  # --------------------------------------------------------------------------
+  # Frontend (Vite Dev Server)
+  # --------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: recupdz_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-5175}:5175"
+    environment:
+      - VITE_API_URL=http://localhost:8002
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - recupdz_network
+
+  # --------------------------------------------------------------------------
+  # Nginx Reverse Proxy (Production)
+  # --------------------------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: recupdz_nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-80}:80"
+      - "${NGINX_SSL_PORT:-443}:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - recupdz_network
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+  redis_data:
+  ollama_data:
+
+networks:
+  recupdz_network:
+    driver: bridge

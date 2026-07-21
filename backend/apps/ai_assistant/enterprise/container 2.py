@@ -370,13 +370,6 @@ class Container:
             safety_layer=self.safety_layer,
         ))
 
-    @property
-    def response_orchestrator(self):
-        from apps.ai_assistant.enterprise.response_orchestrator import ResponseOrchestrator
-        return self._get_or_create("response_orchestrator", lambda: ResponseOrchestrator(
-            container=self,
-        ))
-
     # ------------------------------------------------------------------
     # Memory — Session & User (used by ConversationOrchestrator)
     # ------------------------------------------------------------------

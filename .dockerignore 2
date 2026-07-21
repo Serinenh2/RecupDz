@@ -1,0 +1,59 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+*.egg
+dist
+build
+*.whl
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+media/
+
+# Node (frontend)
+node_modules/
+frontend/dist/
+frontend/build/
+
+# Tests
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# Docker
+docker-compose.override.yml
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Documentation
+*.md
+LICENSE
+docs/
