@@ -3,7 +3,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import {
   FileText, Plus, Search, X, Save, Edit, Trash2,
   Download, Shield, AlertTriangle, CheckCircle2,
-  Clock, XCircle, Clipboard, BarChart3, Calendar, Truck, ShoppingCart, FileSignature, Receipt
+  Clock, XCircle, Calendar, Truck, ShoppingCart, FileSignature, Receipt
 } from 'lucide-react'
 import api from '../../api'
 import { useAuthStore } from '../../store'
@@ -31,16 +31,6 @@ const dsdAPI = {
   word:    (d)    => api.post('/declarations/generate-dsd-word/', d, { responseType:'blob' }),
   wordById:(id)   => api.post(`/declarations/${id}/generer_word/`, {}, { responseType:'blob' }),
 }
-const pvAPI = {
-  getAll:  (p)    => api.get('/inspections/', { params: p }),
-  create:  (d)    => api.post('/inspections/', d),
-  update:  (id,d) => api.patch(`/inspections/${id}/`, d),
-  delete:  (id)   => api.delete(`/inspections/${id}/`),
-  pdf:     (d)    => api.post('/inspections/generate-pv/', d, { responseType:'blob' }),
-  pdfById: (id)   => api.get(`/inspections/${id}/generer_pdf/`, { responseType:'blob' }),
-  word:    (d)    => api.post('/inspections/generate-pv-word/', d, { responseType:'blob' }),
-  wordById:(id)   => api.get(`/inspections/${id}/generer_word/`, { responseType:'blob' }),
-}
 const blAPI = {
   getAll:  (p)    => api.get('/bl/', { params: p }),
   create:  (d)    => api.post('/bl/', d),
@@ -62,7 +52,6 @@ const bcAPI = {
 }
 const recupAPI = { getAll: () => api.get('/recuperateurs/?page_size=200') }
 const tracaAPI = { getAll: (p) => api.get('/traceability/', { params: p }) }
-const eliminateurAPI = { getAll: () => api.get('/operateurs/?type_operateur=ELIMINATEUR&page_size=200') }
 const destinatairesAPI = {
   getAll: (type) => api.get('/operateurs/', { params: { type_operateur: type, page_size: 200 } }),
 }
@@ -75,8 +64,6 @@ const TABS = [
   { key:'facture',  label:'Facture',  icon:Receipt,       desc:'Facture — document de facturation, même contenu que le Bon de Commande' },
   { key:'dsd',      label:'DSD',      icon:AlertTriangle, desc:'Déclarations des Déchets Spéciaux Dangereux — formulaire annuel officiel' },
   { key:'bsd',      label:'BSD',      icon:FileText,      desc:'Bordereaux de Suivi des Déchets — documents de traçabilité obligatoires' },
-  { key:'pv',       label:'PV',       icon:Clipboard,     desc:'Procès-Verbaux de contrôle environnemental' },
-  { key:'rapports', label:'Rapports', icon:BarChart3,     desc:'Rapports environnementaux périodiques' },
 ]
 const BL_ST = {
   BROUILLON: { label:'Brouillon', badge:'badge-gray',   icon:Clock        },
@@ -1640,242 +1627,6 @@ function DSDForm({ dsd, recuperateurs, dossiers, currentUser, onSave, onClose })
   )
 }
 
-// ── PV Form ───────────────────────────────────────────────────────────────────
-function PVForm({ pv, recuperateurs, dossiers, eliminateurs, currentUser, onSave, onClose }) {
-  const isEdit = !!pv?.id
-  const { register, handleSubmit, watch, setValue, reset } = useForm({
-    defaultValues: pv || {
-      type_inspection:'ROUTINE',
-      recuperateur: currentUser?.recuperateur_id||'',
-      date_inspection: new Date().toISOString().split('T')[0],
-    }
-  })
-  const [saving,     setSaving]     = useState(false)
-  const [generating, setGenerating] = useState(false)
-  const isRecup = currentUser?.role === 'RECUPERATEUR'
-  const recuperateurId = watch('recuperateur')
-  const eliminateurId  = watch('eliminateur_id')
-
-  useEffect(() => { if (pv) reset(pv) }, [pv])
-
-  // Renseigne automatiquement l'adresse et l'agrément du récupérateur sélectionné
-  useEffect(() => {
-    const r = recuperateurs.find(x => String(x.id) === String(recuperateurId))
-    if (r) {
-      setValue('recuperateur_adresse', [r.commune, r.wilaya ? `W.${r.wilaya}` : ''].filter(Boolean).join(', '))
-      setValue('recuperateur_agrement', r.agrement_actif?.numero_agrement || '')
-      setValue('recuperateur_agrement_date', r.agrement_actif?.date_delivrance || '')
-    }
-  }, [recuperateurId, recuperateurs])
-
-  // Renseigne automatiquement l'en-tête du PV à partir de l'opérateur Éliminateur
-  // sélectionné (fiche créée une seule fois dans la page Opérateurs et réutilisée ici).
-  const importerEliminateur = (op) => {
-    setValue('raison_sociale', op.raison_sociale || '')
-    setValue('agrement_exploitation', op.num_agrement || '')
-    setValue('adresse', op.adresse || '')
-    setValue('rc', op.registre_commerce || '')
-    setValue('nif', op.nif || '')
-    setValue('nis', op.nis || '')
-    setValue('telephone', op.telephone || '')
-  }
-
-  useEffect(() => {
-    if (!eliminateurId) return
-    const op = eliminateurs.find(x => String(x.id) === String(eliminateurId))
-    if (op) importerEliminateur(op)
-  }, [eliminateurId, eliminateurs])
-
-  const importerDossier = (d) => {
-    setValue('designation_dechet', d.designation_dechet || '')
-    setValue('quantite', d.quantite || '')
-    setValue('unite', d.unite_display || d.unite || '')
-    setValue('generateur_nom', d.generateur_nom || '')
-    if (!isRecup && d.recuperateur) setValue('recuperateur', d.recuperateur)
-    if (d.eliminateur) setValue('eliminateur_id', d.eliminateur)
-    const note = `Dossier ${d.numero} — ${d.code_dechet} ${d.designation_dechet||''} (${d.quantite} ${d.unite_display||d.unite})`
-    if (!watch('observations')) setValue('observations', note)
-    toast.success(`Dossier ${d.numero} importé`)
-  }
-
-  const onSubmit = async (data) => {
-    setSaving(true)
-    if (isRecup && currentUser?.recuperateur_id) data.recuperateur = currentUser.recuperateur_id
-    try {
-      if (isEdit) { await pvAPI.update(pv.id,data); toast.success('PV mis à jour') }
-      else        { await pvAPI.create(data);        toast.success('PV créé') }
-      onSave()
-    } catch { toast.error('Erreur') }
-    finally { setSaving(false) }
-  }
-
-  const buildPvData = () => {
-    const recup = recuperateurs.find(x => String(x.id) === String(watch('recuperateur')))
-    return {
-      pv_numero:           watch('pv_numero'),
-      type_inspection:     watch('type_inspection'),
-      date_inspection:     watch('date_inspection'),
-      resultat:            watch('resultat'),
-      observations:        watch('observations'),
-      actions_correctives: watch('actions_correctives'),
-      recuperateur:        watch('recuperateur'),
-      recuperateur_nom:    isRecup ? currentUser?.recuperateur_nom : recup?.nom_raison_sociale,
-      recuperateur_adresse:      watch('recuperateur_adresse'),
-      recuperateur_agrement:     watch('recuperateur_agrement'),
-      recuperateur_agrement_date:watch('recuperateur_agrement_date'),
-      generateur_nom:      watch('generateur_nom'),
-      generateur_adresse:  watch('generateur_adresse'),
-      designation_dechet:  watch('designation_dechet'),
-      quantite:            watch('quantite'),
-      unite:               watch('unite'),
-      raison_sociale:      watch('raison_sociale'),
-      agrement_exploitation: watch('agrement_exploitation'),
-      adresse:             watch('adresse'),
-      rc:                  watch('rc'),
-      nif:                 watch('nif'),
-      nis:                 watch('nis'),
-      art:                 watch('art'),
-      telephone:           watch('telephone'),
-      site_incineration:   watch('site_incineration'),
-    }
-  }
-
-  const downloadPdf = async () => {
-    setGenerating(true)
-    try {
-      const formData = buildPvData()
-      const res = await pvAPI.pdf(formData)
-      const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/pdf'}))
-      const a   = document.createElement('a')
-      a.href = url; a.setAttribute('download', `PV_${formData.pv_numero||'incineration'}.pdf`)
-      document.body.appendChild(a); a.click(); a.remove()
-      window.URL.revokeObjectURL(url)
-      toast.success('PV téléchargé !')
-    } catch { toast.error('Erreur génération PDF') }
-    finally { setGenerating(false) }
-  }
-
-  const downloadWord = async () => {
-    setGenerating(true)
-    try {
-      const formData = buildPvData()
-      const res = await pvAPI.word(formData)
-      const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}))
-      const a   = document.createElement('a')
-      a.href = url; a.setAttribute('download', `PV_${formData.pv_numero||'incineration'}.docx`)
-      document.body.appendChild(a); a.click(); a.remove()
-      window.URL.revokeObjectURL(url)
-      toast.success('PV téléchargé (Word) !')
-    } catch { toast.error('Erreur génération Word') }
-    finally { setGenerating(false) }
-  }
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      {!isEdit && <DossierPicker dossiers={dossiers} onSelect={importerDossier}/>}
-      {!isRecup && (
-        <F label="Récupérateur" req>
-          <select {...register('recuperateur',{required:true})} className="input">
-            <option value="">-- Sélectionner --</option>
-            {recuperateurs.map(r=><option key={r.id} value={r.id}>{r.nom_raison_sociale}</option>)}
-          </select>
-        </F>
-      )}
-      <div className="grid grid-cols-2 gap-3">
-        <F label="Type de contrôle">
-          <select {...register('type_inspection')} className="input">
-            <option value="ROUTINE">Contrôle de routine</option>
-            <option value="SURPRISE">Contrôle inopiné</option>
-            <option value="PLAINTE">Suite à plainte</option>
-            <option value="SUIVI">Contrôle de suivi</option>
-          </select>
-        </F>
-        <F label="Date du contrôle" req>
-          <DateInput value={watch('date_inspection')||''} onChange={v=>setValue('date_inspection',v)}/>
-        </F>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <F label="N° PV"><input {...register('pv_numero')} className="input" placeholder="PV-2024-..."/></F>
-        <F label="Résultat">
-          <select {...register('resultat')} className="input">
-            <option value="">--</option>
-            <option value="CONFORME">Conforme</option>
-            <option value="NON_CONFORME">Non conforme</option>
-            <option value="EN_COURS">En cours d'examen</option>
-          </select>
-        </F>
-      </div>
-      <F label="Observations"><textarea {...register('observations')} className="input" rows={3}/></F>
-      <F label="Actions correctives"><textarea {...register('actions_correctives')} className="input" rows={2}/></F>
-
-      <div className="card p-4 space-y-3 border-l-4 border-amber-400">
-        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-          Procès-verbal d'incinération — déchet détruit
-        </p>
-        <div className="grid grid-cols-2 gap-3">
-          <F label="Désignation du déchet">
-            <input {...register('designation_dechet')} className="input" placeholder="Désignation..."/>
-          </F>
-          <div className="grid grid-cols-2 gap-2">
-            <F label="Quantité"><input {...register('quantite')} className="input"/></F>
-            <F label="Unité"><input {...register('unite')} className="input" placeholder="kg, t..."/></F>
-          </div>
-          <F label="Générateur des déchets">
-            <input {...register('generateur_nom')} className="input" placeholder="Raison sociale du générateur"/>
-          </F>
-          <F label="Adresse du générateur">
-            <input {...register('generateur_adresse')} className="input" placeholder="Sise à..."/>
-          </F>
-        </div>
-      </div>
-
-      <div className="card p-4 space-y-3 border-l-4 border-slate-400">
-        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-          Installation d'incinération — Éliminateur (en-tête du PV)
-        </p>
-        <F label="Éliminateur enregistré">
-          <select {...register('eliminateur_id')} className="input">
-            <option value="">-- Sélectionner un éliminateur (ou saisir manuellement ci-dessous) --</option>
-            {eliminateurs.map(op => <option key={op.id} value={op.id}>{op.raison_sociale}</option>)}
-          </select>
-          <p className="text-[10px] text-slate-400 mt-1">
-            Les informations sont reprises automatiquement de la fiche Opérateur. Modifiez-les ci-dessous si besoin.
-          </p>
-        </F>
-        <div className="grid grid-cols-2 gap-3">
-          <F label="Raison sociale"><input {...register('raison_sociale')} className="input"/></F>
-          <F label="Agrément d'exploitation N°"><input {...register('agrement_exploitation')} className="input"/></F>
-          <F label="Adresse"><input {...register('adresse')} className="input"/></F>
-          <F label="Site d'incinération (si différent)"><input {...register('site_incineration')} className="input"/></F>
-          <F label="RC"><input {...register('rc')} className="input"/></F>
-          <F label="NIF"><input {...register('nif')} className="input"/></F>
-          <F label="NIS"><input {...register('nis')} className="input"/></F>
-          <F label="ART"><input {...register('art')} className="input"/></F>
-          <F label="Téléphone"><input {...register('telephone')} className="input"/></F>
-        </div>
-      </div>
-
-      <div className="flex gap-3 pt-2 border-t border-[#E2E8F0]">
-        <Can do={isEdit ? 'inspections.change_inspection' : 'inspections.add_inspection'}>
-          <button type="submit" disabled={saving||generating} className="btn-primary">
-            <Save size={15}/> {saving?'...':isEdit?'Mettre à jour':'Créer le PV'}
-          </button>
-        </Can>
-        <button type="button" onClick={downloadPdf} disabled={saving||generating} className="btn-secondary flex items-center gap-2">
-          {generating
-            ? <><span className="w-4 h-4 border-2 border-slate-400/30 border-t-slate-500 rounded-full animate-spin"/>Génération...</>
-            : <><Download size={15}/>Télécharger PDF</>
-          }
-        </button>
-        <button type="button" onClick={downloadWord} disabled={saving||generating} className="btn-secondary flex items-center gap-2">
-          <Download size={15}/>Télécharger Word
-        </button>
-        <button type="button" onClick={onClose} className="btn-secondary">Annuler</button>
-      </div>
-    </form>
-  )
-}
-
 // ── Cards ─────────────────────────────────────────────────────────────────────
 function BSDCard({ doc, onEdit, onDelete, onPdf, onWord }) {
   const st = BSD_ST[doc.statut] || BSD_ST.BROUILLON
@@ -1976,50 +1727,6 @@ function DSDCard({ doc, onEdit, onDelete, onPdf, onWord }) {
   )
 }
 
-function PVCard({ doc, onEdit, onDelete, onPdf, onWord }) {
-  const RES = {
-    CONFORME:    { badge:'badge-green'  },
-    NON_CONFORME:{ badge:'badge-red'    },
-    EN_COURS:    { badge:'badge-yellow' },
-  }
-  const res = RES[doc.resultat]
-  return (
-    <div className="card p-4 hover:shadow-md transition-all">
-      <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0">
-          <Clipboard size={18} className="text-purple-600"/>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            {doc.pv_numero && <span className="font-mono font-bold text-slate-700 text-sm">{doc.pv_numero}</span>}
-            {res && <span className={`badge ${res.badge} text-[10px]`}>{doc.resultat}</span>}
-          </div>
-          <div className="text-xs text-slate-400 mt-1 flex items-center gap-1">
-            <Calendar size={10}/>{formatDateFR(doc.date_inspection)}
-          </div>
-          {doc.observations && (
-            <p className="text-xs text-slate-500 mt-1 line-clamp-2">{doc.observations}</p>
-          )}
-        </div>
-        <div className="flex gap-1">
-          <button onClick={()=>onPdf(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600" title="PDF">
-            <Download size={13}/>
-          </button>
-          <button onClick={()=>onWord(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600" title="Word">
-            <FileText size={13}/>
-          </button>
-          <Can do="inspections.change_inspection">
-            <button onClick={()=>onEdit(doc)} className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600"><Edit size={13}/></button>
-          </Can>
-          <Can do="inspections.delete_inspection">
-            <button onClick={()=>onDelete(doc.id,'pv')} className="btn-ghost p-1.5 text-slate-400 hover:text-red-600"><Trash2 size={13}/></button>
-          </Can>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function DocumentsPage() {
   const { user } = useAuthStore()
@@ -2032,13 +1739,11 @@ export default function DocumentsPage() {
   const [recuperateurs, setRecuperateurs] = useState([])
   const [dossiers,      setDossiers]      = useState([])
   const [allDossiers,   setAllDossiers]   = useState([])
-  const [eliminateurs,  setEliminateurs]  = useState([])
 
   const isRecup = user?.role === 'RECUPERATEUR'
 
   useEffect(() => {
     recupAPI.getAll().then(r => setRecuperateurs(r.data.results||r.data)).catch(()=>{})
-    eliminateurAPI.getAll().then(r => setEliminateurs(r.data.results||r.data)).catch(()=>{})
     const p = { page_size: 200 }
     if (isRecup && user?.recuperateur_id) p.recuperateur = user.recuperateur_id
     tracaAPI.getAll(p).then(r => {
@@ -2061,7 +1766,6 @@ export default function DocumentsPage() {
       else if (tab==='facture')              res = await bcAPI.getAll({ ...p, type_document:'FACTURE' })
       else if (tab==='bsd')                  res = await bsdAPI.getAll(p)
       else if (tab==='dsd')                  res = await dsdAPI.getAll(p)
-      else if (tab==='pv'||tab==='rapports') res = await pvAPI.getAll(p)
       setItems(res?.data?.results || res?.data || [])
     } catch { toast.error('Erreur chargement') }
     finally { setLoading(false) }
@@ -2076,7 +1780,6 @@ export default function DocumentsPage() {
       else if (type==='bc' || type==='proforma' || type==='facture') await bcAPI.delete(id)
       else if (type==='bsd') await bsdAPI.delete(id)
       else if (type==='dsd') await dsdAPI.delete(id)
-      else                   await pvAPI.delete(id)
       toast.success('Supprimé'); load()
     } catch { toast.error('Erreur') }
   }
@@ -2177,30 +1880,6 @@ export default function DocumentsPage() {
     } catch { toast.error('Erreur Word') }
   }
 
-  const handlePvPdf = async (doc) => {
-    try {
-      const res = await pvAPI.pdfById(doc.id)
-      const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/pdf'}))
-      const a   = document.createElement('a')
-      a.href = url; a.setAttribute('download',`PV_${doc.pv_numero||doc.id}.pdf`)
-      document.body.appendChild(a); a.click(); a.remove()
-      window.URL.revokeObjectURL(url)
-      toast.success('PV téléchargé')
-    } catch { toast.error('Erreur PDF') }
-  }
-
-  const handlePvWord = async (doc) => {
-    try {
-      const res = await pvAPI.wordById(doc.id)
-      const url = window.URL.createObjectURL(new Blob([res.data],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}))
-      const a   = document.createElement('a')
-      a.href = url; a.setAttribute('download',`PV_${doc.pv_numero||doc.id}.docx`)
-      document.body.appendChild(a); a.click(); a.remove()
-      window.URL.revokeObjectURL(url)
-      toast.success('PV téléchargé (Word)')
-    } catch { toast.error('Erreur Word') }
-  }
-
   const handleSave  = () => { setShowForm(false); setEditing(null); load() }
   const handleEdit  = (item) => { setEditing(item); setShowForm(true) }
 
@@ -2233,8 +1912,7 @@ export default function DocumentsPage() {
     if (tab==='facture') return 'Nouvelle Facture'
     if (tab==='bsd') return 'Nouveau BSD'
     if (tab==='dsd') return 'Nouvelle DSD'
-    if (tab==='pv')  return 'Nouveau PV'
-    return 'Nouveau rapport'
+    return 'Nouveau document'
   }
 
   return (
@@ -2242,11 +1920,11 @@ export default function DocumentsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <FileText size={24} className="text-primary-600"/> Documents et Rapports
+            <FileText size={24} className="text-primary-600"/> Documents
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">BSD — DSD — Procès-Verbaux — Rapports</p>
+          <p className="text-slate-500 text-sm mt-0.5">BSD — DSD</p>
         </div>
-        <Can do={tab==='bsd' ? 'bsd.add_bordereausuividechet' : tab==='bl' ? 'bl.add_bonlivraison' : tab==='bc' || tab==='proforma' || tab==='facture' ? 'bc.add_boncommande' : tab==='dsd' ? 'declarations.add_declaration' : tab==='pv' ? 'inspections.add_inspection' : null}>
+        <Can do={tab==='bsd' ? 'bsd.add_bordereausuividechet' : tab==='bl' ? 'bl.add_bonlivraison' : tab==='bc' || tab==='proforma' || tab==='facture' ? 'bc.add_boncommande' : tab==='dsd' ? 'declarations.add_declaration' : null}>
           <button onClick={()=>{setEditing(null);setShowForm(true)}} className="btn-primary">
             <Plus size={16}/> {getBtnLabel()}
           </button>
@@ -2292,7 +1970,7 @@ export default function DocumentsPage() {
         <div className="card p-14 text-center">
           <TabIcon size={36} className="mx-auto mb-3 text-slate-200"/>
           <p className="font-semibold text-slate-400">Aucun {currentTab?.label} trouvé</p>
-          <Can do={tab==='bsd' ? 'bsd.add_bordereausuividechet' : tab==='bl' ? 'bl.add_bonlivraison' : tab==='bc' || tab==='proforma' || tab==='facture' ? 'bc.add_boncommande' : tab==='dsd' ? 'declarations.add_declaration' : tab==='pv' ? 'inspections.add_inspection' : null}>
+          <Can do={tab==='bsd' ? 'bsd.add_bordereausuividechet' : tab==='bl' ? 'bl.add_bonlivraison' : tab==='bc' || tab==='proforma' || tab==='facture' ? 'bc.add_boncommande' : tab==='dsd' ? 'declarations.add_declaration' : null}>
             <button onClick={()=>{setEditing(null);setShowForm(true)}} className="btn-primary mt-4">
               <Plus size={15}/> {getBtnLabel()}
             </button>
@@ -2304,7 +1982,6 @@ export default function DocumentsPage() {
           {(tab==='bc'||tab==='proforma'||tab==='facture') && items.map(doc=><BCCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleBcPdf} onWord={handleBcWord} onGenererBC={handleGenererBC} onGenererBL={handleGenererBL}/>)}
           {tab==='bsd'     && items.map(doc=><BSDCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleBsdPdf} onWord={handleBsdWord}/>)}
           {tab==='dsd'     && items.map(doc=><DSDCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handleDsdPdf} onWord={handleDsdWord}/>)}
-          {(tab==='pv'||tab==='rapports') && items.map(doc=><PVCard key={doc.id} doc={doc} onEdit={handleEdit} onDelete={handleDelete} onPdf={handlePvPdf} onWord={handlePvWord}/>)}
         </div>
       )}
 
@@ -2328,10 +2005,6 @@ export default function DocumentsPage() {
         )}
         {tab==='dsd' && (
           <DSDForm dsd={editing} recuperateurs={recuperateurs} dossiers={dossiers} currentUser={user}
-            onSave={handleSave} onClose={()=>{setShowForm(false);setEditing(null)}}/>
-        )}
-        {(tab==='pv'||tab==='rapports') && (
-          <PVForm pv={editing} recuperateurs={recuperateurs} dossiers={dossiers} eliminateurs={eliminateurs} currentUser={user}
             onSave={handleSave} onClose={()=>{setShowForm(false);setEditing(null)}}/>
         )}
       </Modal>

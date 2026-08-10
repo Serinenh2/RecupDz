@@ -1,0 +1,55 @@
+# =============================================================================
+# RecupDZ Backend — Production Dockerfile
+# Multi-stage build for optimized production image
+# =============================================================================
+
+# Stage 1: Builder
+FROM python:3.13-slim AS builder
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# Stage 2: Production
+FROM python:3.13-slim AS production
+
+# Security: run as non-root
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+WORKDIR /app
+
+# Copy installed packages
+COPY --from=builder /install /usr/local
+
+# Copy application code
+COPY backend/ .
+
+# Collect static files
+RUN python manage.py collectstatic --noinput 2>/dev/null || true
+
+# Switch to non-root user
+USER appuser
+
+# Expose port
+EXPOSE 8002
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8002/api/ai/health')" || exit 1
+
+# Run with Gunicorn
+CMD ["gunicorn", "config.wsgi:application", \
+     "--bind", "0.0.0.0:8002", \
+     "--workers", "4", \
+     "--threads", "2", \
+     "--timeout", "120", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-"]

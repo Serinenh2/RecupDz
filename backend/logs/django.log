@@ -1,1 +1,210 @@
 INFO 2026-07-24 23:11:16,502 autoreload 75591 8467177600 Watching for file changes with StatReloader
+INFO 2026-07-25 01:04:33,632 autoreload 30908 29156 Watching for file changes with StatReloader
+WARNING 2026-07-25 01:04:34,895 basehttp 30908 13076 "POST /api/auth/token/ HTTP/1.1" 401 79
+INFO 2026-07-25 01:16:25,497 autoreload 20328 7040 Watching for file changes with StatReloader
+WARNING 2026-07-25 01:16:27,213 basehttp 20328 31208 "POST /api/auth/token/ HTTP/1.1" 401 79
+INFO 2026-07-25 01:17:09,597 basehttp 20328 27348 "POST /api/auth/token/ HTTP/1.1" 200 486
+INFO 2026-07-25 01:18:12,036 basehttp 20328 18820 "POST /api/auth/token/ HTTP/1.1" 200 486
+INFO 2026-07-25 01:21:19,548 autoreload 5628 12464 Watching for file changes with StatReloader
+WARNING 2026-07-25 01:21:24,807 base 5628 20212 Session data corrupted
+INFO 2026-07-25 01:21:25,018 basehttp 5628 20212 "GET /admin/ HTTP/1.1" 302 0
+WARNING 2026-07-25 01:21:25,032 base 5628 20212 Session data corrupted
+INFO 2026-07-25 01:21:25,451 basehttp 5628 20212 "GET /admin/login/?next=/admin/ HTTP/1.1" 200 4259
+INFO 2026-07-25 01:21:25,486 basehttp 5628 28880 "GET /static/admin/css/dark_mode.css HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:25,486 basehttp 5628 20212 "GET /static/admin/css/base.css HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:25,503 basehttp 5628 28516 "GET /static/admin/css/responsive.css HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:25,503 basehttp 5628 20212 "GET /static/admin/js/theme.js HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:25,503 basehttp 5628 14252 "GET /static/admin/css/nav_sidebar.css HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:25,505 basehttp 5628 10104 "GET /static/admin/css/login.css HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:25,520 basehttp 5628 14252 "GET /static/admin/js/nav_sidebar.js HTTP/1.1" 304 0
+WARNING 2026-07-25 01:21:36,146 base 5628 14252 Session data corrupted
+INFO 2026-07-25 01:21:37,025 basehttp 5628 14252 "POST /admin/login/?next=/admin/ HTTP/1.1" 302 0
+INFO 2026-07-25 01:21:37,277 basehttp 5628 14252 "GET /admin/ HTTP/1.1" 200 21322
+INFO 2026-07-25 01:21:37,299 basehttp 5628 14252 "GET /static/admin/css/dashboard.css HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:37,311 basehttp 5628 20212 "GET /static/admin/img/icon-deletelink.svg HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:37,313 basehttp 5628 10104 "GET /static/admin/img/icon-changelink.svg HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:37,311 basehttp 5628 14252 "GET /static/admin/img/icon-addlink.svg HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:39,785 basehttp 5628 10104 "GET /admin/accounts/user/ HTTP/1.1" 200 22083
+INFO 2026-07-25 01:21:39,819 basehttp 5628 28880 "GET /static/admin/js/core.js HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:39,824 basehttp 5628 10104 "GET /static/admin/css/changelists.css HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:39,824 basehttp 5628 28516 "GET /static/admin/js/jquery.init.js HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:39,824 basehttp 5628 14252 "GET /static/admin/js/vendor/jquery/jquery.js HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:39,826 basehttp 5628 30068 "GET /static/admin/js/admin/RelatedObjectLookups.js HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:39,834 basehttp 5628 28880 "GET /static/admin/js/actions.js HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:39,840 basehttp 5628 10104 "GET /static/admin/js/urlify.js HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:39,843 basehttp 5628 28516 "GET /static/admin/js/vendor/xregexp/xregexp.js HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:39,847 basehttp 5628 14252 "GET /static/admin/js/prepopulate.js HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:39,851 basehttp 5628 30068 "GET /static/admin/img/search.svg HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:39,851 basehttp 5628 28880 "GET /static/admin/img/icon-yes.svg HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:39,859 basehttp 5628 28880 "GET /static/admin/js/filters.js HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:39,859 basehttp 5628 20212 "GET /admin/jsi18n/ HTTP/1.1" 200 8621
+INFO 2026-07-25 01:21:39,887 basehttp 5628 20212 "GET /static/admin/img/tooltag-add.svg HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:39,887 basehttp 5628 28880 "GET /static/admin/img/sorting-icons.svg HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:44,486 basehttp 5628 19344 "POST /api/auth/token/ HTTP/1.1" 200 486
+INFO 2026-07-25 01:21:44,732 basehttp 5628 27868 "GET /api/accounts/me/ HTTP/1.1" 200 1847
+INFO 2026-07-25 01:21:44,908 basehttp 5628 14716 "GET /api/recuperateurs/alerts/ HTTP/1.1" 200 23
+INFO 2026-07-25 01:21:44,966 basehttp 5628 30324 "GET /api/traceability/stats/?recuperateur=4 HTTP/1.1" 200 381
+INFO 2026-07-25 01:21:44,991 basehttp 5628 7176 "GET /api/recuperateurs/alerts/ HTTP/1.1" 200 23
+INFO 2026-07-25 01:21:45,134 basehttp 5628 30560 "GET /api/traceability/stats/?recuperateur=4 HTTP/1.1" 200 381
+INFO 2026-07-25 01:21:49,352 basehttp 5628 17760 "GET /api/operateurs/?page_size=200 HTTP/1.1" 200 5084
+INFO 2026-07-25 01:21:49,441 basehttp 5628 11064 "GET /api/operateurs/?page_size=200 HTTP/1.1" 200 5084
+INFO 2026-07-25 01:21:53,351 basehttp 5628 29064 "GET /api/recuperateurs/agrements/?recuperateur=4&page_size=1 HTTP/1.1" 200 52
+INFO 2026-07-25 01:21:53,351 basehttp 5628 28816 "GET /api/accounts/mon-recuperateur/ HTTP/1.1" 200 1850
+INFO 2026-07-25 01:21:53,413 basehttp 5628 24208 "GET /api/accounts/mon-recuperateur/ HTTP/1.1" 200 1850
+INFO 2026-07-25 01:21:53,424 basehttp 5628 12384 "GET /media/recuperateurs/iso/ISO1-indurex-removebg-preview.png HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:53,424 basehttp 5628 20668 "GET /media/recuperateurs/logos/INDUREX_Logo_Vertical_nouveau-removebg-preview.png HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:53,434 basehttp 5628 19620 "GET /media/recuperateurs/iso/ISO2-indurex-removebg-preview.png HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:53,445 basehttp 5628 14396 "GET /media/recuperateurs/cachets/cachet_electro_indurex-removebg-preview.png HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:53,446 basehttp 5628 25832 "GET /media/recuperateurs/iso/ISO3-indurex-removebg-preview.png HTTP/1.1" 304 0
+INFO 2026-07-25 01:21:53,457 basehttp 5628 14320 "GET /api/recuperateurs/agrements/?recuperateur=4&page_size=1 HTTP/1.1" 200 52
+INFO 2026-07-25 01:21:53,517 basehttp 5628 22588 "GET /api/recuperateurs/specialisation-hierarchie/ HTTP/1.1" 200 11339
+INFO 2026-07-25 01:21:53,562 basehttp 5628 12468 "GET /api/recuperateurs/specialisation-hierarchie/ HTTP/1.1" 200 11339
+INFO 2026-07-25 01:21:57,930 basehttp 5628 30872 "POST /api/auth/token/ HTTP/1.1" 200 486
+INFO 2026-07-25 01:21:58,065 basehttp 5628 3128 "GET /api/accounts/me/ HTTP/1.1" 200 1847
+INFO 2026-07-25 01:21:58,163 basehttp 5628 21384 "GET /api/recuperateurs/alerts/ HTTP/1.1" 200 23
+INFO 2026-07-25 01:21:58,216 basehttp 5628 30076 "GET /api/traceability/stats/?recuperateur=4 HTTP/1.1" 200 381
+INFO 2026-07-25 01:21:58,218 basehttp 5628 26916 "GET /api/recuperateurs/alerts/ HTTP/1.1" 200 23
+INFO 2026-07-25 01:21:58,273 basehttp 5628 20576 "GET /api/traceability/stats/?recuperateur=4 HTTP/1.1" 200 381
+INFO 2026-07-25 01:23:35,324 basehttp 5628 25604 "GET /api/accounts/me/ HTTP/1.1" 200 1847
+INFO 2026-07-25 01:23:35,422 basehttp 5628 22624 "GET /api/recuperateurs/alerts/ HTTP/1.1" 200 23
+INFO 2026-07-25 01:23:35,440 basehttp 5628 12596 "GET /api/traceability/stats/?recuperateur=4 HTTP/1.1" 200 381
+INFO 2026-07-25 01:23:39,788 basehttp 5628 10560 "GET /api/accounts/me/ HTTP/1.1" 200 1847
+INFO 2026-07-25 01:23:39,861 basehttp 5628 6116 "GET /api/recuperateurs/alerts/ HTTP/1.1" 200 23
+INFO 2026-07-25 01:23:39,864 basehttp 5628 9340 "GET /api/traceability/stats/?recuperateur=4 HTTP/1.1" 200 381
+INFO 2026-07-25 01:24:36,678 basehttp 5628 11828 "GET /api/accounts/me/ HTTP/1.1" 200 1847
+INFO 2026-07-25 01:24:36,750 basehttp 5628 27616 "GET /api/recuperateurs/alerts/ HTTP/1.1" 200 23
+INFO 2026-07-25 01:24:36,760 basehttp 5628 3660 "GET /api/traceability/stats/?recuperateur=4 HTTP/1.1" 200 381
+INFO 2026-07-25 01:24:43,524 basehttp 5628 28652 "POST /api/auth/token/ HTTP/1.1" 200 486
+INFO 2026-07-25 01:24:43,591 basehttp 5628 28664 "GET /api/accounts/me/ HTTP/1.1" 200 1847
+INFO 2026-07-25 01:24:43,654 basehttp 5628 8872 "GET /api/recuperateurs/alerts/ HTTP/1.1" 200 23
+INFO 2026-07-25 01:24:43,662 basehttp 5628 15704 "GET /api/traceability/stats/?recuperateur=4 HTTP/1.1" 200 381
+WARNING 2026-07-25 01:56:42,597 basehttp 5628 20304 "GET /api/accounts/me/ HTTP/1.1" 401 188
+INFO 2026-07-25 01:56:42,661 basehttp 5628 27016 "POST /api/auth/token/refresh/ HTTP/1.1" 200 486
+INFO 2026-07-25 01:56:42,726 basehttp 5628 10656 "GET /api/accounts/me/ HTTP/1.1" 200 1847
+INFO 2026-07-25 01:56:42,806 basehttp 5628 12500 "GET /api/recuperateurs/alerts/ HTTP/1.1" 200 23
+INFO 2026-07-25 01:56:42,813 basehttp 5628 14268 "GET /api/traceability/stats/?recuperateur=4 HTTP/1.1" 200 381
+WARNING 2026-07-25 01:59:18,597 basehttp 5628 9232 "POST /api/auth/token/ HTTP/1.1" 401 79
+INFO 2026-07-25 02:01:35,180 basehttp 5628 16192 "POST /api/auth/token/ HTTP/1.1" 200 483
+INFO 2026-07-25 02:01:35,425 basehttp 5628 19288 "GET /api/accounts/me/ HTTP/1.1" 200 4272
+INFO 2026-07-25 02:01:35,494 basehttp 5628 21568 "GET /api/recuperateurs/alerts/ HTTP/1.1" 200 23
+INFO 2026-07-25 02:01:35,510 basehttp 5628 30088 "GET /api/traceability/stats/ HTTP/1.1" 200 433
+INFO 2026-07-25 02:01:55,842 basehttp 5628 13460 "GET /api/accounts/users/?page=1&page_size=10 HTTP/1.1" 200 1332
+INFO 2026-07-25 02:01:59,620 basehttp 5628 4324 "GET /api/accounts/permissions/ HTTP/1.1" 200 21357
+INFO 2026-07-25 02:01:59,673 basehttp 5628 29516 "GET /api/accounts/roles/ HTTP/1.1" 200 8272
+INFO 2026-07-25 02:02:01,988 basehttp 5628 21688 "GET /api/accounts/permissions/ HTTP/1.1" 200 21357
+INFO 2026-07-25 02:02:02,034 basehttp 5628 4408 "GET /api/accounts/roles/ HTTP/1.1" 200 8272
+INFO 2026-07-25 02:02:03,490 basehttp 5628 3124 "GET /api/accounts/audit-log/?limit=2000 HTTP/1.1" 200 34514
+INFO 2026-07-25 02:02:04,923 basehttp 5628 29680 "GET /api/accounts/users/?page_size=1 HTTP/1.1" 200 302
+INFO 2026-07-25 02:02:12,472 basehttp 5628 10864 "GET /api/ai/conversations/suggestions/ HTTP/1.1" 200 342
+INFO 2026-07-25 02:02:18,431 basehttp 5628 18996 "POST /api/ai/conversations/ HTTP/1.1" 201 165
+INFO 2026-07-25 02:02:19,420 audit 5628 696 AUDIT: chat user=1 resource=message/7c00a69f6774 success=True
+INFO 2026-07-25 02:02:19,550 ollama_service 5628 696 OllamaService initialized: url=http://localhost:11434 model=hermes3
+WARNING 2026-07-25 02:02:23,664 agent_orchestrator 5628 696 Hermes/Ollama is unreachable — using AI Router only
+INFO 2026-07-25 02:02:23,664 context 5628 696 Context built: 1 messages, entity=none/none, user=1
+INFO 2026-07-25 02:02:23,997 agent_orchestrator 5628 696 AI Router refined Hermes: reglementation_tool. (conf=0.88)
+INFO 2026-07-25 02:02:25,756 audit 5628 696 AUDIT: error user=1 resource=orchestrator/7c00a69f6774 success=True
+ERROR 2026-07-25 02:02:25,756 agent_orchestrator 5628 696 Orchestrator error: f-string expression part cannot include a backslash (permissions_tool.py, line 209)
+Traceback (most recent call last):
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\enterprise\agent_orchestrator.py", line 517, in orchestrate
+    tool_results = self._enterprise_plan_and_execute(
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\enterprise\agent_orchestrator.py", line 1630, in _enterprise_plan_and_execute
+    return self._execute_tool(tool_name, parameters, ctx, user_message)
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\enterprise\agent_orchestrator.py", line 960, in _execute_tool
+    results = self._c.executor.execute(plan, ctx)
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\enterprise\container.py", line 163, in executor
+    return self._get_or_create("executor",
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\enterprise\container.py", line 435, in _get_or_create
+    self._singletons[key] = factory()
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\enterprise\container.py", line 164, in <lambda>
+    lambda: ToolExecutorAdapter(self.tool_executor))
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\enterprise\container.py", line 158, in tool_executor
+    return self._get_or_create("tool_executor", build)
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\enterprise\container.py", line 435, in _get_or_create
+    self._singletons[key] = factory()
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\enterprise\container.py", line 155, in build
+    executor = ToolExecutor(self.tool_registry, default_timeout=15.0)
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\enterprise\container.py", line 149, in tool_registry
+    return self._get_or_create("tool_registry", build)
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\enterprise\container.py", line 435, in _get_or_create
+    self._singletons[key] = factory()
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\enterprise\container.py", line 144, in build
+    count = registry.discover_package("apps.ai_assistant.tools")
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\tools\tool_registry.py", line 160, in discover_package
+    package = importlib.import_module(package_path)
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python310\lib\importlib\__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 1050, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1027, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1006, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 688, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 883, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\tools\__init__.py", line 51, in <module>
+    from apps.ai_assistant.tools.permissions_tool import PermissionsTool
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\tools\permissions_tool.py", line 209
+    )
+    ^
+SyntaxError: f-string expression part cannot include a backslash
+INFO 2026-07-25 02:02:25,783 ollama_service 5628 696 OllamaService initialized: url=http://localhost:11434 model=hermes3
+WARNING 2026-07-25 02:02:29,832 conversation_manager 5628 696 Ollama unavailable — falling back to rule-based
+INFO 2026-07-25 02:02:29,887 basehttp 5628 696 "POST /api/ai/conversations/11/envoyer_message/ HTTP/1.1" 200 1687
+INFO 2026-07-25 02:02:42,692 basehttp 5628 28236 "POST /api/ai/conversations/ HTTP/1.1" 201 109
+INFO 2026-07-25 02:02:42,753 audit 5628 18740 AUDIT: chat user=1 resource=message/086d16cd72a5 success=True
+INFO 2026-07-25 02:02:42,753 ollama_service 5628 18740 OllamaService initialized: url=http://localhost:11434 model=hermes3
+WARNING 2026-07-25 02:02:46,834 agent_orchestrator 5628 18740 Hermes/Ollama is unreachable — using AI Router only
+INFO 2026-07-25 02:02:46,835 context 5628 18740 Context built: 1 messages, entity=none/none, user=1
+INFO 2026-07-25 02:02:46,837 audit 5628 18740 AUDIT: error user=1 resource=orchestrator/086d16cd72a5 success=True
+ERROR 2026-07-25 02:02:46,839 agent_orchestrator 5628 18740 Orchestrator error: HermesDecision.__init__() missing 1 required positional argument: 'action'
+Traceback (most recent call last):
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\enterprise\agent_orchestrator.py", line 396, in orchestrate
+    hermes_decision = self._hermes_gate(ctx, message, conversation_history, hermes_up)
+  File "C:\Users\HP\Desktop\RECUPDZ (indurex)\backend\apps\ai_assistant\enterprise\agent_orchestrator.py", line 729, in _hermes_gate
+    return HermesDecision(
+TypeError: HermesDecision.__init__() missing 1 required positional argument: 'action'
+INFO 2026-07-25 02:02:46,840 ollama_service 5628 18740 OllamaService initialized: url=http://localhost:11434 model=hermes3
+WARNING 2026-07-25 02:02:50,900 conversation_manager 5628 18740 Ollama unavailable — falling back to rule-based
+INFO 2026-07-25 02:02:50,936 basehttp 5628 18740 "POST /api/ai/conversations/12/envoyer_message/ HTTP/1.1" 200 412
+INFO 2026-07-25 02:03:04,887 basehttp 5628 20236 "POST /api/auth/token/ HTTP/1.1" 200 483
+INFO 2026-07-25 02:03:05,101 basehttp 5628 23216 "GET /api/accounts/me/ HTTP/1.1" 200 4272
+INFO 2026-07-25 02:03:05,167 basehttp 5628 15736 "GET /api/traceability/stats/ HTTP/1.1" 200 433
+INFO 2026-07-25 02:03:05,167 basehttp 5628 11680 "GET /api/recuperateurs/alerts/ HTTP/1.1" 200 23
+INFO 2026-07-25 02:03:07,437 basehttp 5628 23480 "GET /api/operateurs/?page_size=200 HTTP/1.1" 200 9835
+INFO 2026-07-25 02:03:08,734 basehttp 5628 24580 "GET /api/operateurs/?type_operateur=TRANSPORTEUR&page_size=200 HTTP/1.1" 200 927
+INFO 2026-07-25 02:03:08,734 basehttp 5628 9192 "GET /api/recuperateurs/?page_size=200&statut=ACTIF HTTP/1.1" 200 1618
+INFO 2026-07-25 02:03:08,823 basehttp 5628 28256 "GET /api/operateurs/?type_operateur=VALORISATEUR&page_size=200 HTTP/1.1" 200 1424
+INFO 2026-07-25 02:03:08,823 basehttp 5628 13944 "GET /api/operateurs/?type_operateur=ELIMINATEUR&page_size=200 HTTP/1.1" 200 2596
+INFO 2026-07-25 02:03:08,833 basehttp 5628 30012 "GET /api/operateurs/?type_operateur=CET&page_size=200 HTTP/1.1" 200 920
+INFO 2026-07-25 02:03:08,934 basehttp 5628 26456 "GET /api/traceability/?page_size=100 HTTP/1.1" 200 15942
+INFO 2026-07-25 02:03:08,950 basehttp 5628 6700 "GET /api/operateurs/?type_operateur=GENERATEUR&page_size=200 HTTP/1.1" 200 4171
+INFO 2026-07-25 02:03:14,780 basehttp 5628 30560 "GET /api/recuperateurs/?page_size=200 HTTP/1.1" 200 1618
+INFO 2026-07-25 02:03:14,819 basehttp 5628 14948 "GET /api/operateurs/?type_operateur=ELIMINATEUR&page_size=200 HTTP/1.1" 200 2596
+INFO 2026-07-25 02:03:14,862 basehttp 5628 15264 "GET /api/traceability/?page_size=200 HTTP/1.1" 200 15942
+INFO 2026-07-25 02:03:14,894 basehttp 5628 13272 "GET /api/bc/?page_size=100&type_document=PROFORMA HTTP/1.1" 200 7530
+INFO 2026-07-25 02:03:17,548 basehttp 5628 30852 "POST /api/bc/generate-bc/ HTTP/1.1" 200 793752
+INFO 2026-07-25 19:00:17,235 basehttp 5628 18448 "GET /admin/accounts/user/ HTTP/1.1" 200 22083
+WARNING 2026-07-28 19:05:26,899 basehttp 5628 27552 "GET /api/accounts/me/ HTTP/1.1" 401 188
+WARNING 2026-07-28 19:05:28,819 basehttp 5628 28552 "POST /api/auth/token/refresh/ HTTP/1.1" 401 70
+INFO 2026-07-28 19:05:31,964 basehttp 5628 17892 "POST /api/auth/token/ HTTP/1.1" 200 483
+INFO 2026-07-28 19:05:32,197 basehttp 5628 19200 "GET /api/accounts/me/ HTTP/1.1" 200 4272
+INFO 2026-07-28 19:05:32,298 basehttp 5628 29040 "GET /api/recuperateurs/alerts/ HTTP/1.1" 200 23
+INFO 2026-07-28 19:05:32,298 basehttp 5628 28092 "GET /api/traceability/stats/ HTTP/1.1" 200 433
+INFO 2026-07-28 19:06:11,133 basehttp 5628 21228 "GET /api/accounts/users/?page=1&page_size=10 HTTP/1.1" 200 1332
+INFO 2026-07-28 19:07:04,634 basehttp 5628 18196 "GET /api/accounts/permissions/ HTTP/1.1" 200 21357
+INFO 2026-07-28 19:07:04,711 basehttp 5628 28400 "GET /api/accounts/roles/ HTTP/1.1" 200 8272
+INFO 2026-07-28 19:07:36,248 basehttp 5628 16584 "GET /api/accounts/permissions/ HTTP/1.1" 200 21357
+INFO 2026-07-28 19:07:36,321 basehttp 5628 27644 "GET /api/accounts/roles/ HTTP/1.1" 200 8272
+INFO 2026-07-28 19:07:51,525 basehttp 5628 26148 "GET /api/accounts/audit-log/?limit=2000 HTTP/1.1" 200 34514
+INFO 2026-07-28 19:08:09,824 basehttp 5628 30056 "GET /api/accounts/users/?page_size=1 HTTP/1.1" 200 302
+WARNING 2026-07-29 21:29:22,574 basehttp 5628 14400 "GET /api/accounts/me/ HTTP/1.1" 401 188
+WARNING 2026-07-29 21:29:22,625 basehttp 5628 27280 "POST /api/auth/token/refresh/ HTTP/1.1" 401 70
+INFO 2026-08-02 19:16:13,102 autoreload 9616 15616 Watching for file changes with StatReloader
+WARNING 2026-08-02 19:16:44,443 basehttp 9616 11888 "GET /api/accounts/me/ HTTP/1.1" 401 188
+WARNING 2026-08-02 19:16:44,473 basehttp 9616 3496 "POST /api/auth/token/refresh/ HTTP/1.1" 401 70
+INFO 2026-08-02 19:16:47,405 basehttp 9616 9084 "POST /api/auth/token/ HTTP/1.1" 200 483
+INFO 2026-08-02 19:16:47,735 basehttp 9616 15796 "GET /api/accounts/me/ HTTP/1.1" 200 4272
+INFO 2026-08-02 19:16:47,874 basehttp 9616 3608 "GET /api/recuperateurs/alerts/ HTTP/1.1" 200 23
+INFO 2026-08-02 19:16:47,910 basehttp 9616 16080 "GET /api/traceability/stats/ HTTP/1.1" 200 433
+INFO 2026-08-02 19:30:00,328 basehttp 9616 6680 "POST /api/auth/token/ HTTP/1.1" 200 483
+INFO 2026-08-02 19:30:00,477 basehttp 9616 5104 "GET /api/accounts/me/ HTTP/1.1" 200 4272
+INFO 2026-08-02 19:30:00,663 basehttp 9616 20884 "GET /api/recuperateurs/alerts/ HTTP/1.1" 200 23
+INFO 2026-08-02 19:30:00,673 basehttp 9616 17772 "GET /api/traceability/stats/ HTTP/1.1" 200 433

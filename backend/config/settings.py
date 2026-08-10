@@ -11,12 +11,22 @@ init_sentry()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load .env file if it exists (repo root, one level above backend/) — does not
+# override environment variables already set (e.g. by Docker).
+_env_file = BASE_DIR.parent / '.env'
+if _env_file.is_file():
+    load_dotenv(_env_file)
+
 # ═══════════════════════════════════════════════════════════════
 # 🔐 CRITICAL SECURITY — Must be set via .env in production
 # ═══════════════════════════════════════════════════════════════
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'dev-only-change-in-production')
-DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ('true', '1', 'yes')
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY') or os.getenv('SECRET_KEY', 'dev-only-change-in-production')
+DEBUG = (os.getenv('DJANGO_DEBUG') or os.getenv('DEBUG', 'True')).lower() in ('true', '1', 'yes')
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in (os.getenv('DJANGO_ALLOWED_HOSTS') or os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1')).split(',')
+    if h.strip()
+]
 
 # ═══════════════════════════════════════════════════════════════
 # 🧩 INSTALLED APPS
@@ -63,11 +73,20 @@ MIDDLEWARE = [
     'apps.accounts.middleware.AuditLogMiddleware',
     'apps.accounts.middleware.SecurityHeadersMiddleware',
     'apps.accounts.middleware.SentryUserContextMiddleware',
+    'apps.ai_assistant.infrastructure.middleware.RequestTrackingMiddleware',
+    'apps.ai_assistant.infrastructure.middleware.RateLimitMiddleware',
+    'apps.ai_assistant.infrastructure.middleware.AuditMiddleware',
 ]
 
+# ---------------------------------------------------------------------------
+# URLs / Auth
+# ---------------------------------------------------------------------------
 ROOT_URLCONF = 'config.urls'
 AUTH_USER_MODEL = 'accounts.User'
 
+# ---------------------------------------------------------------------------
+# Templates
+# ---------------------------------------------------------------------------
 TEMPLATES = [{
     'BACKEND': 'django.template.backends.django.DjangoTemplates',
     'DIRS': [],
@@ -81,20 +100,29 @@ TEMPLATES = [{
 }]
 
 # ═══════════════════════════════════════════════════════════════
-# 🗄️  DATABASE — Use .env to switch to PostgreSQL in production
+# 🗄️  DATABASE — PostgreSQL when DB_HOST is set, SQLite otherwise
 # ═══════════════════════════════════════════════════════════════
-DATABASES = {
-    'default': {
-        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': os.getenv('DB_NAME', str(BASE_DIR / 'db.sqlite3')),
-        'USER': os.getenv('DB_USER', ''),
-        'PASSWORD': os.getenv('DB_PASSWORD', ''),
-        'HOST': os.getenv('DB_HOST', ''),
-        'PORT': os.getenv('DB_PORT', ''),
-        'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '0')),
-        'OPTIONS': (os.getenv('DB_SSL_CA') and os.getenv('DB_ENGINE', '').endswith('postgresql')) and {'sslmode': 'require'} or {},
+_db_host = os.getenv('DB_HOST', '')
+if _db_host:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME', 'recupdz_db'),
+            'USER': os.getenv('DB_USER', 'recupdz_user'),
+            'PASSWORD': os.getenv('DB_PASSWORD', 'recupdz_password'),
+            'HOST': _db_host,
+            'PORT': os.getenv('DB_PORT', '5432'),
+            'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '600')),
+            'OPTIONS': ({'sslmode': 'require'} if os.getenv('DB_SSL_CA') else {}),
+        },
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        },
+    }
 
 # ═══════════════════════════════════════════════════════════════
 # 🔒 SECURITY HEADERS
@@ -105,7 +133,7 @@ X_FRAME_OPTIONS = 'DENY'
 SECURE_REFERRER_POLICY = 'same-origin'
 
 if not DEBUG:
-    SECURE_SSL_REDIRECT = os.getenv('DJANGO_SECURE_SSL_REDIRECT', 'True').lower() in ('true', '1')
+    SECURE_SSL_REDIRECT = (os.getenv('DJANGO_SECURE_SSL_REDIRECT') or os.getenv('SECURE_SSL_REDIRECT', 'True')).lower() in ('true', '1')
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_HSTS_SECONDS = int(os.getenv('DJANGO_HSTS_SECONDS', '31536000'))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
@@ -119,11 +147,13 @@ if not DEBUG:
 # ═══════════════════════════════════════════════════════════════
 # 🌐 CORS — Strict in production
 # ═══════════════════════════════════════════════════════════════
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # True only in dev
-if not DEBUG:
-    allowed = os.getenv('DJANGO_CORS_ALLOWED_ORIGINS', 'https://your-domain.com').split(',')
-    CORS_ALLOWED_ORIGINS = [o.strip() for o in allowed if o.strip()]
+_cors_origins_raw = os.getenv('DJANGO_CORS_ALLOWED_ORIGINS') or os.getenv('CORS_ALLOWED_ORIGINS', '')
+if _cors_origins_raw and not DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins_raw.split(',') if o.strip()]
     CORS_ALLOW_CREDENTIALS = True
+else:
+    CORS_ALLOW_ALL_ORIGINS = DEBUG  # True only in dev
 
 # ═══════════════════════════════════════════════════════════════
 # 🔑 JWT AUTHENTICATION — Short-lived tokens with rotation
@@ -140,7 +170,7 @@ SIMPLE_JWT = {
 }
 
 # ═══════════════════════════════════════════════════════════════
-# 🐌 RATE LIMITING (Throttling)
+# 🐌 RATE LIMITING (Throttling) — see DEFAULT_THROTTLE_* below
 # ═══════════════════════════════════════════════════════════════
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -249,6 +279,10 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ---------------------------------------------------------------------------
+# i18n / Timezone
+# ---------------------------------------------------------------------------
 LANGUAGE_CODE = 'fr-DZ'
 TIME_ZONE = 'Africa/Algiers'
 USE_I18N = True
