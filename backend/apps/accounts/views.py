@@ -13,6 +13,27 @@ from .models import AuditLog
 User = get_user_model()
 
 
+# ── Helper: Sync User.role with Django Group membership ─────
+ROLE_TO_GROUP = {
+    'SUPERADMIN': 'super_administrateur',
+    'ADMIN': 'administrateur',
+    'RECUPERATEUR': 'recuperateur',
+    'RESPONSABLE_COLLECTE': 'responsable_collecte',
+    'AGENT_COLLECTE': 'agent_collecte',
+    'RESPONSABLE_DECHARGE': 'responsable_decharge',
+    'OBSERVATEUR': 'observateur',
+}
+
+
+def _assign_group_for_role(user):
+    """Sync the Django Group membership to match the user's current role."""
+    group_name = ROLE_TO_GROUP.get(user.role)
+    user.groups.clear()
+    if group_name:
+        group, _ = Group.objects.get_or_create(name=group_name)
+        user.groups.add(group)
+
+
 class RoleSerializer(serializers.ModelSerializer):
     permissions_list = serializers.SerializerMethodField()
     user_count = serializers.SerializerMethodField()
@@ -87,6 +108,8 @@ def user_create(request):
         if password:
             user.set_password(password)
             user.save()
+        # Assign the Django group matching the user's role
+        _assign_group_for_role(user)
         AuditLog.objects.create(
             user=request.user, action='CREATE', model_name='User',
             object_id=str(user.id), details={'username': user.username},
@@ -111,9 +134,13 @@ def user_detail(request, pk):
         return Response(data)
 
     if request.method == 'PATCH':
+        old_role = user.role
         s = UserSerializer(user, data=request.data, partial=True)
         if s.is_valid():
             s.save()
+            # Sync group if role changed
+            if user.role != old_role:
+                _assign_group_for_role(user)
             AuditLog.objects.create(
                 user=request.user, action='UPDATE', model_name='User',
                 object_id=str(pk), details={'fields': list(request.data.keys())},
@@ -279,20 +306,7 @@ def assign_role(request, user_id):
     old_role = user.role
     user.role = role_name
     user.save()
-
-    group_name = {
-        'SUPERADMIN': 'super_administrateur',
-        'ADMIN': 'administrateur',
-        'RESPONSABLE_COLLECTE': 'responsable_collecte',
-        'AGENT_COLLECTE': 'agent_collecte',
-        'RESPONSABLE_DECHARGE': 'responsable_decharge',
-        'OBSERVATEUR': 'observateur',
-    }.get(role_name)
-
-    user.groups.clear()
-    if group_name:
-        group, _ = Group.objects.get_or_create(name=group_name)
-        user.groups.add(group)
+    _assign_group_for_role(user)
 
     AuditLog.objects.create(
         user=request.user,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Shield, Users, Check, X, ChevronDown, ChevronUp, Save, Loader2 } from 'lucide-react'
+import { Shield, Users, Check, X, ChevronDown, ChevronUp, Save, Loader2, Plus } from 'lucide-react'
 import api from '../../../api'
 import clsx from 'clsx'
 import { Can } from '../../../components/guards'
@@ -28,6 +28,9 @@ export default function AdminRolesPage() {
   const [saving, setSaving] = useState(false)
   const [expandedModules, setExpandedModules] = useState({})
   const [loading, setLoading] = useState(true)
+  const [newRoleOpen, setNewRoleOpen] = useState(false)
+  const [newRoleName, setNewRoleName] = useState('')
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -77,6 +80,20 @@ export default function AdminRolesPage() {
     return acc
   }, {})
 
+  const createRole = async () => {
+    if (!newRoleName.trim()) return
+    setCreating(true)
+    try {
+      const { data } = await api.post('/accounts/roles/', { name: newRoleName.trim() })
+      setRoles(prev => [...prev, data])
+      setSelectedRole(data)
+      setNewRoleName('')
+      setNewRoleOpen(false)
+    } catch (err) {
+      alert(err.response?.data?.error || 'Erreur lors de la création')
+    } finally { setCreating(false) }
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center py-20">
       <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
@@ -85,6 +102,28 @@ export default function AdminRolesPage() {
 
   return (
     <div className="space-y-6">
+      {newRoleOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setNewRoleOpen(false)}>
+          <div className="bg-white dark:bg-[#16240D] rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold mb-4">Nouveau rôle</h3>
+            <input
+              autoFocus
+              value={newRoleName}
+              onChange={e => setNewRoleName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && createRole()}
+              placeholder="Nom du rôle"
+              className="w-full px-4 py-2 rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] bg-[#F8FAFC] dark:bg-[#0D1B0A] text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 mb-4"
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setNewRoleOpen(false)} className="px-4 py-2 text-sm rounded-xl border border-[#E2E8F0] dark:border-[#2B3D1E] hover:bg-slate-50">Annuler</button>
+              <button onClick={createRole} disabled={creating || !newRoleName.trim()} className="px-4 py-2 text-sm rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-700 disabled:opacity-50">
+                {creating ? 'Création...' : 'Créer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
           <Shield className="w-5 h-5 text-violet-600" />
@@ -99,6 +138,11 @@ export default function AdminRolesPage() {
         {/* Roles list */}
         <div className="bg-white dark:bg-[#16240D] rounded-2xl border border-[#E2E8F0] dark:border-[#2B3D1E] p-4">
           <h2 className="font-semibold text-slate-900 dark:text-white mb-3">Rôles</h2>
+          <button
+            onClick={() => setNewRoleOpen(true)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 mb-3 rounded-xl border border-dashed border-primary-300 dark:border-primary-700 text-primary-600 text-sm font-medium hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors">
+            <Plus className="w-4 h-4" /> Nouveau rôle
+          </button>
           <div className="space-y-2">
             {roles.map(role => (
               <button
@@ -133,15 +177,13 @@ export default function AdminRolesPage() {
                 <h2 className="font-semibold text-slate-900 dark:text-white">
                   Permissions — {selectedRole.name}
                 </h2>
-                <Can do="accounts.change_group">
-                  <button
-                    onClick={savePermissions}
-                    disabled={saving}
-                    className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl text-sm font-medium hover:bg-primary-700 disabled:opacity-50">
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    Sauvegarder
-                  </button>
-                </Can>
+                <button
+                  onClick={savePermissions}
+                  disabled={saving}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl text-sm font-medium hover:bg-primary-700 disabled:opacity-50">
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Sauvegarder
+                </button>
               </div>
 
               <div className="space-y-3">

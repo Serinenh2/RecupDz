@@ -7,7 +7,7 @@ ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm install && npm cache clean --force
+RUN npm install --legacy-peer-deps && npm cache clean --force
 
 COPY . .
 RUN npx vite build

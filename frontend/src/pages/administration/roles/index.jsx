@@ -9,7 +9,7 @@ import { useAuthStore } from '../../../store'
 import api from '../../../api'
 import toast from 'react-hot-toast'
 import clsx from 'clsx'
-import { Can, useCan } from '../../../components/guards'
+import { Can } from '../../../components/guards'
 
 const MODULE_LABELS = {
   accounts: 'Utilisateurs',
@@ -397,11 +397,9 @@ function PermissionsEditor({ open, onClose, role, allPerms, onSave, loading }) {
           </span>
           <div className="flex gap-2">
             <button onClick={onClose} className="btn-secondary btn-sm">Annuler</button>
-            <Can do="accounts.change_group">
-              <button onClick={handleSave} disabled={loading} className="btn-primary btn-sm">
-                {loading ? 'Enregistrement...' : 'Enregistrer'}
-              </button>
-            </Can>
+            <button onClick={handleSave} disabled={loading} className="btn-primary btn-sm">
+              {loading ? 'Enregistrement...' : 'Enregistrer'}
+            </button>
           </div>
         </div>
       </div>
@@ -472,21 +470,15 @@ function RoleDetailPanel({ open, role, onClose, onEdit, onPermissions, onDelete 
 
           {/* Actions */}
           <div className="space-y-2">
-            <Can do="accounts.change_group">
-              <button onClick={() => onEdit(role)} className="btn-secondary btn-sm w-full justify-start">
-                <Edit className="w-4 h-4" /> Modifier le nom
-              </button>
-            </Can>
-            <Can do="accounts.change_group">
-              <button onClick={() => onPermissions(role)} className="btn-secondary btn-sm w-full justify-start">
-                <Key className="w-4 h-4" /> Gérer les permissions
-              </button>
-            </Can>
-            <Can do="accounts.delete_group">
-              <button onClick={() => onDelete(role)} className="btn-danger btn-sm w-full justify-start">
-                <Trash2 className="w-4 h-4" /> Supprimer le rôle
-              </button>
-            </Can>
+            <button onClick={() => onEdit(role)} className="btn-secondary btn-sm w-full justify-start">
+              <Edit className="w-4 h-4" /> Modifier le nom
+            </button>
+            <button onClick={() => onPermissions(role)} className="btn-secondary btn-sm w-full justify-start">
+              <Key className="w-4 h-4" /> Gérer les permissions
+            </button>
+            <button onClick={() => onDelete(role)} className="btn-danger btn-sm w-full justify-start">
+              <Trash2 className="w-4 h-4" /> Supprimer le rôle
+            </button>
           </div>
         </div>
       </div>
@@ -719,21 +711,15 @@ export default function AdminRolesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
-                        <Can do="accounts.change_group">
-                          <button onClick={() => handleEdit(r)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#2B3D1E]" title="Modifier">
-                            <Edit className="w-3.5 h-3.5 text-slate-500" />
-                          </button>
-                        </Can>
-                        <Can do="accounts.change_group">
-                          <button onClick={() => handlePermissions(r)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#2B3D1E]" title="Permissions">
-                            <Key className="w-3.5 h-3.5 text-slate-500" />
-                          </button>
-                        </Can>
-                        <Can do="accounts.delete_group">
-                          <button onClick={() => handleDelete(r)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10" title="Supprimer">
-                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                          </button>
-                        </Can>
+                        <button onClick={() => handleEdit(r)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#2B3D1E]" title="Modifier">
+                          <Edit className="w-3.5 h-3.5 text-slate-500" />
+                        </button>
+                        <button onClick={() => handlePermissions(r)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#2B3D1E]" title="Permissions">
+                          <Key className="w-3.5 h-3.5 text-slate-500" />
+                        </button>
+                        <button onClick={() => handleDelete(r)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10" title="Supprimer">
+                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                        </button>
                       </div>
                     </td>
                   </tr>

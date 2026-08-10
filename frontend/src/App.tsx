@@ -136,6 +136,16 @@ export default function App() {
                 }
               />
 
+              {/* Legacy administration route (uses same new component) */}
+              <Route
+                path="administration/roles"
+                element={
+                  <RoleGuard allowedRoles={['ADMIN', 'SUPERADMIN']} fallback={<ForbiddenPage />}>
+                    <RolesPage />
+                  </RoleGuard>
+                }
+              />
+
               <Route
                 path="permissions"
                 element={

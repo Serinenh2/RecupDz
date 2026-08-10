@@ -35,6 +35,7 @@ export const useCreateUser = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: usersKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
     },
   });
 };
@@ -49,6 +50,7 @@ export const useUpdateUser = () => {
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: usersKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
       queryClient.setQueryData(usersKeys.detail(variables.id), data);
     },
   });
@@ -63,6 +65,7 @@ export const useDeleteUser = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: usersKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
     },
   });
 };
@@ -77,6 +80,7 @@ export const useToggleUserStatus = () => {
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: usersKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
       queryClient.setQueryData(usersKeys.detail(variables.id), data);
     },
   });

@@ -102,9 +102,7 @@ export default function App() {
             <ProtectedRoute role="SUPERADMIN"><AdministrationUsersPage /></ProtectedRoute>
           } />
 
-          <Route path="roles" element={
-            <ProtectedRoute role="SUPERADMIN"><AdministrationRolesPage /></ProtectedRoute>
-          } />
+          <Route path="roles" element={<Navigate to="/admin/roles" replace />} />
 
           <Route path="permissions" element={
             <ProtectedRoute role="SUPERADMIN"><AdministrationPermissionsPage /></ProtectedRoute>
