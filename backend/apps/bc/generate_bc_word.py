@@ -13,15 +13,12 @@ from docx.oxml import OxmlElement
 
 from .generate_bc import (
     _recuperateur_info, _calc_totaux, _calc_ligne, _fmt_date, _fmt_montant, _fmt_qte,
-    montant_en_lettres, _is_indurex, _INDUREX_NOM, _INDUREX_SLOGAN, _INDUREX_CAPITAL,
+    montant_en_lettres,
 )
 
-_GENERIC_GREEN     = RGBColor(0x3B, 0x6D, 0x11)
 _INDUREX_GREEN     = RGBColor(0x3C, 0x7A, 0x42)
 _INDUREX_CAPITAL_VERT = RGBColor(0x0F, 0x45, 0x2B)
 _INDUREX_GREEN_HEX = '3C7A42'
-_GENERIC_GREEN_HEX = '3B6D11'
-_LIGHT_GREEN_HEX   = 'EAF3DE'
 _WHITE             = RGBColor(0xFF, 0xFF, 0xFF)
 _BLACK             = RGBColor(0x00, 0x00, 0x00)
 
@@ -137,157 +134,7 @@ def _add_picture_safe(cell_or_par, path, width_cm, height_cm=None):
 
 def generate_bc_docx(data: dict) -> bytes:
     rec = _recuperateur_info(data)
-    if _is_indurex(rec):
-        return _generate_bc_docx_indurex(data, rec)
-    return _generate_bc_docx_generique(data, rec)
-
-
-# ── Gabarit générique ───────────────────────────────────────────────────────────
-
-def _generate_bc_docx_generique(data: dict, rec: dict) -> bytes:
-    lignes  = data.get('lignes') or []
-    tva_pct = float(data.get('tva_pct') or 19)
-    type_doc = data.get('type_document')
-
-    doc = Document()
-    for section in doc.sections:
-        section.left_margin  = Cm(1.5)
-        section.right_margin = Cm(1.5)
-        section.top_margin   = Cm(1.2)
-        section.bottom_margin = Cm(1.2)
-
-    # ── En-tête : logo + raison sociale ────────────────────────────────────────
-    entete = doc.add_table(rows=1, cols=2)
-    _set_col_widths(entete, [2.5, COL - 2.5])
-    if rec['logo_path']:
-        _add_picture_safe(entete.rows[0].cells[0], rec['logo_path'], 2.2, 2.2)
-    _cell_lines(entete.rows[0].cells[1], [{
-        'text': (rec['nom'] or '').upper(), 'font': 'Calibri', 'size': 20,
-        'bold': True, 'italic': True, 'color': _GENERIC_GREEN,
-    }])
-
-    if rec['agrement_num']:
-        _doc_p(doc, f"Agrément N° {rec['agrement_num']} du {rec['agrement_date']}", size=9)
-    adresse_ligne = ' '.join(filter(None, [rec['adresse'], rec['code_postal']]))
-    if adresse_ligne:
-        _doc_p(doc, adresse_ligne, size=9)
-
-    id_table = doc.add_table(rows=2, cols=2)
-    _set_col_widths(id_table, [COL / 2, COL / 2])
-    _cell_lines(id_table.rows[0].cells[0], [{'text': f"RC {rec['rc']}", 'size': 9}])
-    _cell_lines(id_table.rows[0].cells[1], [{'text': f"NIF {rec['nif']}", 'size': 9}])
-    _cell_lines(id_table.rows[1].cells[0], [{'text': f"NA {rec['na']}", 'size': 9}])
-    _cell_lines(id_table.rows[1].cells[1], [{'text': f"NIS {rec['nis']}", 'size': 9}])
-    _doc_p(doc)
-
-    # ── Date / lieu ─────────────────────────────────────────────────────────────
-    _doc_p(doc, f"{rec['commune']} le : {_fmt_date(data.get('date_commande', ''))}",
-           align=WD_ALIGN_PARAGRAPH.RIGHT, size=9.5)
-    _doc_p(doc)
-
-    # ── Client ──────────────────────────────────────────────────────────────────
-    p1 = _doc_p(doc, 'Nome de Client : ', size=9.5)
-    _set_run(p1.add_run(str(data.get('client_nom') or '')), size=9.5, bold=True)
-    p2 = _doc_p(doc, 'Adresse : ', size=9.5)
-    _set_run(p2.add_run(str(data.get('client_adresse') or '')), size=9.5, bold=True)
-    _doc_p(doc)
-
-    # ── Titre ───────────────────────────────────────────────────────────────────
-    titre_txt = {'PROFORMA': 'Proforma', 'FACTURE': 'Facture'}.get(type_doc, 'Bon de commande')
-    titre_tbl = doc.add_table(rows=1, cols=1)
-    _set_col_widths(titre_tbl, [8])
-    _cell_borders(titre_tbl.rows[0].cells[0])
-    _cell_lines(titre_tbl.rows[0].cells[0], [{
-        'text': titre_txt, 'size': 13, 'bold': True, 'italic': True, 'align': WD_ALIGN_PARAGRAPH.CENTER,
-    }])
-    _doc_p(doc)
-
-    # ── Tableau des déchets ──────────────────────────────────────────────────────
-    col_w   = [1.2, 6, 2.3, 2, 2.5, 3]
-    headers = ['N°', 'Description (Nature des déchets)', 'Quantités', 'Unités', 'Prix unitaires', 'Total HT']
-    tbl = doc.add_table(rows=1, cols=len(headers))
-    tbl.style = 'Table Grid'
-    _set_col_widths(tbl, col_w)
-    for i, h in enumerate(headers):
-        cell = tbl.rows[0].cells[i]
-        _shade_cell(cell, _GENERIC_GREEN_HEX)
-        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-        _set_run(cell.paragraphs[0].add_run(h), size=9, bold=True, color=_WHITE)
-
-    for i, l in enumerate(lignes, start=1):
-        try:
-            qte = float(l.get('quantite') or 0)
-            pu  = float(l.get('prix_unitaire') or 0)
-            ht  = qte * pu
-        except (TypeError, ValueError):
-            ht = 0.0
-        row = tbl.add_row().cells
-        vals = [
-            str(i), str(l.get('description', '')), str(l.get('quantite', '')), str(l.get('unite', 'KG')),
-            f"{pu:,.2f} DZ".replace(',', ' '), f"{ht:,.2f} DZ".replace(',', ' '),
-        ]
-        for j, val in enumerate(vals):
-            row[j].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT if j >= 4 else WD_ALIGN_PARAGRAPH.CENTER
-            _set_run(row[j].paragraphs[0].add_run(val), size=9)
-
-    _doc_p(doc)
-
-    # ── Récapitulatif HT / TVA / TTC ────────────────────────────────────────────
-    total_ht, tva, total_ttc = _calc_totaux(lignes, tva_pct)
-    recap = doc.add_table(rows=3, cols=2)
-    recap.style = 'Table Grid'
-    _set_col_widths(recap, [4, 3])
-    recap.alignment = None
-    rows_spec = [
-        ('Total HT', f"{total_ht:,.2f} DZ", False),
-        (f'TVA ({tva_pct:.0f}%)', f"{tva:,.2f} DZ", False),
-        ('Total TTC', f"{total_ttc:,.2f} DZ", True),
-    ]
-    for i, (lbl, val, is_bold) in enumerate(rows_spec):
-        row = recap.rows[i]
-        _cell_lines(row.cells[0], [{'text': lbl, 'size': 9.5, 'bold': is_bold}])
-        row.cells[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        _set_run(row.cells[1].paragraphs[0].add_run(val.replace(',', ' ')), size=9, bold=is_bold)
-        if is_bold:
-            _shade_cell(row.cells[0], _LIGHT_GREEN_HEX)
-            _shade_cell(row.cells[1], _LIGHT_GREEN_HEX)
-    # Aligner le tableau récap à droite de la page
-    tblPr = recap._tbl.tblPr
-    jc = OxmlElement('w:jc'); jc.set(qn('w:val'), 'right')
-    tblPr.append(jc)
-
-    _doc_p(doc)
-
-    # ── Arrêté ──────────────────────────────────────────────────────────────────
-    arrete_nom = {'PROFORMA': 'présente proforma', 'BC': 'présente commande'}.get(type_doc, 'présente facture')
-    p_arrete = _doc_p(doc, f"Arrêter la {arrete_nom} en toutes taxes comprises a la somme de : ",
-                       size=9, italic=True, underline=True)
-    _set_run(p_arrete.add_run(f"{total_ttc:,.2f} DZ".replace(',', ' ')), size=9, italic=True, bold=True)
-    validite_jours = data.get('validite_offre_jours')
-    if type_doc == 'PROFORMA' and validite_jours not in (None, ''):
-        p_arrete.add_run().add_break(WD_BREAK.LINE)
-        _set_run(p_arrete.add_run("Validité de l'offre : "), size=9, italic=True, bold=True)
-        _set_run(p_arrete.add_run(f"{int(validite_jours)} jours"), size=9, italic=True)
-
-    _doc_p(doc)
-    _doc_p(doc)
-
-    # ── Signature ───────────────────────────────────────────────────────────────
-    if rec['cachet_path'] or rec['signature_path']:
-        sign_p = _doc_p(doc, align=WD_ALIGN_PARAGRAPH.RIGHT)
-        if rec['cachet_path']:
-            _add_picture_safe(sign_p, rec['cachet_path'], 2.8)
-        if rec['signature_path']:
-            sign_p.add_run('   ')
-            _add_picture_safe(sign_p, rec['signature_path'], 3, 1.6)
-    _doc_p(doc, 'Le Gérant', align=WD_ALIGN_PARAGRAPH.RIGHT, size=10)
-    if rec['responsable']:
-        _doc_p(doc, rec['responsable'], align=WD_ALIGN_PARAGRAPH.RIGHT, size=10)
-
-    buffer = io.BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
-    return buffer.read()
+    return _generate_bc_docx_indurex(data, rec)
 
 
 # ── Gabarit SARL INDUREX ────────────────────────────────────────────────────────
@@ -318,11 +165,12 @@ def _generate_bc_docx_indurex(data: dict, rec: dict) -> bytes:
         _add_picture_safe(entete.rows[0].cells[0], rec['logo_path'], 2, 2)
 
     nom_cell = entete.rows[0].cells[1]
-    _cell_lines(nom_cell, [
-        {'text': _INDUREX_NOM, 'font': 'Calibri', 'size': 20, 'bold': True, 'color': _INDUREX_GREEN},
-        {'text': _INDUREX_SLOGAN, 'font': 'Calibri', 'size': 9.5, 'bold': True, 'color': _INDUREX_GREEN},
-        {'text': _INDUREX_CAPITAL, 'font': 'Calibri', 'size': 7.5, 'bold': True, 'color': _INDUREX_CAPITAL_VERT},
-    ])
+    _nom_lines = [{'text': (rec.get('nom') or '').upper(), 'font': 'Calibri', 'size': 20, 'bold': True, 'color': _INDUREX_GREEN}]
+    if rec.get('slogan'):
+        _nom_lines.append({'text': rec['slogan'], 'font': 'Calibri', 'size': 9.5, 'bold': True, 'color': _INDUREX_GREEN})
+    if rec.get('capital_social'):
+        _nom_lines.append({'text': rec['capital_social'], 'font': 'Calibri', 'size': 7.5, 'bold': True, 'color': _INDUREX_CAPITAL_VERT})
+    _cell_lines(nom_cell, _nom_lines)
 
     ref_cell = entete.rows[0].cells[2]
     _cell_borders(ref_cell)

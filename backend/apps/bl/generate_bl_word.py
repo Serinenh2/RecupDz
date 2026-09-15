@@ -10,118 +10,18 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 from apps.bc.generate_bc_word import (
     _shade_cell, _cell_borders, _set_col_widths, _set_run, _cell_lines, _kv_rows,
-    _add_picture_safe, _zero_spacing, _doc_p, _GENERIC_GREEN, _INDUREX_GREEN,
-    _INDUREX_GREEN_HEX, _GENERIC_GREEN_HEX, _WHITE, COL, _INDUREX_CAPITAL_VERT,
+    _add_picture_safe, _zero_spacing, _doc_p, _INDUREX_GREEN,
+    _INDUREX_GREEN_HEX, _WHITE, COL, _INDUREX_CAPITAL_VERT,
 )
-from .generate_bl import _recuperateur_info, _destinataire_info, _fmt_date, _fmt_montant, _fmt_qte, _is_indurex
+from .generate_bl import _recuperateur_info, _destinataire_info, _fmt_date, _fmt_montant, _fmt_qte
 
-_INDUREX_NOM     = 'SARL INDUREX'
-_INDUREX_SLOGAN  = 'INDUSTRIAL WASTE RECOVERY AND VALORIZATION'
-_INDUREX_CAPITAL = 'AU CAPITAL DE 1 000 000,00 DA'
 _MODE_LIV_ABBR   = {'ENLEVEMENT': 'ENLEV', 'LIVRAISON': 'LIVR'}
 
 
 def generate_bl_docx(data: dict) -> bytes:
     rec  = _recuperateur_info(data)
     dest = _destinataire_info(data)
-    if _is_indurex(rec):
-        return _generate_bl_docx_indurex(data, rec, dest)
-    return _generate_bl_docx_generique(data, rec, dest)
-
-
-# ── Gabarit générique ───────────────────────────────────────────────────────────
-
-def _generate_bl_docx_generique(data: dict, rec: dict, dest: dict) -> bytes:
-    def v(key, default=''):
-        val = data.get(key, default)
-        return str(val) if val not in (None, '') else default
-
-    doc = Document()
-    for section in doc.sections:
-        section.left_margin  = Cm(1.5)
-        section.right_margin = Cm(1.5)
-        section.top_margin   = Cm(1.2)
-        section.bottom_margin = Cm(1.2)
-
-    entete = doc.add_table(rows=1, cols=2)
-    _set_col_widths(entete, [2.5, COL - 2.5])
-    if rec['logo_path']:
-        _add_picture_safe(entete.rows[0].cells[0], rec['logo_path'], 2.2, 2.2)
-    _cell_lines(entete.rows[0].cells[1], [{
-        'text': (rec['nom'] or '').upper(), 'size': 20, 'bold': True, 'italic': True, 'color': _GENERIC_GREEN,
-    }])
-
-    if rec['agrement_num']:
-        _doc_p(doc, f"Agrément N° {rec['agrement_num']} du {rec['agrement_date']}", size=9)
-    adresse_ligne = ' '.join(filter(None, [rec['adresse'], rec['code_postal']]))
-    if adresse_ligne:
-        _doc_p(doc, adresse_ligne, size=9)
-
-    id_table = doc.add_table(rows=2, cols=2)
-    _set_col_widths(id_table, [COL / 2, COL / 2])
-    _cell_lines(id_table.rows[0].cells[0], [{'text': f"RC {rec['rc']}", 'size': 9}])
-    _cell_lines(id_table.rows[0].cells[1], [{'text': f"NIF {rec['nif']}", 'size': 9}])
-    _cell_lines(id_table.rows[1].cells[0], [{'text': f"NA {rec['na']}", 'size': 9}])
-    _cell_lines(id_table.rows[1].cells[1], [{'text': f"NIS {rec['nis']}", 'size': 9}])
-    _doc_p(doc)
-
-    _doc_p(doc, f"{rec['commune']} le : {_fmt_date(v('date_livraison'))}",
-           align=WD_ALIGN_PARAGRAPH.RIGHT, size=9.5)
-    _doc_p(doc)
-
-    p1 = _doc_p(doc, 'Nom de Client : ', size=9.5)
-    _set_run(p1.add_run(dest['nom']), size=9.5, bold=True)
-    p2 = _doc_p(doc, 'Adresse : ', size=9.5)
-    _set_run(p2.add_run(dest['adresse']), size=9.5, bold=True)
-    _doc_p(doc)
-
-    titre_tbl = doc.add_table(rows=1, cols=1)
-    _set_col_widths(titre_tbl, [8])
-    _cell_borders(titre_tbl.rows[0].cells[0])
-    _cell_lines(titre_tbl.rows[0].cells[0], [{
-        'text': 'Bon de livraison', 'size': 13, 'bold': True, 'italic': True, 'align': WD_ALIGN_PARAGRAPH.CENTER,
-    }])
-    _doc_p(doc)
-
-    lignes  = data.get('lignes') or []
-    headers = ['N°', 'Description (Nature des déchets)', 'Quantités', 'Unités', 'Stockage']
-    col_w   = [1.3, 7.7, 2.5, 2.5, 3]
-    tbl = doc.add_table(rows=1, cols=len(headers))
-    tbl.style = 'Table Grid'
-    _set_col_widths(tbl, col_w)
-    for i, h in enumerate(headers):
-        cell = tbl.rows[0].cells[i]
-        _shade_cell(cell, _GENERIC_GREEN_HEX)
-        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-        _set_run(cell.paragraphs[0].add_run(h), size=9, bold=True, color=_WHITE)
-    for i, l in enumerate(lignes, start=1):
-        row = tbl.add_row().cells
-        vals = [str(i), str(l.get('description', '')), str(l.get('quantite', '')),
-                 str(l.get('unite', 'KG')), str(l.get('stockage', ''))]
-        for j, val in enumerate(vals):
-            row[j].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-            _set_run(row[j].paragraphs[0].add_run(val), size=9)
-
-    _doc_p(doc)
-    _doc_p(doc, f"Nom de chauffeur : {v('chauffeur_nom')}", size=9.5)
-    _doc_p(doc, f"Immatriculation de camion : {v('camion_immatriculation')}", size=9.5)
-    _doc_p(doc)
-
-    if rec['cachet_path'] or rec['signature_path']:
-        sign_p = _doc_p(doc, align=WD_ALIGN_PARAGRAPH.RIGHT)
-        if rec['cachet_path']:
-            _add_picture_safe(sign_p, rec['cachet_path'], 2.8)
-        if rec['signature_path']:
-            sign_p.add_run('   ')
-            _add_picture_safe(sign_p, rec['signature_path'], 3, 1.6)
-    _doc_p(doc, 'Le Gérant', align=WD_ALIGN_PARAGRAPH.RIGHT, size=10)
-    if rec['responsable']:
-        _doc_p(doc, rec['responsable'], align=WD_ALIGN_PARAGRAPH.RIGHT, size=10)
-
-    buffer = io.BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
-    return buffer.read()
+    return _generate_bl_docx_indurex(data, rec, dest)
 
 
 # ── Gabarit SARL INDUREX ────────────────────────────────────────────────────────
@@ -145,11 +45,12 @@ def _generate_bl_docx_indurex(data: dict, rec: dict, dest: dict) -> bytes:
     if rec['logo_path']:
         _add_picture_safe(entete.rows[0].cells[0], rec['logo_path'], 2, 2)
 
-    _cell_lines(entete.rows[0].cells[1], [
-        {'text': _INDUREX_NOM, 'size': 20, 'bold': True, 'color': _INDUREX_GREEN},
-        {'text': _INDUREX_SLOGAN, 'size': 9.5, 'bold': True, 'color': _INDUREX_GREEN},
-        {'text': _INDUREX_CAPITAL, 'size': 7.5, 'bold': True, 'color': _INDUREX_CAPITAL_VERT},
-    ])
+    _nom_lines = [{'text': (rec.get('nom') or '').upper(), 'size': 20, 'bold': True, 'color': _INDUREX_GREEN}]
+    if rec.get('slogan'):
+        _nom_lines.append({'text': rec['slogan'], 'size': 9.5, 'bold': True, 'color': _INDUREX_GREEN})
+    if rec.get('capital_social'):
+        _nom_lines.append({'text': rec['capital_social'], 'size': 7.5, 'bold': True, 'color': _INDUREX_CAPITAL_VERT})
+    _cell_lines(entete.rows[0].cells[1], _nom_lines)
 
     ref_cell = entete.rows[0].cells[2]
     _cell_borders(ref_cell)

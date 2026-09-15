@@ -49,6 +49,10 @@ class Recuperateur(models.Model):
                                             verbose_name='Certification ISO 45001:2018')
     nom_raison_sociale = models.CharField(max_length=300)
     nom_commercial     = models.CharField(max_length=300, blank=True)
+    slogan             = models.CharField(max_length=200, blank=True,
+                                           verbose_name='Slogan (documents PDF/Word)')
+    capital_social     = models.CharField(max_length=100, blank=True,
+                                           verbose_name='Capital social (documents PDF/Word)')
     responsable        = models.CharField(max_length=200)
     registre_commerce  = models.CharField(max_length=100, blank=True)
     nif                = models.CharField(max_length=50, blank=True)

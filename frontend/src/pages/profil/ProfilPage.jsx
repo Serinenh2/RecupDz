@@ -889,6 +889,14 @@ export default function ProfilPage() {
                   </select>
                 </F>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <F label="Slogan (affiché sur les PDF/Word)">
+                  <input {...recForm.register('slogan')} className="input" placeholder="Optionnel"/>
+                </F>
+                <F label="Capital social (affiché sur les PDF/Word)">
+                  <input {...recForm.register('capital_social')} className="input" placeholder="Ex: AU CAPITAL DE 1 000 000,00 DA"/>
+                </F>
+              </div>
               <div className="grid grid-cols-4 gap-3">
                 <F label="NIF"><input {...recForm.register('nif')} className="input" placeholder="NIF"/></F>
                 <F label="NIS"><input {...recForm.register('nis')} className="input" placeholder="NIS"/></F>

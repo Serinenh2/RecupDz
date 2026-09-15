@@ -54,6 +54,8 @@ def _recuperateur_info(data):
             agr = r.agrement_actif
             return {
                 'nom':             r.nom_commercial or r.nom_raison_sociale,
+                'slogan':          r.slogan or '',
+                'capital_social':  r.capital_social or '',
                 'agrement_num':    agr.numero_agrement if agr else '',
                 'agrement_date':   agr.date_delivrance.strftime('%d/%m/%Y') if agr and agr.date_delivrance else '',
                 'adresse':         r.adresse or '',
@@ -78,7 +80,8 @@ def _recuperateur_info(data):
         except Recuperateur.DoesNotExist:
             pass
     return {
-        'nom': data.get('recuperateur_nom') or '', 'agrement_num': '', 'agrement_date': '',
+        'nom': data.get('recuperateur_nom') or '', 'slogan': '', 'capital_social': '',
+        'agrement_num': '', 'agrement_date': '',
         'adresse': '', 'commune': '', 'code_postal': '', 'rc': '', 'nif': '', 'na': '', 'nis': '',
         'telephone': '', 'fax': '', 'email': '', 'compte_bancaire': '',
         'responsable': '', 'logo_path': None, 'signature_path': None, 'cachet_path': None,
@@ -200,10 +203,6 @@ def montant_en_lettres(montant):
     if centimes:
         texte += f" et {centimes:02d} Cts"
     return texte
-
-
-def _is_indurex(rec):
-    return 'INDUREX' in (rec.get('nom') or '').upper()
 
 
 # ── Page CGV pleine page (verso de la Facture) : reproduit les marges du
@@ -352,193 +351,10 @@ def _conditions_generales_story():
 
 
 def generate_bc_pdf(data: dict) -> bytes:
-    buffer = io.BytesIO()
-
-    def ps(name, **kw):
-        return ParagraphStyle(name, **kw)
-
-    NOM   = ps('NOM',   fontName='Helvetica-BoldOblique', fontSize=20, alignment=TA_LEFT,    leading=24, textColor=GREEN)
-    META  = ps('META',  fontName='Helvetica',             fontSize=9,  alignment=TA_LEFT,    leading=13)
-    LBL   = ps('LBL',   fontName='Helvetica',             fontSize=9.5,                      leading=15)
-    TITRE = ps('TITRE', fontName='Helvetica-BoldOblique', fontSize=13, alignment=TA_CENTER,  leading=16)
-    HEAD  = ps('HEAD',  fontName='Helvetica-Bold',        fontSize=9,  alignment=TA_CENTER,  leading=12, textColor=colors.white)
-    HEADR = ps('HEADR', fontName='Helvetica-Bold',        fontSize=9,  alignment=TA_RIGHT,   leading=12, textColor=colors.white)
-    CELL  = ps('CELL',  fontName='Helvetica',             fontSize=9,  alignment=TA_CENTER,  leading=12)
-    CELLR = ps('CELLR', fontName='Helvetica',             fontSize=9,  alignment=TA_RIGHT,   leading=12)
-    SIGN  = ps('SIGN',  fontName='Helvetica',             fontSize=10, alignment=TA_RIGHT,   leading=14)
-    FOOT  = ps('FOOT',  fontName='Helvetica-Oblique',     fontSize=9,  alignment=TA_LEFT,    leading=13)
-
-    def v(key, default=''):
-        val = data.get(key, default)
-        return str(val) if val not in (None, '') else default
-
     rec = _recuperateur_info(data)
-
-    if _is_indurex(rec):
-        return _generate_bc_pdf_indurex(data, rec)
-
-    doc = SimpleDocTemplate(buffer, pagesize=A4,
-        topMargin=1.2*cm, bottomMargin=1.2*cm, leftMargin=1.5*cm, rightMargin=1.5*cm)
-    _add_cgv_page_template(doc)
-    story = []
-
-    # ── En-tête : logo + raison sociale ────────────────────────────────────────
-    logo_cell = ''
-    if rec['logo_path']:
-        try:
-            logo_cell = Image(rec['logo_path'], width=2.2*cm, height=2.2*cm)
-        except Exception:
-            logo_cell = ''
-    entete = Table([[logo_cell, Paragraph(rec['nom'].upper(), NOM)]], colWidths=[2.5*cm, COL - 2.5*cm])
-    entete.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'MIDDLE')]))
-    story.append(entete)
-    story.append(Spacer(1, 6))
-
-    if rec['agrement_num']:
-        story.append(Paragraph(f"Agrément N° {rec['agrement_num']} du {rec['agrement_date']}", META))
-    adresse_ligne = ' '.join(filter(None, [rec['adresse'], rec['code_postal']]))
-    if adresse_ligne:
-        story.append(Paragraph(adresse_ligne, META))
-
-    id_table = Table([[
-        Paragraph(f"RC {rec['rc']}", META), Paragraph(f"NIF {rec['nif']}", META),
-    ], [
-        Paragraph(f"NA {rec['na']}", META), Paragraph(f"NIS {rec['nis']}", META),
-    ]], colWidths=[COL / 2, COL / 2])
-    id_table.setStyle(TableStyle([('TOPPADDING', (0, 0), (-1, -1), 1), ('BOTTOMPADDING', (0, 0), (-1, -1), 1)]))
-    story.append(id_table)
-    story.append(Spacer(1, 10))
-
-    # ── Date / lieu ─────────────────────────────────────────────────────────────
-    lieu_date = Table([['', Paragraph(f"{rec['commune']} le : {_fmt_date(v('date_commande'))}", LBL)]],
-        colWidths=[COL - 7*cm, 7*cm])
-    story.append(lieu_date)
-    story.append(Spacer(1, 8))
-
-    # ── Client ──────────────────────────────────────────────────────────────────
-    story.append(Paragraph(f"Nome de Client : <b>{v('client_nom')}</b>", LBL))
-    story.append(Paragraph(f"Adresse : <b>{v('client_adresse')}</b>", LBL))
-    story.append(Spacer(1, 10))
-
-    # ── Titre ───────────────────────────────────────────────────────────────────
-    titre_txt = {'PROFORMA': 'Proforma', 'FACTURE': 'Facture'}.get(data.get('type_document'), 'Bon de commande')
-    titre_tbl = Table([[Paragraph(titre_txt, TITRE)]], colWidths=[8*cm])
-    titre_tbl.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 0.8, BLACK),
-        ('TOPPADDING', (0, 0), (-1, -1), 6), ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-    ]))
-    wrapper = Table([[titre_tbl]], colWidths=[COL])
-    wrapper.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'CENTER')]))
-    story.append(wrapper)
-    story.append(Spacer(1, 14))
-
-    # ── Tableau des déchets ──────────────────────────────────────────────────────
-    lignes  = data.get('lignes') or []
-    tva_pct = float(data.get('tva_pct') or 19)
-
-    col_w = [1.2*cm, 6*cm, 2.3*cm, 2*cm, 2.5*cm, 3*cm]
-    headers = ['N°', 'Description (Nature des déchets)', 'Quantités', 'Unités', 'Prix unitaires', 'Total HT']
-    # En-têtes alignés sur le même sens que les cellules de données de leur colonne
-    # (Prix unitaires / Total HT sont à droite, comme les montants qu'ils surplombent).
-    header_styles = [HEAD, HEAD, HEAD, HEAD, HEADR, HEADR]
-    rows = [[Paragraph(h, s) for h, s in zip(headers, header_styles)]]
-
-    if not lignes:
-        rows.append([Paragraph(str(x), CELL) for x in ['1', '', '', 'KG', 'DZ', 'DZ']])
-    else:
-        for i, l in enumerate(lignes, start=1):
-            try:
-                qte = float(l.get('quantite') or 0)
-                pu  = float(l.get('prix_unitaire') or 0)
-                ht  = qte * pu
-            except (TypeError, ValueError):
-                ht = 0.0
-            rows.append([
-                Paragraph(str(i), CELL),
-                Paragraph(str(l.get('description', '')), CELL),
-                Paragraph(str(l.get('quantite', '')), CELL),
-                Paragraph(str(l.get('unite', 'KG')), CELL),
-                Paragraph(f"{pu:,.2f} DZ".replace(',', ' '), CELLR),
-                Paragraph(f"{ht:,.2f} DZ".replace(',', ' '), CELLR),
-            ])
-
-    tbl = Table(rows, colWidths=col_w)
-    tbl.setStyle(TableStyle([
-        ('GRID',       (0, 0), (-1, -1), 0.6, BLACK),
-        ('BACKGROUND', (0, 0), (-1, 0),  GREEN),
-        ('TOPPADDING',    (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('VALIGN',     (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    story.append(tbl)
-    story.append(Spacer(1, 6))
-
-    # ── Récapitulatif HT / TVA / TTC (aligné à droite) ─────────────────────────
-    total_ht, tva, total_ttc = _calc_totaux(lignes, tva_pct)
-
-    recap_rows = [
-        [Paragraph('Total HT',              META), Paragraph(f"{total_ht:,.2f} DZ".replace(',', ' '), CELLR)],
-        [Paragraph(f'TVA ({tva_pct:.0f}%)', META), Paragraph(f"{tva:,.2f} DZ".replace(',', ' '), CELLR)],
-        [Paragraph('<b>Total TTC</b>',       LBL),  Paragraph(f"<b>{total_ttc:,.2f} DZ</b>".replace(',', ' '), CELLR)],
-    ]
-    recap_tbl = Table(recap_rows, colWidths=[4*cm, 3*cm])
-    recap_tbl.setStyle(TableStyle([
-        ('GRID',          (0, 0), (-1, -1), 0.5, BLACK),
-        ('BACKGROUND',    (0, 2), (-1, 2),  colors.HexColor('#EAF3DE')),
-        ('TOPPADDING',    (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LEFTPADDING',   (0, 0), (-1, -1), 6),
-        ('RIGHTPADDING',  (0, 0), (-1, -1), 6),
-    ]))
-    recap_wrapper = Table([[recap_tbl]], colWidths=[COL])
-    recap_wrapper.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'RIGHT')]))
-    story.append(recap_wrapper)
-    story.append(Spacer(1, 14))
-
-    # ── Arrêté de la facture ─────────────────────────────────────────────────────
-    arrete_nom = {'PROFORMA': 'présente proforma', 'BC': 'présente commande'}.get(
-        data.get('type_document'), 'présente facture')
-    arrete_txt = (
-        f"<u>Arrêter la {arrete_nom} en toutes taxes comprises a la somme de :</u> "
-        f"<b>{total_ttc:,.2f} DZ</b>".replace(',', ' ')
-    )
-    validite_jours = data.get('validite_offre_jours')
-    if data.get('type_document') == 'PROFORMA' and validite_jours not in (None, ''):
-        arrete_txt += f"<br/><b>Validité de l'offre :</b> {int(validite_jours)} jours"
-    story.append(Paragraph(arrete_txt, FOOT))
-    story.append(Spacer(1, 30))
-
-    # ── Signature ───────────────────────────────────────────────────────────────
-    sign_flowable = _signature_flowable(rec)
-    if sign_flowable:
-        story.append(sign_flowable)
-        story.append(Spacer(1, 4))
-    story.append(Paragraph('Le Gérant', SIGN))
-    if rec['responsable']:
-        story.append(Paragraph(rec['responsable'], SIGN))
-
-    if data.get('type_document') == 'FACTURE':
-        story.extend(_conditions_generales_story())
-
-        def _first_page_footer(canvas_obj, _doc):
-            canvas_obj.saveState()
-            canvas_obj.setFont('Helvetica-Bold', 9)
-            canvas_obj.setFillColor(_CGV_ROUGE)
-            canvas_obj.drawCentredString(A4[0] / 2, 1.0 * cm, 'Voir conditions générales de vente au verso')
-            canvas_obj.restoreState()
-
-        doc.build(story, onFirstPage=_first_page_footer)
-    else:
-        doc.build(story)
-    buffer.seek(0)
-    return buffer.read()
+    return _generate_bc_pdf_indurex(data, rec)
 
 
-# ── Nom et slogan fixes de l'en-tête SARL INDUREX (non stockés en base — identité
-#    visuelle propre à cette société, indépendante de nom_commercial/nom_raison_sociale) ──
-_INDUREX_NOM     = 'SARL INDUREX'
-_INDUREX_SLOGAN  = 'INDUSTRIAL WASTE RECOVERY AND VALORIZATION'
-_INDUREX_CAPITAL      = 'AU CAPITAL DE 1 000 000,00 DA'
 _INDUREX_CAPITAL_VERT = colors.HexColor('#0F452B')
 
 
@@ -703,7 +519,11 @@ def _generate_bc_pdf_indurex(data: dict, rec: dict) -> bytes:
         ('TOPPADDING', (0, 0), (-1, -1), 1), ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
     ]))
 
-    nom_block = [Paragraph(_INDUREX_NOM, NOM), Paragraph(_INDUREX_SLOGAN, SLOGAN), Paragraph(_INDUREX_CAPITAL, CAPITAL)]
+    nom_block = [Paragraph((rec.get('nom') or '').upper(), NOM)]
+    if rec.get('slogan'):
+        nom_block.append(Paragraph(rec['slogan'], SLOGAN))
+    if rec.get('capital_social'):
+        nom_block.append(Paragraph(rec['capital_social'], CAPITAL))
     entete = Table([[logo_cell, nom_block, ref_box]], colWidths=[2.3*cm, COL - 2.3*cm - 6.7*cm, 6.7*cm])
     entete.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
