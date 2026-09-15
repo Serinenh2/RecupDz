@@ -190,7 +190,8 @@ function CatalogueEntreprise() {
     return NOMENCLATURE_ENTREPRISE.filter(item =>
       !q ||
       item.designation.toLowerCase().includes(q) ||
-      item.reference.toLowerCase().includes(q)
+      item.reference.toLowerCase().includes(q) ||
+      (item.code_dechet || '').toLowerCase().includes(q)
     )
   }, [search])
 
@@ -200,7 +201,7 @@ function CatalogueEntreprise() {
         <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher par désignation ou référence..."
+            placeholder="Rechercher par désignation, référence ou code déchet..."
             className="input pl-9 text-sm" />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
@@ -220,6 +221,7 @@ function CatalogueEntreprise() {
                 <tr className="bg-gray-50 dark:bg-[#2B3D1E] border-b border-gray-200 dark:border-[#2B3D1E]">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Désignation</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Référence</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-40">Code déchet</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-40">Conditionnement</th>
                 </tr>
               </thead>
@@ -234,6 +236,20 @@ function CatalogueEntreprise() {
                       <span className="font-mono text-xs font-bold text-primary-700 bg-primary-50 px-2 py-1 rounded">
                         {item.reference}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {item.code_dechet ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded">
+                            {item.code_dechet}
+                          </span>
+                          <span className={`badge ${CLASSE_CFG[item.classe]?.badge || 'badge-gray'} text-[10px]`}>
+                            {item.classe}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`badge ${COND_BADGE[item.conditionnement] || 'badge-gray'}`}>
