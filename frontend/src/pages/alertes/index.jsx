@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Bell, AlertTriangle, XCircle, Clock, CheckCircle2,
   Shield, RefreshCw, Search, ChevronRight, X,
@@ -44,10 +45,14 @@ function Spinner() {
 }
 
 // ── Alert Card ────────────────────────────────────────────────────────────────
-function AlertCard({ alert }) {
+function AlertCard({ alert, currentUser }) {
+  const navigate = useNavigate()
   const cfg     = TYPE_CFG[alert.type] || TYPE_CFG.AGREMENT_EXPIRE
   const sevCfg  = SEV_CFG[alert.severity] || SEV_CFG.warning
   const Icon    = cfg.icon
+  // Seule la page Profil permet de gérer un agrément, et uniquement le sien —
+  // l'action n'est donc navigable que si l'alerte concerne le récupérateur courant.
+  const isOwn   = alert.recuperateur_id && String(alert.recuperateur_id) === String(currentUser?.recuperateur_id)
 
   return (
     <div className={`card p-5 border-l-4 ${cfg.border} ${cfg.bg} dark:bg-opacity-10 transition-all hover:shadow-lg`}>
@@ -104,12 +109,22 @@ function AlertCard({ alert }) {
           {/* Action button */}
           {alert.action && (
             <div className="mt-3">
-              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold
-                ${alert.severity === 'critical'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-amber-500 text-white'}`}>
-                <ChevronRight size={12} /> {alert.action}
-              </span>
+              {isOwn ? (
+                <button type="button" onClick={() => navigate('/profil')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-opacity hover:opacity-90
+                    ${alert.severity === 'critical'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-amber-500 text-white'}`}>
+                  <ChevronRight size={12} /> {alert.action}
+                </button>
+              ) : (
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold opacity-70
+                  ${alert.severity === 'critical'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-amber-500 text-white'}`}>
+                  {alert.action}
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -465,15 +480,15 @@ export default function AlertesPage() {
             <div className="space-y-3">
               {/* Critical first */}
               {filtered.filter(a => a.severity === 'critical').map(a => (
-                <AlertCard key={a.id} alert={a} />
+                <AlertCard key={a.id} alert={a} currentUser={currentUser} />
               ))}
               {/* Then warnings */}
               {filtered.filter(a => a.severity === 'warning').map(a => (
-                <AlertCard key={a.id} alert={a} />
+                <AlertCard key={a.id} alert={a} currentUser={currentUser} />
               ))}
               {/* Then others */}
               {filtered.filter(a => a.severity !== 'critical' && a.severity !== 'warning').map(a => (
-                <AlertCard key={a.id} alert={a} />
+                <AlertCard key={a.id} alert={a} currentUser={currentUser} />
               ))}
             </div>
           )}

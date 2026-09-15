@@ -17,7 +17,6 @@ class BLSerializer(serializers.ModelSerializer):
     class Meta:
         model = BonLivraison
         fields = '__all__'
-        read_only_fields = ['recuperateur']
 
     def get_factures_generees_numeros(self, obj):
         return [{'id': f.id, 'numero': f.numero} for f in obj.factures_generees.all()]

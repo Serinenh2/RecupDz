@@ -84,12 +84,28 @@ class Traceability(models.Model):
     # ── Déchet ────────────────────────────────────────────────────
     code_dechet       = models.CharField(max_length=20)
     designation_dechet= models.CharField(max_length=300)
+    designation_ar    = models.CharField(max_length=300, blank=True, verbose_name='Désignation (arabe)')
+    id_recup_dz       = models.CharField(max_length=100, blank=True, verbose_name='ID Récup DZ')
     classe_dechet     = models.CharField(max_length=5, blank=True)
+    etat_physique     = models.CharField(max_length=15, blank=True, choices=[
+        ('SOLIDE',  'Solide'), ('LIQUIDE', 'Liquide'),
+        ('BOUEUX',  'Boueux / Pâteux'), ('GAZEUX', 'Gazeux'),
+    ])
+    conditionnement   = models.CharField(max_length=20, blank=True)
+    lieu_stockage     = models.CharField(max_length=200, blank=True)
+    caracteristiques_danger = models.CharField(max_length=300, blank=True)
     unite             = models.CharField(max_length=10, choices=UNITE_CHOICES, default='KG')
     quantite          = models.DecimalField(max_digits=12, decimal_places=3)
     # Spécifique aux plastiques (ex: code 15.01.02) — caractérisation visuelle du déchet.
     couleur           = models.CharField(max_length=20, choices=COULEUR_CHOICES, blank=True)
     niveau_proprete   = models.CharField(max_length=25, choices=PROPRETE_CHOICES, blank=True, verbose_name='Niveau de propreté')
+
+    # ── Enlèvement ────────────────────────────────────────────────
+    ordre_enlevement     = models.CharField(max_length=100, blank=True, verbose_name="N° Ordre d'enlèvement")
+    date_collecte_prevue = models.DateField(null=True, blank=True)
+    date_enlevement      = models.DateField(null=True, blank=True)
+    quantite_chargee     = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    adresse_enlevement   = models.CharField(max_length=300, blank=True)
 
     # ── Transporteur ──────────────────────────────────────────────
     transporteur      = models.ForeignKey(
@@ -99,6 +115,19 @@ class Traceability(models.Model):
     )
     chauffeur         = models.CharField(max_length=200, blank=True)
     immatriculation   = models.CharField(max_length=100, blank=True)
+    transporteur_agrement       = models.CharField(max_length=100, blank=True, verbose_name='N° Agrément transporteur')
+    transporteur_date_agrement  = models.DateField(null=True, blank=True)
+    transporteur_statut_agrement = models.CharField(max_length=10, blank=True, choices=[
+        ('ACTIF', 'Actif'), ('EXPIRE', 'Expiré'),
+    ])
+    type_engin        = models.CharField(max_length=100, blank=True)
+    date_depart       = models.DateField(null=True, blank=True)
+    lieu_depart       = models.CharField(max_length=300, blank=True)
+    itineraire        = models.CharField(max_length=300, blank=True, verbose_name='Itinéraire prévu')
+    incident          = models.CharField(max_length=15, blank=True, choices=[
+        ('ACCIDENT', 'Accident'), ('FUITE', 'Fuite'),
+        ('PERTE', 'Perte de chargement'), ('RETARD', 'Retard important'),
+    ])
     frais_transport_ttc = models.DecimalField(
         max_digits=14, decimal_places=2, null=True, blank=True,
         verbose_name='Frais de transport TTC (DZD)'
@@ -118,6 +147,12 @@ class Traceability(models.Model):
         max_digits=14, decimal_places=2, null=True, blank=True,
         verbose_name="Prix d'achat total TTC (DZD)"
     )
+
+    # ── Réception ─────────────────────────────────────────────────
+    date_reception       = models.DateField(null=True, blank=True)
+    quantite_acceptee    = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    quantite_refusee     = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    motif_refus          = models.CharField(max_length=300, blank=True)
 
     # ── Destination ───────────────────────────────────────────────
     destination_type  = models.CharField(max_length=20, choices=DESTINATION_CHOICES, default='VALORISATION')

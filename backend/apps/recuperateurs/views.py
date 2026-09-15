@@ -119,17 +119,7 @@ class AgrementViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def alerts(self, request):
-        today = date.today()
-        soon  = today + timedelta(days=60)
-        result = []
-        for agr in AgrementRecuperateur.objects.filter(statut='ACTIF', date_fin__lt=today).select_related('recuperateur'):
-            result.append({'type':'EXPIRE','severity':'critical',
-                'message': f"Agrément {agr.numero_agrement} expiré — {agr.recuperateur.nom_raison_sociale}",
-                'recuperateur_id': agr.recuperateur.id, 'agrement_id': agr.id})
-        for agr in AgrementRecuperateur.objects.filter(statut='ACTIF', date_fin__gte=today, date_fin__lte=soon).select_related('recuperateur'):
-            result.append({'type':'EXPIRING','severity':'warning',
-                'message': f"Agrément expire dans {(agr.date_fin - today).days}j — {agr.recuperateur.nom_raison_sociale}",
-                'recuperateur_id': agr.recuperateur.id, 'agrement_id': agr.id})
+        result = get_all_alerts()
         return Response({'total': len(result), 'critical': sum(1 for r in result if r['severity']=='critical'), 'alerts': result})
 
     @action(detail=False, methods=['get'])

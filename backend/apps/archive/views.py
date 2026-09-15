@@ -18,7 +18,14 @@ ALLOWED_DOC_MIMES = {
     'text/csv',
     'image/jpeg',
     'image/png',
+    'application/zip',
+    'application/x-zip-compressed',
+    'application/x-rar-compressed',
+    'application/vnd.rar',
 }
+
+# Aligné sur la limite affichée dans l'UI d'import de documents (50 Mo)
+MAX_DOC_UPLOAD_SIZE = 50 * 1024 * 1024
 
 
 class DocumentViewSet(viewsets.ModelViewSet):
@@ -40,7 +47,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         fichier = self.request.FILES.get('fichier')
         extra = {}
         if fichier:
-            fichier = validate_uploaded_file(fichier, allowed_mimes=ALLOWED_DOC_MIMES)
+            fichier = validate_uploaded_file(fichier, allowed_mimes=ALLOWED_DOC_MIMES, max_size=MAX_DOC_UPLOAD_SIZE)
             extra['nom_original'] = fichier.name
             extra['taille']       = fichier.size
             extra['type_mime']    = fichier.content_type or ''
@@ -50,7 +57,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         fichier = self.request.FILES.get('fichier')
         extra = {}
         if fichier:
-            fichier = validate_uploaded_file(fichier, allowed_mimes=ALLOWED_DOC_MIMES)
+            fichier = validate_uploaded_file(fichier, allowed_mimes=ALLOWED_DOC_MIMES, max_size=MAX_DOC_UPLOAD_SIZE)
             extra['nom_original'] = fichier.name
             extra['taille']       = fichier.size
             extra['type_mime']    = fichier.content_type or ''

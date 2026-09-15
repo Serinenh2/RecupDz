@@ -8,6 +8,7 @@ import clsx from 'clsx'
 const ROLES = {
   SUPERADMIN: 'Super Admin',
   ADMIN: 'Admin',
+  RECUPERATEUR: 'Récupérateur',
   RESPONSABLE_COLLECTE: 'Resp. Collecte',
   AGENT_COLLECTE: 'Agent Collecte',
   RESPONSABLE_DECHARGE: 'Resp. Décharge',
@@ -17,6 +18,7 @@ const ROLES = {
 const ROLE_BADGE = {
   SUPERADMIN: 'badge-red',
   ADMIN: 'badge-blue',
+  RECUPERATEUR: 'badge-green',
   RESPONSABLE_COLLECTE: 'badge-green',
   AGENT_COLLECTE: 'badge-green',
   RESPONSABLE_DECHARGE: 'badge-yellow',

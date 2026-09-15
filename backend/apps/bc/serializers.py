@@ -20,7 +20,6 @@ class BCSerializer(serializers.ModelSerializer):
     class Meta:
         model  = BonCommande
         fields = '__all__'
-        read_only_fields = ['recuperateur']
 
     def get_bc_generes_numeros(self, obj):
         return [{'id': bc.id, 'numero': bc.numero} for bc in obj.bc_generes.all()]

@@ -134,6 +134,8 @@ def user_detail(request, pk):
         return Response(data)
 
     if request.method == 'PATCH':
+        if user.is_superuser and request.data.get('is_active') is False:
+            return Response({'error': 'Impossible de désactiver un superadmin'}, status=400)
         old_role = user.role
         s = UserSerializer(user, data=request.data, partial=True)
         if s.is_valid():

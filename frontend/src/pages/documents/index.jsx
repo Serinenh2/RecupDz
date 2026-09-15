@@ -29,7 +29,7 @@ const dsdAPI = {
   pdf:     (d)    => api.post('/declarations/generate-dsd/', d, { responseType:'blob' }),
   pdfById: (id)   => api.get(`/declarations/${id}/generer_pdf/`, { responseType:'blob' }),
   word:    (d)    => api.post('/declarations/generate-dsd-word/', d, { responseType:'blob' }),
-  wordById:(id)   => api.post(`/declarations/${id}/generer_word/`, {}, { responseType:'blob' }),
+  wordById:(id)   => api.get(`/declarations/${id}/generer_word/`, { responseType:'blob' }),
 }
 const blAPI = {
   getAll:  (p)    => api.get('/bl/', { params: p }),
@@ -295,8 +295,9 @@ function DossierPicker({ dossiers = [], onSelect, label = 'Importer depuis un do
 }
 
 // ── BL Form (Bon de Livraison) ─────────────────────────────────────────────────
-function BLForm({ bl, currentUser, dossiers = [], onSave, onClose }) {
+function BLForm({ bl, currentUser, dossiers = [], recuperateurs = [], onSave, onClose }) {
   const isEdit = !!bl?.id
+  const isRecup = currentUser?.role === 'RECUPERATEUR'
   const { register, handleSubmit, watch, setValue, control, reset } = useForm({
     defaultValues: bl || {
       numero: '',
@@ -322,6 +323,7 @@ function BLForm({ bl, currentUser, dossiers = [], onSave, onClose }) {
 
   const onSubmit = async (data) => {
     setSaving(true)
+    if (isRecup && currentUser?.recuperateur_id) data.recuperateur = currentUser.recuperateur_id
     if (!data.montant_reference && data.montant_reference !== 0) delete data.montant_reference
     if (!isEdit && bl?.bon_commande_origine) data.bon_commande_origine = bl.bon_commande_origine
     if (!isEdit && bl?.dossier_id) data.dossier_id = bl.dossier_id
@@ -361,7 +363,7 @@ function BLForm({ bl, currentUser, dossiers = [], onSave, onClose }) {
 
   const buildBlData = () => ({
     numero:                 watch('numero') || '',
-    recuperateur:           bl?.recuperateur || currentUser?.recuperateur_id,
+    recuperateur:           bl?.recuperateur || (isRecup ? currentUser?.recuperateur_id : watch('recuperateur')),
     destinataire_type:      watch('destinataire_type'),
     destinataire:           watch('destinataire'),
     ref_client:             watch('ref_client'),
@@ -417,10 +419,19 @@ function BLForm({ bl, currentUser, dossiers = [], onSave, onClose }) {
       <DossierPicker dossiers={dossiers} onSelect={importLigneFromDossier}
         label="Importer la désignation précise depuis un dossier de traçabilité"/>
 
-      <div className="card p-3 bg-primary-50 border-primary-200 flex items-center gap-2">
-        <Shield size={14} className="text-primary-600 flex-shrink-0"/>
-        <p className="text-sm font-semibold text-primary-800">Émetteur : {currentUser?.recuperateur_nom}</p>
-      </div>
+      {isRecup ? (
+        <div className="card p-3 bg-primary-50 border-primary-200 flex items-center gap-2">
+          <Shield size={14} className="text-primary-600 flex-shrink-0"/>
+          <p className="text-sm font-semibold text-primary-800">Émetteur : {currentUser?.recuperateur_nom}</p>
+        </div>
+      ) : (
+        <F label="Récupérateur" req>
+          <select {...register('recuperateur',{required:true})} className="input">
+            <option value="">-- Sélectionner --</option>
+            {recuperateurs.map(r=><option key={r.id} value={r.id}>{r.nom_raison_sociale}</option>)}
+          </select>
+        </F>
+      )}
 
       <F label="N° Bon de Livraison" req>
         <input {...register('numero',{required:true})} className="input font-mono" placeholder="BL20260003"/>
@@ -662,8 +673,9 @@ function BLCard({ doc, onEdit, onDelete, onPdf, onWord, onGenererFacture }) {
 }
 
 // ── BC Form (Bon de Commande) ─────────────────────────────────────────────────
-function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument = 'BC' }) {
+function BCForm({ bc, currentUser, dossiers = [], recuperateurs = [], onSave, onClose, typeDocument = 'BC' }) {
   const isEdit = !!bc?.id
+  const isRecup = currentUser?.role === 'RECUPERATEUR'
   const isFacture = typeDocument === 'FACTURE'
   const isProforma = typeDocument === 'PROFORMA'
   const docLabel = typeDocument === 'PROFORMA' ? 'Proforma' : typeDocument === 'FACTURE' ? 'Facture' : 'BC'
@@ -739,6 +751,7 @@ function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument 
 
   const onSubmit = async (data) => {
     setSaving(true)
+    if (isRecup && currentUser?.recuperateur_id) data.recuperateur = currentUser.recuperateur_id
     if (!isEdit) data.type_document = typeDocument
     if (data.validite_offre_jours === '') data.validite_offre_jours = null
     if (!isEdit && bc?.proforma_origine)      data.proforma_origine      = bc.proforma_origine
@@ -757,7 +770,7 @@ function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument 
   const buildBcData = () => ({
     numero:               watch('numero') || '',
     type_document:        bc?.type_document || typeDocument,
-    recuperateur:         bc?.recuperateur || currentUser?.recuperateur_id,
+    recuperateur:         bc?.recuperateur || (isRecup ? currentUser?.recuperateur_id : watch('recuperateur')),
     ref_client:           watch('ref_client'),
     client_nom:           watch('client_nom'),
     client_adresse:       watch('client_adresse'),
@@ -812,10 +825,19 @@ function BCForm({ bc, currentUser, dossiers = [], onSave, onClose, typeDocument 
       <DossierPicker dossiers={dossiers} onSelect={importLigneFromDossier}
         label="Importer la désignation précise depuis un dossier de traçabilité"/>
 
-      <div className="card p-3 bg-primary-50 border-primary-200 flex items-center gap-2">
-        <Shield size={14} className="text-primary-600 flex-shrink-0"/>
-        <p className="text-sm font-semibold text-primary-800">Émetteur : {currentUser?.recuperateur_nom}</p>
-      </div>
+      {isRecup ? (
+        <div className="card p-3 bg-primary-50 border-primary-200 flex items-center gap-2">
+          <Shield size={14} className="text-primary-600 flex-shrink-0"/>
+          <p className="text-sm font-semibold text-primary-800">Émetteur : {currentUser?.recuperateur_nom}</p>
+        </div>
+      ) : (
+        <F label="Récupérateur" req>
+          <select {...register('recuperateur',{required:true})} className="input">
+            <option value="">-- Sélectionner --</option>
+            {recuperateurs.map(r=><option key={r.id} value={r.id}>{r.nom_raison_sociale}</option>)}
+          </select>
+        </F>
+      )}
 
       <F label={`N° ${docLabel}`} req>
         <input {...register('numero',{required:true})} className="input font-mono" placeholder={`${numeroPrefix}20260003`}/>
@@ -1405,7 +1427,7 @@ function DSDForm({ dsd, recuperateurs, dossiers, currentUser, onSave, onClose })
   const buildDsdData = () => ({
     annee:               watch('annee'),
     date_transmission:   watch('date_transmission'),
-    statut:              watch('statut_juridique'),
+    statut_juridique:    watch('statut_juridique'),
     denomination:        watch('denomination'),
     siege_social:        watch('siege_social'),
     domaine_activite:    watch('domaine_activite'),
@@ -1496,6 +1518,11 @@ function DSDForm({ dsd, recuperateurs, dossiers, currentUser, onSave, onClose })
         <F label="Statut juridique" req col="">
           <select {...register('statut_juridique',{required:true})} className="input">
             {['EURL','SARL','SPA','SNC','PHYSIQUE','AUTRE'].map(s=><option key={s}>{s}</option>)}
+          </select>
+        </F>
+        <F label="Statut" col="">
+          <select {...register('statut')} className="input">
+            {Object.entries(DSD_ST).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
           </select>
         </F>
         <F label="Dénomination" req col="">
@@ -1991,11 +2018,11 @@ export default function DocumentsPage() {
         title={editing?.id ? `Modifier ${tab.toUpperCase()}` : editing ? `${getBtnLabel()} (généré automatiquement)` : getBtnLabel()}
         size={tab==='dsd' || tab==='bc' || tab==='proforma' || tab==='facture' ? 'max-w-3xl' : 'max-w-2xl'}>
         {tab==='bl' && (
-          <BLForm bl={editing} currentUser={user} dossiers={allDossiers}
+          <BLForm bl={editing} currentUser={user} dossiers={allDossiers} recuperateurs={recuperateurs}
             onSave={handleSave} onClose={()=>{setShowForm(false);setEditing(null)}}/>
         )}
         {(tab==='bc'||tab==='proforma'||tab==='facture') && (
-          <BCForm bc={editing} currentUser={user} dossiers={allDossiers}
+          <BCForm bc={editing} currentUser={user} dossiers={allDossiers} recuperateurs={recuperateurs}
             typeDocument={tab==='proforma' ? 'PROFORMA' : tab==='facture' ? 'FACTURE' : 'BC'}
             onSave={handleSave} onClose={()=>{setShowForm(false);setEditing(null)}}/>
         )}

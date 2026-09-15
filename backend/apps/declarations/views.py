@@ -49,7 +49,7 @@ class DeclarationViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': str(e)}, status=500)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['get'])
     def generer_word(self, request, pk=None):
         """Genere le document Word DSD pour une declaration existante"""
         decl = self.get_object()
