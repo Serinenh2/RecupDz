@@ -34,6 +34,26 @@ def _assign_group_for_role(user):
         user.groups.add(group)
 
 
+def _ensure_recuperateur_fiche(user):
+    """A RECUPERATEUR user needs a linked fiche (company profile) to do anything —
+    BC/BL/BSD/DSD/Traçabilité creation and the Profil page's logo/ISO-badge upload
+    all depend on it. There's no separate "create récupérateur" UI, so create an
+    empty, immediately-editable fiche the first time a user is given this role."""
+    if user.role != 'RECUPERATEUR':
+        return
+    from apps.recuperateurs.models import Recuperateur
+    if Recuperateur.objects.filter(user=user).exists():
+        return
+    nom = f"{user.first_name} {user.last_name}".strip() or user.username
+    Recuperateur.objects.create(
+        user=user,
+        type_recuperateur='SANS_AGREMENT',
+        nom_raison_sociale=nom,
+        responsable=nom,
+        email=user.email,
+    )
+
+
 class RoleSerializer(serializers.ModelSerializer):
     permissions_list = serializers.SerializerMethodField()
     user_count = serializers.SerializerMethodField()
@@ -110,6 +130,7 @@ def user_create(request):
             user.save()
         # Assign the Django group matching the user's role
         _assign_group_for_role(user)
+        _ensure_recuperateur_fiche(user)
         AuditLog.objects.create(
             user=request.user, action='CREATE', model_name='User',
             object_id=str(user.id), details={'username': user.username},
@@ -143,6 +164,7 @@ def user_detail(request, pk):
             # Sync group if role changed
             if user.role != old_role:
                 _assign_group_for_role(user)
+                _ensure_recuperateur_fiche(user)
             AuditLog.objects.create(
                 user=request.user, action='UPDATE', model_name='User',
                 object_id=str(pk), details={'fields': list(request.data.keys())},
