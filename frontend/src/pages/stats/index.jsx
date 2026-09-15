@@ -36,7 +36,17 @@ const VUES = [
   { key: 'STOCKAGE',     label: 'Déchets en stock' },
   { key: 'VALORISATION', label: 'Déchets valorisés' },
   { key: 'ELIMINATION',  label: 'Déchets éliminés' },
-  { key: 'STOCK_ACTUEL', label: 'Stock actuel par type de déchets' },
+]
+
+// Sections indépendantes affichables sur la page — l'utilisateur choisit
+// lesquelles voir plutôt que de toutes les afficher en permanence.
+const SECTIONS = [
+  { key: 'SPECIAUX',   label: 'Déchets spéciaux et spéciaux dangereux (S/SD)', icon: AlertTriangle },
+  { key: 'MENAGERS',   label: 'Déchets ménagers et assimilés',                 icon: Home },
+  { key: 'CET',        label: "Déchets envoyés au CET",                        icon: Layers },
+  { key: 'STOCK',      label: 'Stock actuel par type de déchets',              icon: Boxes },
+  { key: 'PRIX',       label: 'Évolution des prix',                           icon: TrendingUp },
+  { key: 'QUANTITES',  label: 'Évolution des quantités',                      icon: Activity },
 ]
 
 // Destinations physiques qui font sortir un déchet du stock disponible
@@ -660,10 +670,14 @@ export default function StatsPage() {
   const [loadingCet, setLoadingCet] = useState(false)
   const [rowsStock,    setRowsStock]    = useState([])
   const [loadingStock, setLoadingStock] = useState(false)
-  const [showPrix,      setShowPrix]      = useState(false)
   const [priceDocs,     setPriceDocs]     = useState([])
   const [loadingPrices, setLoadingPrices] = useState(false)
-  const [showQuantites, setShowQuantites] = useState(false)
+
+  // Sections visibles — par défaut les deux rubriques déchets + CET, comme avant.
+  const [sections, setSections] = useState(['SPECIAUX', 'MENAGERS', 'CET'])
+  const toggleSection = (key) => setSections(prev =>
+    prev.includes(key) ? prev.filter(s => s !== key) : [...prev, key]
+  )
 
   const rowsFiltrees = useMemo(() => {
     const destinations = DESTINATIONS_PAR_VUE[vue]
@@ -750,7 +764,7 @@ export default function StatsPage() {
 
   useEffect(() => { load(); loadCet() }, [periode, datePrecise, dateMin, dateMax, mois, annee])
   useEffect(() => { loadStock() }, [])
-  useEffect(() => { if (showPrix && priceDocs.length === 0) loadPrices() }, [showPrix])
+  useEffect(() => { if (sections.includes('PRIX') && priceDocs.length === 0) loadPrices() }, [sections])
 
   return (
     <div className="space-y-5">
@@ -819,59 +833,67 @@ export default function StatsPage() {
           </div>
         )}
 
-        <div className="flex items-end gap-3 pt-2 border-t border-[#E2E8F0] dark:border-[#2B3D1E]">
-          <div className="max-w-sm flex-1">
-            <label className="label">Vue</label>
-            <select value={vue} onChange={e=>setVue(e.target.value)} className="input">
-              {VUES.map(v => <option key={v.key} value={v.key}>{v.label}</option>)}
-            </select>
+        <div className="pt-2 border-t border-[#E2E8F0] dark:border-[#2B3D1E]">
+          <label className="label">Vue (regroupement des rubriques Spéciaux / Ménagers)</label>
+          <select value={vue} onChange={e=>setVue(e.target.value)} className="input max-w-sm">
+            {VUES.map(v => <option key={v.key} value={v.key}>{v.label}</option>)}
+          </select>
+        </div>
+
+        <div className="pt-2 border-t border-[#E2E8F0] dark:border-[#2B3D1E]">
+          <label className="label">Statistiques à afficher</label>
+          <div className="flex gap-2 flex-wrap">
+            {SECTIONS.map(s => {
+              const active = sections.includes(s.key)
+              return (
+                <button key={s.key} type="button" onClick={() => toggleSection(s.key)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all
+                    ${active
+                      ? 'bg-primary-600 text-white border-primary-600'
+                      : 'bg-white dark:bg-[#16240D] text-slate-500 border-[#E2E8F0] dark:border-[#2B3D1E] hover:border-primary-300'}`}>
+                  <s.icon size={13}/> {s.label}
+                </button>
+              )
+            })}
           </div>
-          <button onClick={() => setShowPrix(v => !v)}
-            title="Suivi des prix unitaires des déchets récupérés"
-            className={showPrix ? 'btn-primary whitespace-nowrap' : 'btn-secondary whitespace-nowrap'}>
-            <TrendingUp size={15}/> Évolution des prix
-          </button>
-          <button onClick={() => setShowQuantites(v => !v)}
-            title="Suivi des quantités récupérées par type de déchet"
-            className={showQuantites ? 'btn-primary whitespace-nowrap' : 'btn-secondary whitespace-nowrap'}>
-            <Activity size={15}/> Évolution des quantités
-          </button>
         </div>
       </div>
 
-      {showPrix && <RubriquePrix docs={priceDocs} loading={loadingPrices} />}
-      {showQuantites && <RubriqueQuantites rows={rowsStock} loading={loadingStock} />}
-
-      {vue === 'STOCK_ACTUEL' ? (
-        <RubriqueStock rows={rowsStock} loading={loadingStock} />
-      ) : (
-        <>
-          {/* Rubrique 1 — Déchets spéciaux et spéciaux dangereux */}
-          <Rubrique
-            titre="Déchets spéciaux et spéciaux dangereux (S / SD)"
-            icon={AlertTriangle}
-            accent={{ border: 'border-red-400', text: 'text-red-600', bg: 'bg-red-500' }}
-            rows={rowsSpeciaux}
-            loading={loading}
-            vue={vue}
-            fichierCsv={`statistiques_dechets_speciaux_${periode.toLowerCase()}.csv`}
-          />
-
-          {/* Rubrique 2 — Déchets ménagers et assimilés */}
-          <Rubrique
-            titre="Déchets ménagers et assimilés"
-            icon={Home}
-            accent={{ border: 'border-emerald-400', text: 'text-emerald-600', bg: 'bg-emerald-500' }}
-            rows={rowsMenagers}
-            loading={loading}
-            vue={vue}
-            fichierCsv={`statistiques_dechets_menagers_${periode.toLowerCase()}.csv`}
-          />
-
-          {/* Rubrique 3 — Déchets envoyés au CET */}
-          <RubriqueCET bls={blsCet} loading={loadingCet} />
-        </>
+      {sections.length === 0 && (
+        <div className="card p-10 text-center">
+          <Package size={32} className="mx-auto mb-2 text-slate-200"/>
+          <p className="font-semibold text-slate-400 text-sm">Aucune statistique sélectionnée — choisissez-en au moins une ci-dessus.</p>
+        </div>
       )}
+
+      {sections.includes('SPECIAUX') && (
+        <Rubrique
+          titre="Déchets spéciaux et spéciaux dangereux (S / SD)"
+          icon={AlertTriangle}
+          accent={{ border: 'border-red-400', text: 'text-red-600', bg: 'bg-red-500' }}
+          rows={rowsSpeciaux}
+          loading={loading}
+          vue={vue}
+          fichierCsv={`statistiques_dechets_speciaux_${periode.toLowerCase()}.csv`}
+        />
+      )}
+
+      {sections.includes('MENAGERS') && (
+        <Rubrique
+          titre="Déchets ménagers et assimilés"
+          icon={Home}
+          accent={{ border: 'border-emerald-400', text: 'text-emerald-600', bg: 'bg-emerald-500' }}
+          rows={rowsMenagers}
+          loading={loading}
+          vue={vue}
+          fichierCsv={`statistiques_dechets_menagers_${periode.toLowerCase()}.csv`}
+        />
+      )}
+
+      {sections.includes('CET') && <RubriqueCET bls={blsCet} loading={loadingCet} />}
+      {sections.includes('STOCK') && <RubriqueStock rows={rowsStock} loading={loadingStock} />}
+      {sections.includes('PRIX') && <RubriquePrix docs={priceDocs} loading={loadingPrices} />}
+      {sections.includes('QUANTITES') && <RubriqueQuantites rows={rowsStock} loading={loadingStock} />}
     </div>
   )
 }
