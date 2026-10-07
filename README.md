@@ -4,7 +4,17 @@
 
 ---
 
-## 🚀 Installation et lancement
+> **Déploiement en production (serveur client) : utiliser Docker.**
+> - Serveur Windows → [`GUIDE_INSTALLATION_WINDOWS.md`](GUIDE_INSTALLATION_WINDOWS.md) (double-clic sur `install.bat`)
+> - Serveur Linux → [`GUIDE_INSTALLATION.md`](GUIDE_INSTALLATION.md)
+>
+> Les instructions ci-dessous (venv Python, `npm run dev`...) décrivent un
+> environnement de **développement local uniquement** — ne pas les suivre
+> pour un déploiement client.
+
+---
+
+## 🚀 Installation et lancement (développement local uniquement)
 
 ### Prérequis
 - Python 3.10+

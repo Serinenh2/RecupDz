@@ -162,6 +162,7 @@ services:
     command: >
       "python manage.py migrate --noinput &&
        python manage.py createsuperuser --noinput 2>/dev/null || true &&
+       python manage.py fix_superuser_role &&
        python manage.py setup_rbac 2>/dev/null || true"
     volumes:
       - backend_media:/app/media
