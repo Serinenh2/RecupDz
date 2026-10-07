@@ -1,5 +1,3 @@
-version: "3.9"
-
 x-app-defaults: &app-defaults
   restart: unless-stopped
   networks:

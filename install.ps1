@@ -1,18 +1,22 @@
-# ═══════════════════════════════════════════════════════════════════════════
-# RecupIndurex — Installation automatique (Windows Server / Windows 10+)
+# ===============================================================================
+# RecupIndurex - Installation automatique (Windows Server / Windows 10+)
 #
-# Prérequis (voir GUIDE_INSTALLATION_WINDOWS.md) :
-#   - Docker Desktop installé, démarré, backend WSL2 actif
+# Prerequis (voir GUIDE_INSTALLATION_WINDOWS.md) :
+#   - Docker Desktop installe, demarre, backend WSL2 actif
 #
 # Usage :
 #   .\install.bat                        (double-clic, domaine = localhost)
 #   .\install.ps1 -Domain mon-serveur.local
-# ═══════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 param(
     [string]$Domain = "localhost"
 )
 
-$ErrorActionPreference = "Stop"
+# Pas de $ErrorActionPreference = "Stop" ici : sous Windows PowerShell 5.1,
+# rediriger le stderr d'un programme natif (ex: docker ... 2>$null) alors que
+# ErrorActionPreference = Stop est actif transforme tout texte stderr - meme
+# un simple avertissement - en erreur fatale qui arrete le script. On verifie
+# explicitement $LASTEXITCODE apres chaque commande docker importante a la place.
 Set-Location -Path $PSScriptRoot
 
 function Write-Step { param($msg) Write-Host "`n==> $msg" -ForegroundColor Cyan }
@@ -42,10 +46,10 @@ function Wait-ServiceHealthy {
 }
 
 Write-Host "========================================" -ForegroundColor Yellow
-Write-Host " RecupIndurex — Installation" -ForegroundColor Yellow
+Write-Host " RecupIndurex - Installation" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
-# ── 1. Docker disponible ? ───────────────────────────────────────────────────
+# --- 1. Docker disponible ? ---------------------------------------------------
 Write-Step "Verification de Docker"
 try {
     docker version *> $null
@@ -58,7 +62,7 @@ try {
 }
 Write-Ok "Docker est disponible"
 
-# ── 2. Fichier .env ───────────────────────────────────────────────────────────
+# --- 2. Fichier .env ------------------------------------------------------------
 $envPath = Join-Path $PSScriptRoot ".env"
 if (-not (Test-Path $envPath)) {
     Write-Step "Generation du fichier .env (identifiants securises generes automatiquement)"
@@ -68,7 +72,7 @@ if (-not (Test-Path $envPath)) {
     $adminPassword = New-RandomSecret 14
 
     $envContent = @"
-# Genere automatiquement par install.ps1 — NE PAS COMMITER DANS GIT
+# Genere automatiquement par install.ps1 - NE PAS COMMITER DANS GIT
 DJANGO_SECRET_KEY=$secretKey
 DJANGO_DEBUG=False
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,$Domain
@@ -100,20 +104,20 @@ DJANGO_SUPERUSER_PASSWORD=$adminPassword
     Set-Content -Path $envPath -Value $envContent -Encoding utf8
     Write-Ok ".env genere"
 } else {
-    Write-Ok ".env existe deja — conserve tel quel (identifiants inchanges)"
+    Write-Ok ".env existe deja - conserve tel quel (identifiants inchanges)"
 }
 
 $envLines  = Get-Content $envPath
 $adminUser = ($envLines | Where-Object { $_ -match '^DJANGO_SUPERUSER_USERNAME=' })  -replace 'DJANGO_SUPERUSER_USERNAME=', ''
 $adminPass = ($envLines | Where-Object { $_ -match '^DJANGO_SUPERUSER_PASSWORD=' })  -replace 'DJANGO_SUPERUSER_PASSWORD=', ''
 
-# ── 3. Construction des images ────────────────────────────────────────────────
+# --- 3. Construction des images -------------------------------------------------
 Write-Step "Construction des images Docker (plusieurs minutes la premiere fois)"
 docker compose build
 if ($LASTEXITCODE -ne 0) { Write-Err "Echec de la construction des images"; exit 1 }
 Write-Ok "Images construites"
 
-# ── 4. Base de donnees ────────────────────────────────────────────────────────
+# --- 4. Base de donnees ----------------------------------------------------------
 Write-Step "Demarrage de la base de donnees"
 docker compose up -d db
 if (-not (Wait-ServiceHealthy "db" 90)) {
@@ -123,13 +127,13 @@ if (-not (Wait-ServiceHealthy "db" 90)) {
 }
 Write-Ok "Base de donnees prete"
 
-# ── 5. Migrations + compte admin + RBAC ───────────────────────────────────────
+# --- 5. Migrations + compte admin + RBAC -----------------------------------------
 Write-Step "Migrations de la base de donnees et configuration initiale"
 docker compose run --rm migrate
 if ($LASTEXITCODE -ne 0) { Write-Err "Echec des migrations"; exit 1 }
 Write-Ok "Base de donnees migree, compte admin et permissions configures"
 
-# ── 6. Backend + Frontend ─────────────────────────────────────────────────────
+# --- 6. Backend + Frontend --------------------------------------------------------
 Write-Step "Demarrage du backend et du frontend"
 docker compose up -d backend nginx
 if (-not (Wait-ServiceHealthy "backend" 180)) {
@@ -144,7 +148,7 @@ if (-not (Wait-ServiceHealthy "nginx" 60)) {
 }
 Write-Ok "Backend et frontend demarres"
 
-# ── 7. Verification finale ────────────────────────────────────────────────────
+# --- 7. Verification finale -------------------------------------------------------
 Write-Step "Verification finale"
 $ok = $false
 try {
@@ -170,7 +174,7 @@ Write-Host " Changez ce mot de passe apres la premiere connexion (page Profil)."
 Write-Host "========================================`n" -ForegroundColor Green
 
 if (-not $ok) {
-    Write-Host "Attention : la verification finale a echoue — relisez les erreurs ci-dessus" -ForegroundColor Yellow
+    Write-Host "Attention : la verification finale a echoue - relisez les erreurs ci-dessus" -ForegroundColor Yellow
     Write-Host "avant de considerer l'installation comme terminee. Voir GUIDE_INSTALLATION_WINDOWS.md > Depannage." -ForegroundColor Yellow
     exit 1
 }

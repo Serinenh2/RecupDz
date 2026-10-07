@@ -1,5 +1,5 @@
 @echo off
-REM Redemarre l'application (sans reconstruire les images) — a utiliser apres
+REM Redemarre l'application (sans reconstruire les images) - a utiliser apres
 REM un redemarrage du serveur ou un arret manuel.
 cd /d "%~dp0"
 docker compose up -d db
