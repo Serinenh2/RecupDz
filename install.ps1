@@ -1,8 +1,10 @@
 # ===============================================================================
 # RecupIndurex - Installation automatique (Windows Server / Windows 10+)
 #
-# Prerequis (voir GUIDE_INSTALLATION_WINDOWS.md) :
-#   - Docker Desktop installe, demarre, backend WSL2 actif
+# Entierement automatique : installe WSL2 et Docker Desktop si necessaire
+# (aucun prerequis manuel), puis installe l'application. Un redemarrage
+# Windows peut etre necessaire une seule fois si WSL2 n'etait pas deja
+# active - le script reprend alors tout seul apres la reconnexion.
 #
 # Usage :
 #   .\install.bat                        (double-clic, domaine = localhost)
@@ -22,6 +24,7 @@ Set-Location -Path $PSScriptRoot
 function Write-Step { param($msg) Write-Host "`n==> $msg" -ForegroundColor Cyan }
 function Write-Ok   { param($msg) Write-Host "    OK : $msg" -ForegroundColor Green }
 function Write-Err  { param($msg) Write-Host "    ERREUR : $msg" -ForegroundColor Red }
+function Write-Warn { param($msg) Write-Host "    ATTENTION : $msg" -ForegroundColor Yellow }
 
 function New-RandomSecret {
     param([int]$Length = 32)
@@ -45,24 +48,183 @@ function Wait-ServiceHealthy {
     return $false
 }
 
+function Test-IsAdmin {
+    $identity  = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
+}
+
+function Register-ResumeAfterReboot {
+    # Relance automatiquement ce script a la prochaine connexion Windows
+    # (une seule fois) - necessaire quand on doit redemarrer pour activer WSL2.
+    $runOnceKey = "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce"
+    $command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Domain `"$Domain`""
+    Set-ItemProperty -Path $runOnceKey -Name "RecupIndurexInstall" -Value $command -ErrorAction SilentlyContinue
+}
+
 Write-Host "========================================" -ForegroundColor Yellow
 Write-Host " RecupIndurex - Installation" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
-# --- 1. Docker disponible ? ---------------------------------------------------
-Write-Step "Verification de Docker"
-try {
-    docker version *> $null
-    if ($LASTEXITCODE -ne 0) { throw "docker non disponible" }
-} catch {
-    Write-Err "Docker n'est pas installe ou n'est pas demarre."
-    Write-Host "    Installez Docker Desktop (backend WSL2) puis relancez ce script."
-    Write-Host "    Voir GUIDE_INSTALLATION_WINDOWS.md, section Prerequis."
-    exit 1
+# --- 0. Elevation a la demande ------------------------------------------------------
+# On ne demande les droits administrateur QUE si une action qui en a reellement
+# besoin doit etre effectuee (activer WSL2, installer Docker Desktop) - pas a
+# chaque lancement. Si tout est deja installe, aucune invite Windows n'apparait.
+function Request-Elevation {
+    if (Test-IsAdmin) { return }
+    Write-Step "Droits administrateur requis pour cette etape - relancement avec elevation"
+    Write-Host "    (Windows va demander une confirmation - cliquez sur Oui)"
+    $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Domain `"$Domain`""
+    try {
+        Start-Process powershell.exe -Verb RunAs -ArgumentList $argList
+    } catch {
+        Write-Err "Elevation refusee ou impossible. Relancez install.bat et acceptez l'invite Windows."
+        exit 1
+    }
+    exit
+}
+
+# --- 1. WSL2 -----------------------------------------------------------------------
+# "wsl --status" ne necessite pas de droits administrateur et renvoie un code de
+# sortie 0 si WSL2 est deja pret - on ne verifie via DISM (qui exige l'elevation)
+# que si cette premiere verification echoue.
+Write-Step "Verification de WSL2"
+wsl --status *> $null
+$wslNeedsEnable = $LASTEXITCODE -ne 0
+
+if ($wslNeedsEnable) {
+    Request-Elevation
+    $wslFeature = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -ErrorAction SilentlyContinue
+    $vmFeature  = Get-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -ErrorAction SilentlyContinue
+    $wslNeedsEnable = ($null -eq $wslFeature) -or ($wslFeature.State -ne "Enabled") -or
+                      ($null -eq $vmFeature)  -or ($vmFeature.State  -ne "Enabled")
+}
+
+if ($wslNeedsEnable) {
+    Write-Host "    WSL2 n'est pas encore active sur ce PC - activation..."
+    dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart | Out-Null
+    dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart | Out-Null
+
+    Register-ResumeAfterReboot
+
+    Write-Host "`n========================================" -ForegroundColor Yellow
+    Write-Host " REDEMARRAGE NECESSAIRE (une seule fois)" -ForegroundColor Yellow
+    Write-Host "========================================" -ForegroundColor Yellow
+    Write-Host " WSL2 vient d'etre active - Windows exige un redemarrage"
+    Write-Host " pour terminer cette etape. L'installation reprendra"
+    Write-Host " automatiquement apres votre prochaine connexion."
+    Write-Host " (Si une invite de securite Windows apparait a ce moment-la,"
+    Write-Host "  acceptez-la pour laisser l'installation continuer.)"
+    Write-Host ""
+    Write-Host " Fermez vos autres programmes, puis appuyez sur une touche"
+    Write-Host " pour redemarrer maintenant..."
+    [System.Console]::ReadKey($true) | Out-Null
+    Restart-Computer -Force
+    exit
+}
+Write-Ok "WSL2 est actif"
+
+try { wsl --set-default-version 2 *> $null } catch {}
+
+# --- 2. Docker Desktop ---------------------------------------------------------------
+Write-Step "Verification de Docker Desktop"
+$dockerCmd = Get-Command docker.exe -ErrorAction SilentlyContinue
+$dockerExePath = "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+$dockerInstalled = ($null -ne $dockerCmd) -or (Test-Path $dockerExePath)
+
+if (-not $dockerInstalled) {
+    Request-Elevation
+    Write-Host "    Docker Desktop n'est pas installe - telechargement..."
+    $installerPath = Join-Path $env:TEMP "DockerDesktopInstaller.exe"
+    try {
+        Invoke-WebRequest -Uri "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe" `
+            -OutFile $installerPath -UseBasicParsing
+    } catch {
+        Write-Err "Echec du telechargement de Docker Desktop : $($_.Exception.Message)"
+        Write-Host "    Verifiez la connexion internet de ce PC, ou installez Docker Desktop"
+        Write-Host "    manuellement depuis https://www.docker.com/products/docker-desktop puis relancez."
+        exit 1
+    }
+    Write-Ok "Docker Desktop telecharge"
+
+    Write-Step "Installation de Docker Desktop (silencieuse, quelques minutes)"
+    $proc = Start-Process -FilePath $installerPath `
+        -ArgumentList "install", "--quiet", "--accept-license", "--backend=wsl-2" `
+        -Wait -PassThru
+    Remove-Item $installerPath -Force -ErrorAction SilentlyContinue
+
+    if ($proc.ExitCode -eq 3010) {
+        # Code standard Windows "redemarrage requis"
+        Register-ResumeAfterReboot
+        Write-Host "`n========================================" -ForegroundColor Yellow
+        Write-Host " REDEMARRAGE NECESSAIRE (une seule fois)" -ForegroundColor Yellow
+        Write-Host "========================================" -ForegroundColor Yellow
+        Write-Host " Docker Desktop a ete installe - Windows exige un redemarrage"
+        Write-Host " pour terminer cette etape. L'installation reprendra"
+        Write-Host " automatiquement apres votre prochaine connexion."
+        Write-Host ""
+        Write-Host " Fermez vos autres programmes, puis appuyez sur une touche"
+        Write-Host " pour redemarrer maintenant..."
+        [System.Console]::ReadKey($true) | Out-Null
+        Restart-Computer -Force
+        exit
+    }
+    if ($proc.ExitCode -ne 0) {
+        Write-Err "L'installation de Docker Desktop a echoue (code $($proc.ExitCode))"
+        Write-Host "    Installez-le manuellement depuis https://www.docker.com/products/docker-desktop puis relancez."
+        exit 1
+    }
+    Write-Ok "Docker Desktop installe"
+} else {
+    Write-Ok "Docker Desktop est deja installe"
+}
+
+# --- 3. Docker pret (demarre Docker Desktop si besoin, attend le moteur) -----------
+Write-Step "Demarrage de Docker"
+docker version *> $null
+if ($LASTEXITCODE -ne 0) {
+    if (Test-Path $dockerExePath) {
+        Start-Process $dockerExePath
+    }
+    Write-Host "    Attente du demarrage de Docker Desktop (peut prendre 1 a 2 minutes la premiere fois)..."
+    $elapsed = 0
+    while ($elapsed -lt 180) {
+        docker version *> $null
+        if ($LASTEXITCODE -eq 0) { break }
+        Start-Sleep -Seconds 5
+        $elapsed += 5
+    }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "Docker n'a pas demarre a temps."
+        Write-Host "    Ouvrez Docker Desktop manuellement (icone sur le Bureau), attendez"
+        Write-Host "    l'icone verte 'Running', puis relancez install.bat."
+        exit 1
+    }
 }
 Write-Ok "Docker est disponible"
 
-# --- 2. Fichier .env ------------------------------------------------------------
+# --- 3b. Pare-feu (acces depuis le reseau local) ------------------------------------
+Write-Step "Verification du pare-feu"
+$fwRule = Get-NetFirewallRule -DisplayName "RecupIndurex HTTP" -ErrorAction SilentlyContinue
+if (-not $fwRule) {
+    try {
+        if (Test-IsAdmin) {
+            New-NetFirewallRule -DisplayName "RecupIndurex HTTP" -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow -ErrorAction Stop | Out-Null
+            Write-Ok "Regle de pare-feu ajoutee (port 80)"
+        } else {
+            Write-Warn "Regle de pare-feu non ajoutee (droits insuffisants) - l'application"
+            Write-Host "    ne sera accessible que depuis ce PC (http://localhost/). Pour l'ouvrir"
+            Write-Host "    au reseau local, executez en administrateur :"
+            Write-Host '    New-NetFirewallRule -DisplayName "RecupIndurex HTTP" -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow'
+        }
+    } catch {
+        Write-Warn "Impossible d'ajouter la regle de pare-feu automatiquement - voir GUIDE_INSTALLATION_WINDOWS.md > Depannage"
+    }
+} else {
+    Write-Ok "Regle de pare-feu deja presente"
+}
+
+# --- 4. Fichier .env ------------------------------------------------------------
 $envPath = Join-Path $PSScriptRoot ".env"
 if (-not (Test-Path $envPath)) {
     Write-Step "Generation du fichier .env (identifiants securises generes automatiquement)"
@@ -111,13 +273,13 @@ $envLines  = Get-Content $envPath
 $adminUser = ($envLines | Where-Object { $_ -match '^DJANGO_SUPERUSER_USERNAME=' })  -replace 'DJANGO_SUPERUSER_USERNAME=', ''
 $adminPass = ($envLines | Where-Object { $_ -match '^DJANGO_SUPERUSER_PASSWORD=' })  -replace 'DJANGO_SUPERUSER_PASSWORD=', ''
 
-# --- 3. Construction des images -------------------------------------------------
+# --- 5. Construction des images -------------------------------------------------
 Write-Step "Construction des images Docker (plusieurs minutes la premiere fois)"
 docker compose build
 if ($LASTEXITCODE -ne 0) { Write-Err "Echec de la construction des images"; exit 1 }
 Write-Ok "Images construites"
 
-# --- 4. Base de donnees ----------------------------------------------------------
+# --- 6. Base de donnees ----------------------------------------------------------
 Write-Step "Demarrage de la base de donnees"
 docker compose up -d db
 if (-not (Wait-ServiceHealthy "db" 90)) {
@@ -127,13 +289,13 @@ if (-not (Wait-ServiceHealthy "db" 90)) {
 }
 Write-Ok "Base de donnees prete"
 
-# --- 5. Migrations + compte admin + RBAC -----------------------------------------
+# --- 7. Migrations + compte admin + RBAC -----------------------------------------
 Write-Step "Migrations de la base de donnees et configuration initiale"
 docker compose run --rm migrate
 if ($LASTEXITCODE -ne 0) { Write-Err "Echec des migrations"; exit 1 }
 Write-Ok "Base de donnees migree, compte admin et permissions configures"
 
-# --- 6. Backend + Frontend --------------------------------------------------------
+# --- 8. Backend + Frontend --------------------------------------------------------
 Write-Step "Demarrage du backend et du frontend"
 docker compose up -d backend nginx
 if (-not (Wait-ServiceHealthy "backend" 180)) {
@@ -148,7 +310,7 @@ if (-not (Wait-ServiceHealthy "nginx" 60)) {
 }
 Write-Ok "Backend et frontend demarres"
 
-# --- 7. Verification finale -------------------------------------------------------
+# --- 9. Verification finale -------------------------------------------------------
 Write-Step "Verification finale"
 $ok = $false
 try {

@@ -92,18 +92,17 @@ docker compose run --rm migrate
 if ($LASTEXITCODE -ne 0) { Write-Err "Echec de la verification post-restauration"; exit 1 }
 Write-Ok "Base de donnees a jour"
 
-# --- 4. Backend + Frontend ----------------------------------------------------------
-Write-Step "Demarrage du backend et du frontend"
-docker compose up -d backend nginx *> $null
+# --- 4. Backend --------------------------------------------------------------------
+# Demarre et restaure les fichiers des que le backend seul est pret - independant
+# de nginx, pour ne pas bloquer la restauration des medias si seul nginx a un
+# souci (ex: port 80 deja pris par un autre service sur ce serveur).
+Write-Step "Demarrage du backend"
+docker compose up -d backend *> $null
 if (-not (Wait-ServiceHealthy "backend" 180)) {
     Write-Err "Le backend n'est pas devenu sain a temps"
     exit 1
 }
-if (-not (Wait-ServiceHealthy "nginx" 60)) {
-    Write-Err "Nginx n'est pas devenu sain a temps"
-    exit 1
-}
-Write-Ok "Backend et frontend demarres"
+Write-Ok "Backend demarre"
 
 # --- 5. Restauration des fichiers (logo, cachet, badges ISO...) ------------------
 Write-Step "Restauration des fichiers (logo, cachet, badges ISO...)"
@@ -113,6 +112,15 @@ if ($LASTEXITCODE -ne 0) { Write-Err "Echec de la copie des fichiers vers le con
 docker compose exec backend sh -c "tar xzf /tmp/media_backup.tar.gz -C /app/media && rm -f /tmp/media_backup.tar.gz"
 if ($LASTEXITCODE -ne 0) { Write-Err "Echec de l'extraction des fichiers"; exit 1 }
 Write-Ok "Fichiers restaures"
+
+# --- 5b. Frontend --------------------------------------------------------------------
+Write-Step "Demarrage du frontend"
+docker compose up -d nginx *> $null
+if (-not (Wait-ServiceHealthy "nginx" 60)) {
+    Write-Err "Nginx n'est pas devenu sain a temps (les donnees et fichiers sont deja restaures - verifiez le port 80 : docker compose logs nginx)"
+    exit 1
+}
+Write-Ok "Frontend demarre"
 
 # --- 6. Verification finale -------------------------------------------------------
 Write-Step "Verification finale"

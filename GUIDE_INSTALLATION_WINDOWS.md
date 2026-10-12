@@ -7,48 +7,28 @@ Desktop + son moteur WSL2, pas nativement.
 
 ---
 
-## 1. Prérequis (une seule fois)
+## 1. Prérequis
 
-### 1.1 Activer WSL2
+**Aucune installation manuelle n'est nécessaire** — `install.bat` installe
+tout seul ce qui manque (WSL2, Docker Desktop, règle de pare-feu). Il suffit
+d'avoir :
 
-Ouvrir **PowerShell en administrateur** et exécuter :
+- Windows 10/11 ou Windows Server 2019+
+- Une connexion internet (pour télécharger Docker Desktop la première fois,
+  si besoin)
+- Un compte Windows avec droits administrateur sur ce PC (une invite de
+  sécurité Windows apparaîtra si une installation est nécessaire — cliquer
+  sur **Oui**)
+- La virtualisation (Intel VT-x / AMD-V) activée dans le BIOS/UEFI — c'est le
+  cas par défaut sur la quasi-totalité des PC récents ; voir section 10
+  (Dépannage) si l'installation signale un problème à ce sujet, seul point
+  qu'un script ne peut pas activer à la place de l'utilisateur.
 
-```powershell
-wsl --install
-```
-
-Redémarrer le serveur si demandé. Si `wsl --install` n'est pas disponible
-(Windows Server plus ancien), activer manuellement :
-
-```powershell
-Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart
-Enable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -NoRestart
-Restart-Computer
-```
-
-Puis installer le noyau WSL2 (lien officiel Microsoft "WSL2 Linux kernel
-update package") et définir la version par défaut :
-
-```powershell
-wsl --set-default-version 2
-```
-
-### 1.2 Installer Docker Desktop
-
-1. Télécharger Docker Desktop depuis [docker.com](https://www.docker.com/products/docker-desktop)
-2. Installer avec l'option **"Use WSL 2 instead of Hyper-V"** cochée
-3. Lancer Docker Desktop, attendre l'icône verte "Running" dans la barre système
-4. Vérifier dans un terminal :
-   ```powershell
-   docker version
-   ```
-   Doit afficher une version Client **et** Server sans erreur.
-
-### 1.3 Ouvrir le port dans le pare-feu Windows (accès depuis le réseau local)
-
-```powershell
-New-NetFirewallRule -DisplayName "RecupIndurex HTTP" -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow
-```
+Si WSL2 n'était pas déjà actif sur ce PC, Windows exigera **un redémarrage,
+une seule fois**, en cours d'installation — `install.bat` le signale
+clairement, attend une touche avant de redémarrer, et reprend tout seul à la
+reconnexion (double-cliquer à nouveau sur `install.bat` n'est pas
+nécessaire).
 
 ---
 
@@ -75,21 +55,33 @@ sécurisés pour ce serveur.
 
 ## 3. Installer
 
-Dans l'explorateur de fichiers, double-cliquer sur **`install.bat`**.
+Dans l'explorateur de fichiers, double-cliquer sur **`install.bat`**. C'est
+la seule action manuelle de toute l'installation — tout le reste est
+automatique.
 
 (Équivalent en ligne de commande : `powershell -ExecutionPolicy Bypass -File install.ps1`)
 
 Le script :
-1. Vérifie que Docker fonctionne
-2. Génère `.env` avec une clé secrète, un mot de passe de base de données et
+1. Vérifie WSL2 — l'active automatiquement s'il ne l'est pas encore
+   (redémarrage Windows requis dans ce cas précis, voir section 1)
+2. Vérifie Docker Desktop — le télécharge et l'installe automatiquement s'il
+   est absent (quelques minutes)
+3. Démarre Docker et attend qu'il soit prêt
+4. Ajoute la règle de pare-feu (accès depuis le réseau local)
+5. Génère `.env` avec une clé secrète, un mot de passe de base de données et
    un mot de passe administrateur générés aléatoirement (si `.env` n'existe
    pas déjà)
-3. Construit les images (quelques minutes la première fois)
-4. Démarre la base de données et attend qu'elle soit prête
-5. Applique les migrations, crée le compte administrateur, configure les
+6. Construit les images (quelques minutes la première fois)
+7. Démarre la base de données et attend qu'elle soit prête
+8. Applique les migrations, crée le compte administrateur, configure les
    permissions (RBAC)
-6. Démarre le backend et le site
-7. Vérifie que le site répond bien
+9. Démarre le backend et le site
+10. Vérifie que le site répond bien
+
+Une invite de sécurité Windows ("Voulez-vous autoriser cette application...")
+peut apparaître une fois au début si WSL2 ou Docker Desktop doivent être
+installés — cliquer sur **Oui**. Si tout est déjà installé sur ce PC, aucune
+invite n'apparaît.
 
 **À la fin, le script affiche l'URL et les identifiants administrateur —
 notez-les, le mot de passe n'est affiché qu'une seule fois** (il reste
@@ -236,9 +228,31 @@ docker compose exec db pg_dump -U recup_user recup_indurex | Out-File -Encoding 
 
 ## 10. Dépannage
 
-**`docker version` échoue ou Docker Desktop ne démarre pas**
-→ Vérifier que la virtualisation est activée dans le BIOS/UEFI du serveur
-(Intel VT-x / AMD-V) et que WSL2 est bien installé (`wsl --status`).
+**`install.bat` affiche une erreur de virtualisation, ou Docker ne démarre
+jamais après son installation**
+→ C'est le seul point que le script ne peut pas activer à la place de
+l'utilisateur : la virtualisation (Intel VT-x / AMD-V) doit être activée
+dans le BIOS/UEFI du PC. Redémarrer, entrer dans le BIOS (touche Suppr/F2/F10
+selon le fabricant, affichée au tout début du démarrage), chercher une
+option "Virtualization Technology", "Intel VT-x" ou "SVM Mode" et l'activer,
+puis enregistrer et relancer `install.bat`.
+
+**L'invite de sécurité Windows a été refusée ou fermée par erreur**
+→ Relancer simplement `install.bat` et accepter l'invite cette fois.
+
+**Après le redémarrage automatique, l'installation ne reprend pas toute
+seule**
+→ Se reconnecter sur le compte Windows utilisé pour l'installation (la
+reprise automatique est propre à ce compte), ou double-cliquer à nouveau sur
+`install.bat` — il reprendra exactement là où il s'était arrêté.
+
+**Le téléchargement de Docker Desktop échoue ("Echec du telechargement")**
+→ Ce PC n'a pas accès à internet, ou un pare-feu/proxy d'entreprise bloque
+le téléchargement. Télécharger Docker Desktop manuellement depuis
+[docker.com](https://www.docker.com/products/docker-desktop) sur un PC qui a
+accès à internet, le transférer sur ce PC (clé USB), l'installer normalement
+(cocher "Use WSL 2 instead of Hyper-V"), puis relancer `install.bat` — il
+détectera que Docker est déjà installé et passera directement à la suite.
 
 **Le site ne répond pas après installation (`status.bat` montre une erreur)**
 → `docker compose logs backend --tail 100` et `docker compose logs nginx --tail 50`
@@ -248,8 +262,10 @@ IIS ou un autre service — l'arrêter, ou changer le port dans
 relancer `install.bat`.
 
 **Un collègue sur le réseau local n'arrive pas à accéder au site**
-→ Vérifier la règle de pare-feu (section 1.3) et que l'IP utilisée est bien
-celle du serveur (`ipconfig`), pas `localhost`.
+→ Vérifier que la règle de pare-feu a bien été créée (`install.bat` l'ajoute
+automatiquement — sinon, voir le message affiché à l'étape "Verification du
+pare-feu" lors de l'installation) et que l'IP utilisée est bien celle du
+serveur (`ipconfig`), pas `localhost`.
 
 **Mot de passe administrateur perdu**
 → `docker compose exec backend python manage.py changepassword admin`
