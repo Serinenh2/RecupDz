@@ -144,10 +144,10 @@ function CodesPicker({ value, onChange }) {
 }
 
 // ── Operateur Form ────────────────────────────────────────────────────────────
-function OperateurForm({ operateur, onSave, onClose }) {
+function OperateurForm({ operateur, defaultType, onSave, onClose }) {
   const isEdit = !!operateur?.id
   const { register, handleSubmit, watch, setValue, reset } = useForm({
-    defaultValues: operateur || { type_operateur: 'GENERATEUR', statut: 'ACTIF' }
+    defaultValues: operateur || { type_operateur: defaultType || 'GENERATEUR', statut: 'ACTIF' }
   })
   const [saving,       setSaving]       = useState(false)
   const [codesValue,   setCodesValue]   = useState(operateur?.codes_dechets_autorises || '')
@@ -748,7 +748,7 @@ export default function OperateursPage() {
       {/* Form modal */}
       <Modal open={showForm} onClose={() => { setShowForm(false); setEditing(null) }}
         title={editing ? `Modifier — ${editing.raison_sociale}` : 'Nouvel opérateur'} size="max-w-3xl">
-        <OperateurForm operateur={editing} onSave={handleSave} onClose={() => { setShowForm(false); setEditing(null) }} />
+        <OperateurForm operateur={editing} defaultType={typeFilter} onSave={handleSave} onClose={() => { setShowForm(false); setEditing(null) }} />
       </Modal>
 
       {/* Detail panel */}
