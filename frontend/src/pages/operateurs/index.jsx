@@ -637,7 +637,7 @@ export default function OperateursPage() {
   const handleDelete = async (id) => {
     if (!window.confirm('Supprimer cet opérateur ?')) return
     try { await opAPI.delete(id); toast.success('Supprimé'); load() }
-    catch { toast.error('Erreur suppression') }
+    catch (e) { toast.error(e.response?.data?.error || 'Erreur suppression', { duration: 6000 }) }
   }
 
   const handleSave = () => { setShowForm(false); setEditing(null); load() }

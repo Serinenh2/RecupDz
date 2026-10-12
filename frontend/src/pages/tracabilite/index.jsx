@@ -719,6 +719,9 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
       if (!payload.prix_revient_global_ttc && payload.prix_revient_global_ttc !== 0) delete payload.prix_revient_global_ttc
       if (!payload.prix_revient_unitaire_ttc && payload.prix_revient_unitaire_ttc !== 0) delete payload.prix_revient_unitaire_ttc
       if (!payload.quantite_enfouie && payload.quantite_enfouie !== 0) delete payload.quantite_enfouie
+      if (!payload.date_reception) delete payload.date_reception
+      if (!payload.quantite_acceptee && payload.quantite_acceptee !== 0) delete payload.quantite_acceptee
+      if (!payload.quantite_refusee && payload.quantite_refusee !== 0) delete payload.quantite_refusee
       return payload
     }
 
@@ -950,7 +953,7 @@ function TracabiliteForm({ operation, lists, currentUser, onSave, onClose }) {
           </div>
           <div className="flex gap-3 pt-2 border-t border-[#E2E8F0]">
             <button type="button" onClick={()=>setEtape(3)} className="btn-secondary">Retour</button>
-            <Can do={isEdit ? 'traceability.change_trace' : 'traceability.add_trace'}>
+            <Can do={isEdit ? 'traceability.change_traceability' : 'traceability.add_traceability'}>
               <button type="submit" disabled={saving||allAlertes.length>0} className="btn-primary">
                 <Save size={15}/> {saving?'Enregistrement...':isEdit?'Mettre à jour':dechets.length>1?`Créer ${dechets.length} dossiers de traçabilité`:'Créer le dossier de traçabilité'}
               </button>

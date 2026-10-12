@@ -3,9 +3,16 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Q
+from django.db.models.deletion import ProtectedError
 from apps.accounts.permissions import ModulePermission
 from .models import Operateur
 from .serializers import OperateurSerializer, OperateurListSerializer
+
+# related_name -> libellé humain, pour un message d'erreur clair quand la
+# suppression est bloquée par un document déjà émis (ex: BL).
+PROTECTED_RELATIONS_LABELS = {
+    'bons_livraison_recus': 'bon(s) de livraison',
+}
 
 class OperateurViewSet(viewsets.ModelViewSet):
     module_label     = 'operateurs'
@@ -28,6 +35,24 @@ class OperateurViewSet(viewsets.ModelViewSet):
             # Ses propres opérateurs + les opérateurs partagés/institutionnels (sans propriétaire)
             return qs.filter(Q(recuperateur=recuperateur) | Q(recuperateur__isnull=True))
         return qs.filter(recuperateur__isnull=True)
+
+    def destroy(self, request, *args, **kwargs):
+        operateur = self.get_object()
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            # Compte par type de document protégé (related_name sur Operateur)
+            details = []
+            for related_name, label in PROTECTED_RELATIONS_LABELS.items():
+                count = getattr(operateur, related_name).count()
+                if count:
+                    details.append(f"{count} {label}")
+            message = (
+                f"Impossible de supprimer « {operateur.raison_sociale} » : il est référencé par "
+                f"{', '.join(details) if details else 'des documents déjà émis'}. "
+                "Désactivez-le plutôt (Statut → Inactif) pour le retirer des listes sans perdre l'historique."
+            )
+            return Response({'error': message}, status=400)
 
     def perform_create(self, serializer):
         recuperateur = getattr(self.request.user, 'recuperateur', None)
