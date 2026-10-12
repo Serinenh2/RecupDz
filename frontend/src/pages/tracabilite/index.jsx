@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import api from '../../api'
 import { useAuthStore } from '../../store'
+import { NOMENCLATURE_ENTREPRISE } from '../nomenclature/nomenclatureEntreprise'
 import DateInput from '../../components/common/DateInput'
 import { formatDateFR } from '../../utils/formatDate'
 import toast from 'react-hot-toast'
@@ -186,7 +187,7 @@ function RepartitionBuilder({ quantiteTotale, unite, lists, value, onChange }) {
 function emptyDechet() {
   return {
     _key: `d${Date.now()}${Math.random().toString(36).slice(2)}`,
-    typeDechet: '', sousCategorie: '', codeDechet: '', classe: '', designationChoisie: '',
+    typeDechet: '', catalogueRef: '', sousCategorie: '', codeDechet: '', classe: '', designationChoisie: '',
     designation_dechet: '', designation_ar: '', id_recup_dz: '',
     etat_physique: '', quantite: '', unite: 'KG', conditionnement: '', lieu_stockage: '',
     caracteristiques_danger: '', couleur: '', niveau_proprete: '',
@@ -212,9 +213,11 @@ function initLigneRepartitions(op) {
 function dechetFromOperation(op) {
   const base = emptyDechet()
   if (!op) return base
+  const catalogueItem = NOMENCLATURE_ENTREPRISE.find(item => item.designation === op.designation_dechet)
   return {
     ...base,
-    typeDechet: op.classe_dechet === 'MA' ? 'MA' : ['S','SD'].includes(op.classe_dechet) ? 'SD' : '',
+    typeDechet: catalogueItem ? 'CATALOGUE' : op.classe_dechet === 'MA' ? 'MA' : ['S','SD'].includes(op.classe_dechet) ? 'SD' : '',
+    catalogueRef: catalogueItem?.reference || '',
     codeDechet: op.code_dechet || '',
     classe: op.classe_dechet || '',
     designation_dechet: op.designation_dechet || '',
@@ -311,12 +314,36 @@ function DechetLigneForm({ index, value, onChange, onRemove, canRemove, currentU
 
       <F label="Type de déchets" req>
         <select value={value.typeDechet} className="input"
-          onChange={e => update({ typeDechet: e.target.value, sousCategorie: '', codeDechet: '', classe: '', designationChoisie: '', designation_dechet: '' })}>
+          onChange={e => update({ typeDechet: e.target.value, catalogueRef: '', sousCategorie: '', codeDechet: '', classe: '', designationChoisie: '', designation_dechet: '' })}>
           <option value="">-- Sélectionner un type --</option>
+          <option value="CATALOGUE">Mon catalogue</option>
           <option value="MA">Déchets ménagers et assimilés</option>
           <option value="SD">Déchets spéciaux et spéciaux dangereux</option>
         </select>
       </F>
+
+      {value.typeDechet === 'CATALOGUE' && (
+        <F label="Article du catalogue" req>
+          <select value={value.catalogueRef} className="input"
+            onChange={e => {
+              const item = NOMENCLATURE_ENTREPRISE.find(x => x.reference === e.target.value)
+              if (item) update({
+                catalogueRef: item.reference,
+                designation_dechet: item.designation,
+                codeDechet: item.code_dechet,
+                classe: item.classe,
+                designationChoisie: '',
+                unite: item.conditionnement === 'Unité' ? 'UNITE' : 'KG',
+              })
+              else update({ catalogueRef: '', designation_dechet: '', codeDechet: '', classe: '' })
+            }}>
+            <option value="">-- Sélectionner un article --</option>
+            {NOMENCLATURE_ENTREPRISE.map(item => (
+              <option key={item.reference} value={item.reference}>{item.designation} — {item.reference}</option>
+            ))}
+          </select>
+        </F>
+      )}
 
       {value.typeDechet === 'MA' && (
         <>

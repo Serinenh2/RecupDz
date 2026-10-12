@@ -42,16 +42,28 @@ def _ensure_recuperateur_fiche(user):
     if user.role != 'RECUPERATEUR':
         return
     from apps.recuperateurs.models import Recuperateur
+    from apps.recuperateurs.models_specialisation import DetailSpecialisation
     if Recuperateur.objects.filter(user=user).exists():
         return
     nom = f"{user.first_name} {user.last_name}".strip() or user.username
-    Recuperateur.objects.create(
+    recuperateur = Recuperateur.objects.create(
         user=user,
         type_recuperateur='SANS_AGREMENT',
         nom_raison_sociale=nom,
         responsable=nom,
         email=user.email,
     )
+    # Sans ça, la page Traçabilité (type "Déchets ménagers et assimilés")
+    # affiche "Aucune catégorie ne vous a été assignée" tant qu'un Super
+    # Admin n'a pas été coché manuellement sa spécialisation dans Django
+    # Admin — on assigne donc par défaut les codes d'emballage courants
+    # (ceux de "Mon catalogue"), modifiable ensuite si besoin.
+    emballage_details = DetailSpecialisation.objects.filter(
+        sous_categorie__nom="Déchets d'emballage",
+        codes_nomenclature__isnull=False,
+    ).distinct()
+    if emballage_details.exists():
+        recuperateur.specialisation_details.add(*emballage_details)
 
 
 class RoleSerializer(serializers.ModelSerializer):
