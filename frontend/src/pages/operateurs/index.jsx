@@ -36,8 +36,9 @@ export const TYPE_CFG = {
   MINISTERE:    { label: "Ministère de l'Environnement",         icon: Landmark,   color: 'bg-violet-500',   light: 'bg-violet-50 text-violet-700 border-violet-200',     badge: 'bg-violet-100 text-violet-800'  },
 }
 
-// Types needing agrément
-const TYPES_AGREMENT = ['GENERATEUR', 'TRANSPORTEUR', 'ELIMINATEUR']
+// Types toujours soumis à agrément — un Transporteur n'en a besoin que s'il
+// manipule des déchets spéciaux ou spéciaux dangereux (S/SD), voir needsAgrement.
+const TYPES_AGREMENT_TOUJOURS = ['ELIMINATEUR']
 
 // Defined once at module scope (not inside the form component) so its identity
 // stays stable across re-renders — otherwise React remounts the wrapped <input>
@@ -158,8 +159,14 @@ function OperateurForm({ operateur, defaultType, onSave, onClose }) {
   const duree   = watch('duree_agrement')
   const dDebut  = watch('date_debut_agrement')
 
-  const needsAgrement = TYPES_AGREMENT.includes(type)
-  const isTransporteur= type === 'TRANSPORTEUR'
+  const isTransporteur = type === 'TRANSPORTEUR'
+  const hasDangerousCodes = useMemo(() =>
+    codesValue.split(',').map(s => s.trim()).filter(Boolean).some(code => {
+      const n = NOMENCLATURE.find(x => x.code === code)
+      return n && (n.classe === 'S' || n.classe === 'SD')
+    })
+  , [codesValue])
+  const needsAgrement = TYPES_AGREMENT_TOUJOURS.includes(type) || (isTransporteur && hasDangerousCodes)
 
   useEffect(() => {
     if (wilaya) setCommunes(getCommunesByWilaya(wilaya))
@@ -279,10 +286,12 @@ function OperateurForm({ operateur, defaultType, onSave, onClose }) {
               <DateInput value={watch('date_fin_agrement')||''} onChange={v=>setValue('date_fin_agrement',v)} />
             </F>
           </div>
-          <div>
-            <label className="label">Codes déchets autorisés par l'agrément</label>
-            <CodesPicker value={codesValue} onChange={setCodesValue} />
-          </div>
+          {!isTransporteur && (
+            <div>
+              <label className="label">Codes déchets autorisés par l'agrément</label>
+              <CodesPicker value={codesValue} onChange={setCodesValue} />
+            </div>
+          )}
         </div>
       )}
 
@@ -300,6 +309,16 @@ function OperateurForm({ operateur, defaultType, onSave, onClose }) {
             <F label="Nom du conducteur">
               <input {...register('nom_conducteur')} className="input" placeholder="Nom et prénom" />
             </F>
+          </div>
+          <div>
+            <label className="label">Codes déchets transportés</label>
+            <CodesPicker value={codesValue} onChange={setCodesValue} />
+            {!hasDangerousCodes && (
+              <p className="text-xs text-slate-400 mt-1.5">
+                Aucun agrément requis pour des déchets ménagers/assimilés ou inertes. Il devient
+                obligatoire dès qu'un code spécial (S) ou spécial dangereux (SD) est sélectionné ci-dessus.
+              </p>
+            )}
           </div>
         </div>
       )}

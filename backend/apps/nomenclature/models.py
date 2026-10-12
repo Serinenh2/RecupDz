@@ -66,3 +66,35 @@ class DesignationDechet(models.Model):
 
     def __str__(self):
         return f"[{self.id_recup_dz}] {self.designation} ({self.nomenclature.code})"
+
+
+class CatalogueEntreprise(models.Model):
+    """
+    "Mon catalogue" — les articles qu'un récupérateur manipule habituellement
+    (ex: Palette de PEHD, BigBag, Cartons déchets...), avec leur référence
+    interne et leur rattachement optionnel à un code officiel du Décret 06-104.
+    Alimente les listes déroulantes "Description (Nature des déchets)" sur les
+    documents (BC/BL/Facture) et "Article du catalogue" en Traçabilité.
+    Chaque récupérateur gère son propre catalogue.
+    """
+    CONDITIONNEMENT_CHOICES = [
+        ('Kilogramme', 'Kilogramme'),
+        ('Unité',      'Unité'),
+    ]
+    recuperateur    = models.ForeignKey('recuperateurs.Recuperateur', on_delete=models.CASCADE,
+                        related_name='catalogue')
+    designation     = models.CharField(max_length=300)
+    reference       = models.CharField(max_length=100, blank=True)
+    conditionnement = models.CharField(max_length=50, choices=CONDITIONNEMENT_CHOICES, blank=True)
+    nomenclature    = models.ForeignKey(Nomenclature, on_delete=models.SET_NULL,
+                        null=True, blank=True, related_name='catalogue_entreprise',
+                        help_text="Code déchet officiel correspondant (optionnel)")
+    created_at      = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['designation']
+        verbose_name = "Article du catalogue"
+        verbose_name_plural = "Mon catalogue (par récupérateur)"
+
+    def __str__(self):
+        return f"{self.designation} ({self.reference})" if self.reference else self.designation

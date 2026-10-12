@@ -3,8 +3,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Nomenclature, DesignationDechet
-from .serializers import NomenclatureSerializer, DesignationDechetSerializer
+from apps.accounts.permissions import ModulePermission
+from .models import Nomenclature, DesignationDechet, CatalogueEntreprise
+from .serializers import NomenclatureSerializer, DesignationDechetSerializer, CatalogueEntrepriseSerializer
 
 class NomenclatureViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -38,6 +39,32 @@ class NomenclatureViewSet(viewsets.ReadOnlyModelViewSet):
                     # Spécialisation pas encore assignée → aucun code (évite de tout montrer par erreur)
                     qs = qs.none()
         return qs
+
+
+class CatalogueEntrepriseViewSet(viewsets.ModelViewSet):
+    """
+    "Mon catalogue" — CRUD scopé au récupérateur connecté (chacun ne voit et
+    ne gère que son propre catalogue ; Admin/Super Admin voient tout).
+    """
+    module_label     = 'nomenclature'
+    permission_classes = [ModulePermission]
+    serializer_class = CatalogueEntrepriseSerializer
+    queryset         = CatalogueEntreprise.objects.all()
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = CatalogueEntreprise.objects.select_related('nomenclature')
+        user = self.request.user
+        if user.is_superuser or user.has_role('SUPERADMIN', 'ADMIN'):
+            return qs
+        recuperateur = getattr(user, 'recuperateur', None)
+        if recuperateur is not None:
+            return qs.filter(recuperateur=recuperateur)
+        return qs.none()
+
+    def perform_create(self, serializer):
+        recuperateur = getattr(self.request.user, 'recuperateur', None)
+        serializer.save(recuperateur=recuperateur)
 
 
 @api_view(['GET'])

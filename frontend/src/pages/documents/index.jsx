@@ -94,23 +94,6 @@ const DSD_ST = {
 
 const SD_CODES = useMemo => NOMENCLATURE.filter(n => ['S','SD'].includes(n.classe))
 
-const DECHETS_MENAGERS = [
-  'Déchets ménagers mélangés',
-  'Papier et carton',
-  'Verre',
-  'Plastiques divers',
-  'Métaux ferreux',
-  'Métaux non ferreux',
-  'Textiles et vêtements',
-  'Déchets verts / de jardin',
-  "Déchets d'emballage",
-  'Encombrants ménagers',
-  'Déchets alimentaires',
-  'Bois et dérivés',
-  "Déchets d'équipements électriques et électroniques (DEEE)",
-  'Déchets inertes de chantier',
-]
-
 function Spinner() {
   return <div className="flex justify-center py-12"><div className="w-7 h-7 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"/></div>
 }
@@ -203,55 +186,50 @@ function CodeDechetPicker({ value, onChange }) {
   )
 }
 
-// ── Description Déchet Picker (full nomenclature, used by BL lines) ──────────
+// ── Description Déchet Picker (Mon catalogue — saisie libre ou sélection) ────
+// L'utilisateur peut taper n'importe quelle description à la main (elle est
+// enregistrée à chaque frappe) ou cliquer une suggestion de Mon catalogue
+// pour aller plus vite — les deux sont possibles, aucun n'est obligatoire.
 function DescriptionDechetPicker({ value, onChange }) {
-  const [search, setSearch] = useState(value || '')
-  const [open,   setOpen]   = useState(false)
-  const [dirty,  setDirty]  = useState(false)
+  const [open, setOpen] = useState(false)
+  const [catalogue, setCatalogue] = useState([])
 
-  useEffect(() => { setSearch(value || ''); setDirty(false) }, [value])
-
-  // Tant que l'utilisateur n'a pas retapé, on ignore la valeur pré-remplie pour le
-  // filtrage (elle peut venir d'une ancienne saisie libre qui ne correspond à aucune
-  // rubrique de la nomenclature) et on affiche la liste complète à l'ouverture.
-  const filterText = dirty ? search : ''
+  useEffect(() => {
+    api.get('/nomenclature/catalogue-entreprise/').then(r => setCatalogue(r.data.results || r.data)).catch(() => {})
+  }, [])
 
   const filtered = useMemo(() =>
-    NOMENCLATURE
-      .filter(n =>
-        !filterText ||
-        n.code.includes(filterText.split(' ')[0]) ||
-        n.nom_fr.toLowerCase().includes(filterText.toLowerCase())
-      )
-      .slice(0, 40)
-  , [filterText])
+    catalogue.filter(item =>
+      !value ||
+      item.designation.toLowerCase().includes(value.toLowerCase()) ||
+      (item.reference || '').toLowerCase().includes(value.toLowerCase())
+    )
+  , [value, catalogue])
 
-  const select = (n) => {
-    setSearch(n.nom_fr)
-    setDirty(false)
+  const select = (item) => {
+    onChange(item.designation)
     setOpen(false)
-    onChange(n.nom_fr)
   }
 
   return (
     <div className="relative">
       <input
-        value={search}
-        onChange={e => { setSearch(e.target.value); setDirty(true); setOpen(true) }}
+        value={value || ''}
+        onChange={e => { onChange(e.target.value); setOpen(true) }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        placeholder="Plastique PET..."
+        placeholder="Palette de PEHD, Cartons déchets... ou saisie libre"
         className="input"
       />
       {open && (
         <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-white dark:bg-[#16240D] border border-[#E2E8F0] rounded-xl shadow-xl max-h-52 overflow-y-auto">
           {filtered.length === 0 ? (
-            <p className="text-center py-4 text-slate-400 text-xs">Aucun résultat</p>
-          ) : filtered.map(n => (
-            <button key={n.code} type="button" onClick={() => select(n)}
+            <p className="text-center py-4 text-slate-400 text-xs">Aucun article de Mon catalogue ne correspond — la saisie libre sera conservée</p>
+          ) : filtered.map(item => (
+            <button key={item.id} type="button" onClick={() => select(item)}
               className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-[#16240D] text-xs">
-              <span className="font-mono font-bold text-primary-700 flex-shrink-0 w-16">{n.code}</span>
-              <span className="text-slate-600 dark:text-slate-300 truncate">{n.nom_fr}</span>
+              <span className="font-mono font-bold text-primary-700 flex-shrink-0">{item.reference}</span>
+              <span className="text-slate-600 dark:text-slate-300 truncate">{item.designation}</span>
             </button>
           ))}
         </div>
@@ -518,20 +496,11 @@ function BLForm({ bl, currentUser, dossiers = [], recuperateurs = [], onSave, on
               </div>
               <div className="col-span-9">
                 {i===0 && <label className="label text-[10px]">Description (Nature des déchets)</label>}
-                {watch('destinataire_type') === 'CET' ? (
-                  <select {...register(`lignes.${i}.description`)} className="input">
-                    <option value="">— Sélectionner la désignation —</option>
-                    {DECHETS_MENAGERS.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                ) : (
-                  <>
-                    <DescriptionDechetPicker
-                      value={watch(`lignes.${i}.description`) || ''}
-                      onChange={text => setValue(`lignes.${i}.description`, text)}
-                    />
-                    <input type="hidden" {...register(`lignes.${i}.description`)} />
-                  </>
-                )}
+                <DescriptionDechetPicker
+                  value={watch(`lignes.${i}.description`) || ''}
+                  onChange={text => setValue(`lignes.${i}.description`, text)}
+                />
+                <input type="hidden" {...register(`lignes.${i}.description`)} />
               </div>
             </div>
             <div className="grid grid-cols-12 gap-2 items-end">

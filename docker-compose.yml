@@ -164,7 +164,8 @@ services:
        python manage.py setup_rbac 2>/dev/null || true &&
        python manage.py seed_nomenclature_complete &&
        python manage.py seed_designations &&
-       python manage.py seed_specialisation_default"
+       python manage.py seed_specialisation_default &&
+       python manage.py seed_catalogue_indurex"
     volumes:
       - backend_media:/app/media
       - backend_static:/app/staticfiles

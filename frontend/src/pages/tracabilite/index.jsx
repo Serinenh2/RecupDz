@@ -9,7 +9,6 @@ import {
 } from 'lucide-react'
 import api from '../../api'
 import { useAuthStore } from '../../store'
-import { NOMENCLATURE_ENTREPRISE } from '../nomenclature/nomenclatureEntreprise'
 import DateInput from '../../components/common/DateInput'
 import { formatDateFR } from '../../utils/formatDate'
 import toast from 'react-hot-toast'
@@ -213,11 +212,13 @@ function initLigneRepartitions(op) {
 function dechetFromOperation(op) {
   const base = emptyDechet()
   if (!op) return base
-  const catalogueItem = NOMENCLATURE_ENTREPRISE.find(item => item.designation === op.designation_dechet)
   return {
     ...base,
-    typeDechet: catalogueItem ? 'CATALOGUE' : op.classe_dechet === 'MA' ? 'MA' : ['S','SD'].includes(op.classe_dechet) ? 'SD' : '',
-    catalogueRef: catalogueItem?.reference || '',
+    // Mon catalogue n'est plus détectable de façon synchrone (le catalogue est
+    // désormais chargé depuis l'API par récupérateur) — un dossier créé via
+    // Mon catalogue se rouvre donc via la cascade générique MA, avec les mêmes
+    // code/classe/désignation déjà enregistrés.
+    typeDechet: op.classe_dechet === 'MA' ? 'MA' : ['S','SD'].includes(op.classe_dechet) ? 'SD' : '',
     codeDechet: op.code_dechet || '',
     classe: op.classe_dechet || '',
     designation_dechet: op.designation_dechet || '',
@@ -240,6 +241,53 @@ function dechetFromOperation(op) {
     motif_refus: op.motif_refus || '',
     repartitions: initLigneRepartitions(op),
   }
+}
+
+// ── Article du catalogue — saisie libre ou sélection ─────────────────────────
+// L'utilisateur peut taper une désignation à la main (enregistrée à chaque
+// frappe) ou cliquer une suggestion de Mon catalogue pour associer directement
+// son code déchet réglementaire — les deux sont possibles.
+function CatalogueArticlePicker({ designation, onPick, onTypeText }) {
+  const [open, setOpen] = useState(false)
+  const [catalogue, setCatalogue] = useState([])
+
+  useEffect(() => {
+    api.get('/nomenclature/catalogue-entreprise/').then(r => setCatalogue(r.data.results || r.data)).catch(() => {})
+  }, [])
+
+  const filtered = useMemo(() =>
+    catalogue.filter(item =>
+      !designation ||
+      item.designation.toLowerCase().includes(designation.toLowerCase()) ||
+      (item.reference || '').toLowerCase().includes(designation.toLowerCase())
+    )
+  , [designation, catalogue])
+
+  return (
+    <div className="relative">
+      <input
+        value={designation || ''}
+        onChange={e => { onTypeText(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="Palette de PEHD, Cartons déchets... ou saisie libre"
+        className="input"
+      />
+      {open && (
+        <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-white dark:bg-[#16240D] border border-[#E2E8F0] rounded-xl shadow-xl max-h-52 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <p className="text-center py-4 text-slate-400 text-xs">Aucun article de Mon catalogue ne correspond — la saisie libre sera conservée</p>
+          ) : filtered.map(item => (
+            <button key={item.id} type="button" onClick={() => { onPick(item); setOpen(false) }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-[#16240D] text-xs">
+              <span className="font-mono font-bold text-primary-700 flex-shrink-0">{item.reference}</span>
+              <span className="text-slate-600 dark:text-slate-300 truncate">{item.designation}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function DechetLigneForm({ index, value, onChange, onRemove, canRemove, currentUser, isRecup, recupId, onAlertesChange }) {
@@ -324,24 +372,23 @@ function DechetLigneForm({ index, value, onChange, onRemove, canRemove, currentU
 
       {value.typeDechet === 'CATALOGUE' && (
         <F label="Article du catalogue" req>
-          <select value={value.catalogueRef} className="input"
-            onChange={e => {
-              const item = NOMENCLATURE_ENTREPRISE.find(x => x.reference === e.target.value)
-              if (item) update({
-                catalogueRef: item.reference,
-                designation_dechet: item.designation,
-                codeDechet: item.code_dechet,
-                classe: item.classe,
-                designationChoisie: '',
-                unite: item.conditionnement === 'Unité' ? 'UNITE' : 'KG',
-              })
-              else update({ catalogueRef: '', designation_dechet: '', codeDechet: '', classe: '' })
-            }}>
-            <option value="">-- Sélectionner un article --</option>
-            {NOMENCLATURE_ENTREPRISE.map(item => (
-              <option key={item.reference} value={item.reference}>{item.designation} — {item.reference}</option>
-            ))}
-          </select>
+          <CatalogueArticlePicker
+            designation={value.designation_dechet}
+            onTypeText={text => update({ designation_dechet: text, catalogueRef: '', codeDechet: '', classe: '' })}
+            onPick={item => update({
+              catalogueRef: item.reference,
+              designation_dechet: item.designation,
+              codeDechet: item.code_dechet,
+              classe: item.classe,
+              designationChoisie: '',
+              unite: item.conditionnement === 'Unité' ? 'UNITE' : 'KG',
+            })}
+          />
+          {!value.codeDechet && (
+            <p className="text-xs text-amber-600 mt-1.5">
+              Sélectionnez un article dans la liste pour associer son code déchet réglementaire (nécessaire pour créer le dossier).
+            </p>
+          )}
         </F>
       )}
 

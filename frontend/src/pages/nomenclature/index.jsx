@@ -1,7 +1,9 @@
-import { useState, useMemo } from 'react'
-import { Search, X, Package, AlertTriangle, Leaf, Info, ChevronDown, ChevronRight, BookOpen } from 'lucide-react'
-import { NOMENCLATURE_ENTREPRISE } from './nomenclatureEntreprise'
+import { useState, useMemo, useEffect } from 'react'
+import { Search, X, Package, AlertTriangle, Leaf, Info, ChevronDown, ChevronRight, BookOpen, Plus, Edit, Trash2 } from 'lucide-react'
 import { NOMENCLATURE, FAMILLES } from './nomenclatureData'
+import api from '../../api'
+import toast from 'react-hot-toast'
+import { Can } from '../../components/guards'
 
 const COND_BADGE = {
   Kilogramme: 'badge-blue',
@@ -181,24 +183,169 @@ function Rubrique({ title, subtitle, icon: Icon, iconBg, items, showDanger, onSe
   )
 }
 
+// ── Modal wrapper ────────────────────────────────────────────────────────────
+function ArticleModal({ open, onClose, title, children }) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-[#16240D] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0] dark:border-[#2B3D1E] flex-shrink-0">
+          <h3 className="font-bold text-slate-900 dark:text-white">{title}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1"><X size={18} /></button>
+        </div>
+        <div className="p-6 overflow-y-auto">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+// ── Code déchet officiel picker (recherche dans les 193 codes du backend) ────
+function CodeOfficielPicker({ value, onChange }) {
+  const [all, setAll] = useState([])
+  const [search, setSearch] = useState('')
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => { api.get('/nomenclature/').then(r => setAll(r.data.results || r.data)).catch(() => {}) }, [])
+
+  const filtered = useMemo(() => {
+    if (!search) return []
+    const q = search.toLowerCase()
+    return all.filter(n => n.code.toLowerCase().includes(q) || n.designation_fr.toLowerCase().includes(q)).slice(0, 30)
+  }, [search, all])
+
+  return (
+    <div className="relative">
+      <input
+        value={search}
+        onChange={e => { setSearch(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder={value ? `${value.code} — ${value.designation_fr}` : 'Rechercher un code déchet officiel (optionnel)...'}
+        className="input"
+      />
+      {value && !search && (
+        <button type="button" onClick={() => onChange(null)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500">
+          <X size={14} />
+        </button>
+      )}
+      {open && search && (
+        <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-white dark:bg-[#16240D] border border-[#E2E8F0] rounded-xl shadow-xl max-h-52 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <p className="text-center py-4 text-slate-400 text-xs">Aucun résultat</p>
+          ) : filtered.map(n => (
+            <button key={n.id} type="button" onClick={() => { onChange(n); setSearch(''); setOpen(false) }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-[#16240D] text-xs">
+              <span className="font-mono font-bold text-primary-700 flex-shrink-0 w-16">{n.code}</span>
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold flex-shrink-0 ${CLASSE_CFG[n.classe]?.badge || 'badge-gray'}`}>{n.classe}</span>
+              <span className="text-slate-600 dark:text-slate-300 truncate">{n.designation_fr}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Formulaire d'ajout / modification d'un article ───────────────────────────
+function ArticleForm({ item, onSave, onClose }) {
+  const isEdit = !!item?.id
+  const [designation, setDesignation]         = useState(item?.designation || '')
+  const [reference, setReference]             = useState(item?.reference || '')
+  const [conditionnement, setConditionnement] = useState(item?.conditionnement || 'Kilogramme')
+  const [codeObj, setCodeObj]                 = useState(
+    item?.code_dechet ? { id: item.nomenclature, code: item.code_dechet, designation_fr: item.designation } : null
+  )
+  const [saving, setSaving] = useState(false)
+
+  const onSubmit = async (e) => {
+    e.preventDefault()
+    if (!designation.trim()) { toast.error('La désignation est requise'); return }
+    setSaving(true)
+    try {
+      const payload = { designation, reference, conditionnement, nomenclature: codeObj?.id || null }
+      if (isEdit) await api.patch(`/nomenclature/catalogue-entreprise/${item.id}/`, payload)
+      else        await api.post('/nomenclature/catalogue-entreprise/', payload)
+      toast.success(isEdit ? 'Article mis à jour' : 'Article ajouté à Mon catalogue')
+      onSave()
+    } catch {
+      toast.error('Erreur lors de la sauvegarde')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div>
+        <label className="label">Désignation <span className="text-red-500">*</span></label>
+        <input value={designation} onChange={e => setDesignation(e.target.value)} className="input"
+          placeholder="ex: Palette de PEHD" autoFocus />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label">Référence</label>
+          <input value={reference} onChange={e => setReference(e.target.value)} className="input" placeholder="ex: COMPALPEHD" />
+        </div>
+        <div>
+          <label className="label">Conditionnement</label>
+          <select value={conditionnement} onChange={e => setConditionnement(e.target.value)} className="input">
+            <option value="Kilogramme">Kilogramme</option>
+            <option value="Unité">Unité</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label className="label">Code déchet officiel</label>
+        <CodeOfficielPicker value={codeObj} onChange={setCodeObj} />
+      </div>
+      <div className="flex gap-3 pt-2 border-t border-[#E2E8F0] dark:border-[#2B3D1E]">
+        <button type="submit" disabled={saving} className="btn-primary">
+          {saving ? 'Enregistrement...' : isEdit ? 'Mettre à jour' : "Ajouter l'article"}
+        </button>
+        <button type="button" onClick={onClose} className="btn-secondary">Annuler</button>
+      </div>
+    </form>
+  )
+}
+
 // ── Tab: Catalogue de l'entreprise ──────────────────────────────────────────────
 function CatalogueEntreprise() {
-  const [search, setSearch] = useState('')
+  const [items,    setItems]    = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [search,   setSearch]   = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [editing,  setEditing]  = useState(null)
+
+  const load = () => {
+    setLoading(true)
+    api.get('/nomenclature/catalogue-entreprise/')
+      .then(r => setItems(r.data.results || r.data))
+      .catch(() => toast.error('Erreur chargement du catalogue'))
+      .finally(() => setLoading(false))
+  }
+  useEffect(() => { load() }, [])
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Supprimer cet article du catalogue ?')) return
+    try { await api.delete(`/nomenclature/catalogue-entreprise/${id}/`); toast.success('Article supprimé'); load() }
+    catch { toast.error('Erreur suppression') }
+  }
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    return NOMENCLATURE_ENTREPRISE.filter(item =>
+    return items.filter(item =>
       !q ||
       item.designation.toLowerCase().includes(q) ||
-      item.reference.toLowerCase().includes(q) ||
+      (item.reference || '').toLowerCase().includes(q) ||
       (item.code_dechet || '').toLowerCase().includes(q)
     )
-  }, [search])
+  }, [items, search])
 
   return (
     <div className="space-y-5">
-      <div className="card p-4">
-        <div className="relative">
+      <div className="card p-4 flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-56">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Rechercher par désignation, référence ou code déchet..."
@@ -209,11 +356,18 @@ function CatalogueEntreprise() {
             </button>
           )}
         </div>
+        <Can do="nomenclature.add_catalogueentreprise">
+          <button onClick={() => { setEditing(null); setShowForm(true) }} className="btn-primary btn-sm">
+            <Plus size={14} /> Ajouter une désignation déchets
+          </button>
+        </Can>
       </div>
 
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <p className="text-center py-10 text-slate-400 text-sm">Chargement...</p>
+          ) : filtered.length === 0 ? (
             <p className="text-center py-10 text-slate-400 text-sm">Aucun résultat</p>
           ) : (
             <table className="w-full text-sm">
@@ -223,19 +377,22 @@ function CatalogueEntreprise() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Référence</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-40">Code déchet</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-40">Conditionnement</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide w-20">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(item => (
-                  <tr key={item.reference} className="border-b border-gray-50 dark:border-[#2B3D1E] last:border-0 hover:bg-primary-50/40 dark:hover:bg-[#2B3D1E]/40 transition-colors">
+                  <tr key={item.id} className="border-b border-gray-50 dark:border-[#2B3D1E] last:border-0 hover:bg-primary-50/40 dark:hover:bg-[#2B3D1E]/40 transition-colors">
                     <td className="px-4 py-3 flex items-center gap-2 text-slate-800 dark:text-slate-100">
                       <Package size={14} className="text-primary-500 flex-shrink-0" />
                       {item.designation}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="font-mono text-xs font-bold text-primary-700 bg-primary-50 px-2 py-1 rounded">
-                        {item.reference}
-                      </span>
+                      {item.reference && (
+                        <span className="font-mono text-xs font-bold text-primary-700 bg-primary-50 px-2 py-1 rounded">
+                          {item.reference}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {item.code_dechet ? (
@@ -252,9 +409,21 @@ function CatalogueEntreprise() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`badge ${COND_BADGE[item.conditionnement] || 'badge-gray'}`}>
-                        {item.conditionnement}
-                      </span>
+                      {item.conditionnement && (
+                        <span className={`badge ${COND_BADGE[item.conditionnement] || 'badge-gray'}`}>
+                          {item.conditionnement}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <Can do="nomenclature.change_catalogueentreprise">
+                        <button onClick={() => { setEditing(item); setShowForm(true) }}
+                          className="btn-ghost p-1.5 text-slate-400 hover:text-primary-600"><Edit size={13} /></button>
+                      </Can>
+                      <Can do="nomenclature.delete_catalogueentreprise">
+                        <button onClick={() => handleDelete(item.id)}
+                          className="btn-ghost p-1.5 text-slate-400 hover:text-red-600"><Trash2 size={13} /></button>
+                      </Can>
                     </td>
                   </tr>
                 ))}
@@ -263,6 +432,13 @@ function CatalogueEntreprise() {
           )}
         </div>
       </div>
+
+      <ArticleModal open={showForm} onClose={() => { setShowForm(false); setEditing(null) }}
+        title={editing ? "Modifier l'article" : 'Ajouter une désignation déchets'}>
+        <ArticleForm item={editing}
+          onSave={() => { setShowForm(false); setEditing(null); load() }}
+          onClose={() => { setShowForm(false); setEditing(null) }} />
+      </ArticleModal>
     </div>
   )
 }
@@ -406,7 +582,7 @@ export default function NomenclaturePage() {
             ${tab==='entreprise'
               ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
               : 'border-[#E2E8F0] text-slate-600 hover:border-primary-300 bg-white dark:bg-[#16240D] dark:border-[#2B3D1E]'}`}>
-          <Package size={15}/> Mon catalogue ({NOMENCLATURE_ENTREPRISE.length})
+          <Package size={15}/> Mon catalogue
         </button>
         <button onClick={() => setTab('codes')}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all border-2

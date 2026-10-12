@@ -81,7 +81,17 @@ class Operateur(models.Model):
 
     @property
     def agrement_requis(self):
-        return self.type_operateur in ('GENERATEUR', 'TRANSPORTEUR', 'ELIMINATEUR')
+        if self.type_operateur == 'ELIMINATEUR':
+            return True
+        if self.type_operateur == 'TRANSPORTEUR':
+            # Un transporteur n'a besoin d'un agrément que s'il est enregistré
+            # pour des déchets spéciaux ou spéciaux dangereux (S/SD).
+            codes = self.codes_list
+            if not codes:
+                return False
+            from apps.nomenclature.models import Nomenclature
+            return Nomenclature.objects.filter(code__in=codes, classe__in=['S', 'SD']).exists()
+        return False
 
     @property
     def convention_date_fin(self):
