@@ -59,6 +59,12 @@ réseau, ou `git clone` si le dépôt est accessible depuis le serveur). Ne pas
 oublier : le dossier doit contenir `docker-compose.yml`, `backend/`,
 `frontend/`, `install.ps1`, `install.bat`.
 
+Si ce package inclut un dossier **`backup\`** (fichiers
+`recup_indurex_data.sql.gz` et `media_backup.tar.gz`), le copier aussi — il
+contient les données déjà saisies pour SARL Indurex (compte, fiche
+entreprise, logo, cachet, badges ISO) et permet de ne pas repartir de zéro
+(voir section 4).
+
 Destination conseillée : `C:\RecupIndurex\`
 
 **Ne pas copier** un éventuel fichier `.env` d'un autre environnement — le
@@ -88,7 +94,9 @@ Le script :
 **À la fin, le script affiche l'URL et les identifiants administrateur —
 notez-les, le mot de passe n'est affiché qu'une seule fois** (il reste
 cependant consultable dans le fichier `.env`, à conserver précieusement et
-à ne jamais partager).
+à ne jamais partager). **Si vous restaurez les données existantes de SARL
+Indurex (section 4 ci-dessous), ces identifiants générés seront remplacés —
+ce n'est pas un problème, passez directement à la section 4.**
 
 Le script est **sans risque à relancer** (idempotent) : si une étape échoue
 (coupure réseau pendant le build, etc.), corrigez le problème et relancez
@@ -96,24 +104,64 @@ Le script est **sans risque à relancer** (idempotent) : si une étape échoue
 
 ---
 
-## 4. Vérifier l'installation
+## 4. Restaurer les données existantes de SARL Indurex (optionnel, une seule fois)
+
+À faire **juste après `install.bat`**, uniquement si le dossier `backup\`
+est présent (voir section 2). Cette étape charge les données déjà saisies —
+compte `admin_indurex`, fiche entreprise complète, logo, cachet électronique
+et badges ISO 9001/14001/45001 — à la place d'une base vide.
+
+Double-cliquer sur **`restore-data.bat`**.
+
+(Équivalent en ligne de commande : `powershell -ExecutionPolicy Bypass -File restore-data.ps1`)
+
+Le script :
+1. Vérifie que `backup\recup_indurex_data.sql.gz` et `backup\media_backup.tar.gz` sont présents
+2. Restaure la base de données (comptes, fiche entreprise, nomenclature...)
+3. Vérifie que tout est à jour (migrations, permissions)
+4. Redémarre le backend et le site
+5. Restaure les fichiers (logo, cachet, badges ISO)
+6. Vérifie que le site répond bien
+
+**Important : après cette restauration, les identifiants générés par
+`install.bat` ne sont plus valables.** Utilisez les identifiants fournis
+avec ce package (voir `GUIDE_UTILISATION.md`) :
+- Administrateur : `admin`
+- Récupérateur (SARL Indurex) : `admin_indurex`
+
+Le script est **sans risque à relancer** — il remplace les comptes et
+données à chaque exécution par celles du dossier `backup\`, sans dupliquer
+quoi que ce soit.
+
+Si le dossier `backup\` n'est pas fourni avec ce package, ignorez cette
+section et passez directement à la section 6 (« Première configuration »)
+pour créer le compte de l'entreprise depuis zéro.
+
+---
+
+## 5. Vérifier l'installation
 
 - Depuis le serveur : http://localhost/
 - Depuis un autre poste du réseau : `http://<IP-du-serveur>/`
   (trouver l'IP avec `ipconfig` sur le serveur)
 
-Se connecter avec le compte administrateur affiché à la fin de
-l'installation.
+Se connecter avec le compte administrateur (celui affiché à la fin de
+l'installation, ou `admin` si les données existantes ont été restaurées —
+section 4).
 
 `status.bat` (à la racine du projet) affiche l'état des conteneurs et teste
 l'accès au site en une commande.
 
 ---
 
-## 5. Première configuration (après installation)
+## 6. Première configuration (si vous n'avez pas restauré de données existantes)
 
-L'application démarre avec une base de données vide — aucune donnée métier
-pré-remplie. Pour configurer le compte de l'entreprise elle-même :
+Si la section 4 a été utilisée, le compte `admin_indurex` et sa fiche
+entreprise (logo, ISO, cachet...) sont déjà prêts — cette section ne vous
+concerne pas.
+
+Sinon, l'application démarre avec une base de données vide — aucune donnée
+métier pré-remplie. Pour configurer le compte de l'entreprise elle-même :
 
 1. Se connecter avec le compte administrateur (`admin`)
 2. Aller dans **Utilisateurs → Nouvel utilisateur**
@@ -133,7 +181,7 @@ Observateur…) avec les permissions adaptées à chacun.
 
 ---
 
-## 6. Opérations courantes
+## 7. Opérations courantes
 
 | Besoin | Commande |
 |---|---|
@@ -152,7 +200,7 @@ manuelle. Vérifier avec `status.bat` après tout redémarrage du serveur.
 
 ---
 
-## 7. Sauvegardes
+## 8. Sauvegardes
 
 Une sauvegarde automatique quotidienne de la base de données peut être
 activée :
@@ -172,7 +220,7 @@ docker compose exec db pg_dump -U recup_user recup_indurex | Out-File -Encoding 
 
 ---
 
-## 8. Mise à jour vers une nouvelle version
+## 9. Mise à jour vers une nouvelle version
 
 1. Arrêter l'application : `stop.bat`
 2. Remplacer les fichiers du projet par la nouvelle version (en conservant
@@ -186,7 +234,7 @@ docker compose exec db pg_dump -U recup_user recup_indurex | Out-File -Encoding 
 
 ---
 
-## 9. Dépannage
+## 10. Dépannage
 
 **`docker version` échoue ou Docker Desktop ne démarre pas**
 → Vérifier que la virtualisation est activée dans le BIOS/UEFI du serveur
@@ -206,21 +254,29 @@ celle du serveur (`ipconfig`), pas `localhost`.
 **Mot de passe administrateur perdu**
 → `docker compose exec backend python manage.py changepassword admin`
 
+**`restore-data.bat` échoue avec "Fichiers de sauvegarde introuvables"**
+→ Vérifier que le dossier `backup\` (avec `recup_indurex_data.sql.gz` et
+`media_backup.tar.gz`) a bien été copié à la racine du projet, au même
+niveau que `restore-data.bat` (voir section 2).
+
 **Recommencer une installation propre (⚠️ supprime toutes les données)**
 ```powershell
 docker compose down -v
 del .env
 install.bat
 ```
+Pour repartir avec les données de SARL Indurex après une réinstallation
+propre, relancer ensuite `restore-data.bat` (section 4).
 
 ---
 
-## 10. Sécurité — à faire avant mise en production réelle
+## 11. Sécurité — à faire avant mise en production réelle
 
-- Changer le mot de passe administrateur généré automatiquement dès la
-  première connexion
+- Si vous êtes parti d'une base vide (section 6), changer le mot de passe
+  administrateur généré automatiquement dès la première connexion
 - Si le serveur est exposé au-delà du réseau local (accès internet), mettre
   en place HTTPS (certificat réel + nom de domaine) — voir
   `GUIDE_INSTALLATION.md` section Certbot pour la configuration SSL, ou
   placer un reverse proxy (IIS, Nginx, Cloudflare Tunnel) devant le port 80
-- Ne jamais partager ou committer le fichier `.env`
+- Ne jamais partager ou committer le fichier `.env` ni le dossier `backup\`
+  (il contient des mots de passe et des documents de l'entreprise)
