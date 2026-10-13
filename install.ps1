@@ -310,6 +310,29 @@ if (-not (Wait-ServiceHealthy "nginx" 60)) {
 }
 Write-Ok "Backend et frontend demarres"
 
+# --- 8b. Raccourci sur le Bureau -----------------------------------------------------
+Write-Step "Creation du raccourci sur le Bureau"
+$iconPath = Join-Path $PSScriptRoot "RecupIndurex.ico"
+if (Test-Path $iconPath) {
+    $shortcutContent = "[InternetShortcut]`r`nURL=http://localhost/`r`nIconFile=$iconPath`r`nIconIndex=0`r`n"
+} else {
+    $shortcutContent = "[InternetShortcut]`r`nURL=http://localhost/`r`n"
+}
+$shortcutCreated = $false
+try {
+    $publicDesktop = [Environment]::GetFolderPath("CommonDesktopDirectory")
+    Set-Content -Path (Join-Path $publicDesktop "RecupIndurex.url") -Value $shortcutContent -Encoding ASCII -Force -ErrorAction Stop
+    $shortcutCreated = $true
+} catch {
+    try {
+        $userDesktop = [Environment]::GetFolderPath("Desktop")
+        Set-Content -Path (Join-Path $userDesktop "RecupIndurex.url") -Value $shortcutContent -Encoding ASCII -Force -ErrorAction Stop
+        $shortcutCreated = $true
+    } catch {}
+}
+if ($shortcutCreated) { Write-Ok "Raccourci 'RecupIndurex' ajoute sur le Bureau" }
+else { Write-Warn "Raccourci non cree (non bloquant) - voir section suivante pour le creer a la main" }
+
 # --- 9. Verification finale -------------------------------------------------------
 Write-Step "Verification finale"
 $ok = $false
