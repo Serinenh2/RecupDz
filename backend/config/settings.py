@@ -148,7 +148,13 @@ if not DEBUG:
 # 🌐 CORS — Strict in production
 # ═══════════════════════════════════════════════════════════════
 _cors_origins_raw = os.getenv('DJANGO_CORS_ALLOWED_ORIGINS') or os.getenv('CORS_ALLOWED_ORIGINS', '')
-if _cors_origins_raw and not DEBUG:
+if _cors_origins_raw.strip() == '*':
+    # Deploiement reseau interne (pas expose a internet) - accessible depuis
+    # n'importe quelle IP/nom d'hote du reseau local sans reconfiguration,
+    # meme convention que ALLOWED_HOSTS='*' ci-dessus.
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOW_CREDENTIALS = True
+elif _cors_origins_raw and not DEBUG:
     CORS_ALLOW_ALL_ORIGINS = False
     CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins_raw.split(',') if o.strip()]
     CORS_ALLOW_CREDENTIALS = True
